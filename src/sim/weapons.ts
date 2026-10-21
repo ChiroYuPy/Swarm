@@ -37,14 +37,20 @@ function target(s: GameState, x: number, y: number, range: number): number {
   return s.grid.nearest(s.enemies, x, y, range, undefined, 0, true);
 }
 
-function aimAngle(s: GameState, p: Player, range: number): number {
+/** Angle vers la dernière cible trouvée par `aim`. */
+let AIM = 0;
+
+/** Vise l'ennemi le plus proche à portée. Renvoie false s'il n'y a personne (l'arme ne tire pas). */
+function aim(s: GameState, p: Player, range: number): boolean {
   const ti = target(s, p.x, p.y, range);
-  if (ti >= 0) {
-    const e = s.enemies[ti];
-    return datan2(e.y - p.y, e.x - p.x);
-  }
-  return datan2(p.faceY, p.faceX);
+  if (ti < 0) return false;
+  const e = s.enemies[ti];
+  AIM = datan2(e.y - p.y, e.x - p.x);
+  return true;
 }
+
+/** Personne à portée : l'arme reste chargée et réessaie bientôt. */
+const RETRY_TICKS = 6;
 
 function spawnBullet(
   s: GameState,
@@ -140,7 +146,11 @@ export function updateWeapons(s: GameState, p: Player): void {
 function projectile(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
-  const a = aimAngle(s, p, 640);
+  if (!aim(s, p, 640)) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
+  const a = AIM;
   const n = L.count ?? 1;
   const spread = L.spread ?? 0.2;
   for (let k = 0; k < n; k++) spawnBullet(s, p, slot, w.def, a + (k - (n - 1) / 2) * spread, L);
@@ -151,6 +161,10 @@ function projectile(s: GameState, p: Player, w: WeaponInst, slot: number, L: Wea
 function spiral(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
+  if (!aim(s, p, 640)) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
   const n = L.count ?? 3;
   for (let k = 0; k < n; k++) spawnBullet(s, p, slot, w.def, w.angle + (k * TWO_PI) / n, L);
   w.angle += L.rotStep ?? 0.4;
@@ -158,7 +172,7 @@ function spiral(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponL
   w.shots++;
   const every = L.burstEvery ?? 8;
   if (w.shots % every === 0) {
-    const a = aimAngle(s, p, 640);
+    const a = AIM;
     const bc = L.burstCount ?? 5;
     const spread = L.spread ?? 0.15;
     for (let k = 0; k < bc; k++) spawnBullet(s, p, slot, w.def, a + (k - (bc - 1) / 2) * spread, L);
@@ -232,6 +246,7 @@ function aura(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   const g = s.grid;
   const n = g.query(s.enemies, p.x, p.y, R);
   let heal = 0;
+  let hit = false;
   for (let q = 0; q < n; q++) {
     const idx = g.out[q];
     const e = s.enemies[idx];
@@ -246,8 +261,9 @@ function aura(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
     }
     damageEnemy(s, idx, dmg, p.index, 0, 0);
     heal += dmg * (L.lifesteal ?? 0);
+    hit = true;
   }
-  w.activeTicks = 8; // flash visuel du tic
+  if (hit) w.activeTicks = 8; // flash visuel du tic, seulement s'il a touché quelqu'un
   if (heal > 0) healPlayer(s, p, Math.min(heal, 4), false);
 }
 
@@ -287,8 +303,11 @@ function beam(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   }
   w.timer -= 1;
   if (w.timer > 0) return;
-  const a = aimAngle(s, p, len);
-  for (let b = 0; b < n; b++) w.angles[b] = a + (b * TWO_PI) / n;
+  if (!aim(s, p, len)) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
+  for (let b = 0; b < n; b++) w.angles[b] = AIM + (b * TWO_PI) / n;
   w.activeTicks = Math.round((L.duration ?? 0.4) * TICK_RATE);
   w.tickTimer = 0;
   w.timer += cdTicks(L, p);
@@ -298,6 +317,11 @@ function beam(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
 function mine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
+  // Les mines sont des pièges : on en pose dès que des ennemis approchent, pas dans le vide.
+  if (target(s, p.x, p.y, 400) < 0) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
   const n = L.count ?? 1;
   for (let k = 0; k < n; k++) {
     const a = w.angle + (k * TWO_PI) / n;
@@ -325,7 +349,11 @@ function mine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
 function boomerang(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
-  const a0 = aimAngle(s, p, 520);
+  if (!aim(s, p, 520)) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
+  const a0 = AIM;
   const n = L.count ?? 1;
   const speed = L.speed ?? 400;
   const range = L.range ?? 260;
@@ -397,7 +425,7 @@ function chain(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
     }
   }
   if (!fired) {
-    w.timer = 6; // personne à portée : on réessaie bientôt
+    w.timer = RETRY_TICKS;
     return;
   }
   w.timer += cdTicks(L, p);
@@ -423,6 +451,10 @@ function pulse(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLe
   }
   w.timer -= 1;
   if (w.timer > 0) return;
+  if (target(s, p.x, p.y, (L.radius ?? 140) * p.stats.area + 40) < 0) {
+    w.timer = RETRY_TICKS;
+    return;
+  }
   emitRing(s, p, w, slot, L);
   w.burstLeft = (L.count ?? 1) - 1;
   w.burstTimer = Math.round((L.delay ?? 0.15) * TICK_RATE);

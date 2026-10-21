@@ -1,8 +1,8 @@
 /**
  * HUD dessiné dans le canvas, même police et mêmes tailles que l'interface DOM.
- * Haut gauche : vie, XP, niveau. Haut centre : chrono, prochain boss / barre du boss.
- * Haut droite : score, record, éliminés, difficulté. Bas gauche : armes et passifs.
- * Bas centre : objet activable (Espace) et bonus temporaires actifs. Bas droite : stats.
+ * Haut gauche : score, record, éliminés, difficulté. Haut centre : chrono, prochain boss / barre du boss.
+ * Bas centre : une seule barre avec PV, XP + niveau, armes, objet activable (Espace) et passifs ;
+ * les bonus temporaires actifs juste au-dessus. Les stats détaillées sont dans l'écran de pause.
  */
 import { BOSS } from '../data/enemies';
 import { HERO } from '../data/hero';
@@ -165,11 +165,6 @@ const STATS: { key: StatKey; label: string; hint: string; value: (st: PlayerStat
   { key: 'maxHp', label: 'PV max', hint: 'Points de vie maximum.', value: (st) => String(Math.round(st.maxHp)), on: (st) => st.maxHp > HERO.maxHp },
 ];
 
-/** Lignes de stats du héros : [libellé, valeur, modifiée par un bonus]. */
-export function statRows(st: PlayerStats): [string, string, boolean][] {
-  return STATS.map((d) => [d.label, d.value(st), d.on(st)]);
-}
-
 export interface StatDetail {
   label: string;
   value: string;
@@ -220,24 +215,6 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const blink = Math.floor(opt.time * 3) % 2 === 0;
   ctx.textBaseline = 'middle';
 
-  // ---------- Haut gauche : PV, XP, niveau ----------
-  panel(ctx, 12, 12, 316, 60);
-  label(ctx, 'PV', 24, 31, 'left', COLORS.hp);
-  const hpF = p.hp / p.stats.maxHp;
-  bar(ctx, 54, 22, 206, 18, hpF, hpF < 0.3 && blink ? '#ffffff' : COLORS.hp, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`);
-  label(ctx, 'XP', 24, 55, 'left', COLORS.xp);
-  bar(ctx, 54, 47, 206, 16, p.xp / p.xpNext, COLORS.xp, `${Math.floor(p.xp)} / ${p.xpNext}`);
-  ctx.beginPath();
-  ctx.roundRect(268.5, 21.5, 50, 42, 5);
-  ctx.strokeStyle = COLORS.xp;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  label(ctx, 'Niv.', 293, 31, 'center', COLORS.xp);
-  ctx.font = `700 20px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(String(p.level), 293, 51);
-
   // ---------- Haut centre : chrono + boss ----------
   ctx.textAlign = 'center';
   ctx.font = `700 30px ${FONT}`;
@@ -257,69 +234,93 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.fillText(soon ? `Boss dans ${Math.ceil(left)} s` : `Prochain boss dans ${formatTime(left)}`, W / 2, 60);
   }
 
-  // ---------- Haut droite : score, record, éliminés ----------
-  const rx = W - 66;
-  label(ctx, 'Score', rx, 18, 'right');
-  ctx.font = `700 22px ${FONT}`;
-  ctx.textAlign = 'right';
-  glowText(ctx, pad7(score.score), rx, 38, '#ffe14d');
+  // ---------- Haut gauche : score, record, éliminés ----------
+  const lx = 18;
+  label(ctx, 'Score', lx, 20);
+  ctx.font = `700 26px ${FONT}`;
+  ctx.textAlign = 'left';
+  glowText(ctx, pad7(score.score), lx, 44, '#ffe14d');
   const beaten = opt.best > 0 && score.score > opt.best;
-  label(ctx, beaten ? 'Nouveau record' : `Record ${pad7(opt.best)}`, rx, 58, 'right', beaten ? COLORS.gold : COLORS.muted);
+  label(ctx, beaten ? 'Nouveau record' : `Record ${pad7(opt.best)}`, lx, 68, 'left', beaten ? COLORS.gold : COLORS.muted);
   ctx.font = TEXT;
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.text;
-  ctx.fillText(`${p.kills.toLocaleString('fr-FR')} éliminés`, rx, 76);
-  label(ctx, opt.difficulty.name, rx, 94, 'right', opt.difficulty.color);
+  const killsText = `${p.kills.toLocaleString('fr-FR')} éliminés`;
+  ctx.fillText(killsText, lx, 87);
+  label(ctx, opt.difficulty.name, lx + ctx.measureText(killsText).width + 10, 87, 'left', opt.difficulty.color);
 
-  // ---------- Bas gauche : armes et passifs ----------
-  const size = 48;
+  // ---------- Bas centre : barre principale (PV, XP, armes, objet, passifs) ----------
+  const ws = 46; // emplacement d'arme
+  const ps = 40; // emplacement de passif
+  const as = 52; // objet activable
   const gap = 6;
-  const y0 = H - size - 22;
-  label(ctx, `Armes ${p.weapons.length}/${MAX_WEAPON_SLOTS}`, 16, y0 - 12);
+  const sep = 24;
+  const weaponsW = MAX_WEAPON_SLOTS * ws + (MAX_WEAPON_SLOTS - 1) * gap;
+  const passivesW = MAX_PASSIVE_SLOTS * ps + (MAX_PASSIVE_SLOTS - 1) * gap;
+  const rowW = weaponsW + sep + as + sep + passivesW;
+  const PW = rowW + 32;
+  const PH = 146;
+  const x0 = Math.round(W / 2 - PW / 2);
+  const top = H - PH - 12;
+  panel(ctx, x0, top, PW, PH);
+
+  // PV : la barre la plus visible de l'écran.
+  const hpF = p.hp / p.stats.maxHp;
+  const low = hpF < 0.3;
+  const barX = x0 + 50;
+  const barW = PW - 50 - 16;
+  label(ctx, 'PV', x0 + 16, top + 22, 'left', COLORS.hp);
+  bar(ctx, barX, top + 12, barW, 20, hpF, low && blink ? '#ffffff' : COLORS.hp, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`);
+  // XP + niveau
+  label(ctx, `Niv. ${p.level}`, x0 + 16, top + 46, 'left', COLORS.xp);
+  bar(ctx, barX + 8, top + 40, barW - 8, 12, p.xp / p.xpNext, COLORS.xp, '');
+
+  const ry = top + 76;
+  let x = x0 + 16;
+  // Armes
+  label(ctx, `Armes ${p.weapons.length}/${MAX_WEAPON_SLOTS}`, x, ry - 10);
   for (let i = 0; i < MAX_WEAPON_SLOTS; i++) {
-    const x = 16 + i * (size + gap);
+    const sx = x + i * (ws + gap);
     const w = p.weapons[i];
     const def = w ? weaponDef(w.def) : null;
-    slot(ctx, x, y0, size, def ? def.color : null);
+    slot(ctx, sx, ry, ws, def ? def.color : null);
     if (!w || !def) continue;
-    ctx.drawImage(icon('weapon', def.id), x + 3, y0 + 3, size - 6, size - 6);
+    ctx.drawImage(icon('weapon', def.id), sx + 3, ry + 3, ws - 6, ws - 6);
     if (def.fusion) {
       ctx.fillStyle = COLORS.gold;
-      ctx.fillRect(x, y0 + size + 4, size, 4);
-    } else pips(ctx, x, y0 + size + 4, size, w.level, weaponMaxLevel(w.def), def.color);
+      ctx.fillRect(sx, ry + ws + 4, ws, 4);
+    } else pips(ctx, sx, ry + ws + 4, ws, w.level, weaponMaxLevel(w.def), def.color);
   }
-  const px0 = 16 + MAX_WEAPON_SLOTS * (size + gap) + 12;
-  const ps = 40;
-  const py = y0 + (size - ps);
-  label(ctx, `Passifs ${p.passives.length}/${MAX_PASSIVE_SLOTS}`, px0, y0 - 12);
+  x += weaponsW + sep;
+  // Objet activable (Espace), au centre
+  const act = p.activable;
+  const ay = ry - 3;
+  slot(ctx, x, ay, as, act >= 0 ? PICKUPS[act].color : null);
+  if (act >= 0) ctx.drawImage(icon('pickup', PICKUPS[act].id), x + 4, ay + 4, as - 8, as - 8);
+  label(ctx, act >= 0 ? PICKUPS[act].name : 'Objet', x + as / 2, ry - 10, 'center', act >= 0 ? PICKUPS[act].color : COLORS.muted);
+  label(ctx, 'Espace', x + as / 2, ay + as + 8, 'center', act >= 0 ? '#ffffff' : COLORS.muted);
+  x += as + sep;
+  // Passifs
+  const py = ry + (ws - ps);
+  label(ctx, `Passifs ${p.passives.length}/${MAX_PASSIVE_SLOTS}`, x, ry - 10);
   for (let i = 0; i < MAX_PASSIVE_SLOTS; i++) {
-    const x = px0 + i * (ps + gap);
+    const sx = x + i * (ps + gap);
     const it = p.passives[i];
     const def = it ? PASSIVES[it.def] : null;
-    slot(ctx, x, py, ps, def ? def.color : null);
+    slot(ctx, sx, py, ps, def ? def.color : null);
     if (!it || !def) continue;
-    ctx.drawImage(icon('passive', def.id), x + 3, py + 3, ps - 6, ps - 6);
-    pips(ctx, x, py + ps + 4, ps, it.level, 5, def.color);
+    ctx.drawImage(icon('passive', def.id), sx + 3, py + 3, ps - 6, ps - 6);
+    pips(ctx, sx, py + ps + 4, ps, it.level, 5, def.color);
   }
 
-  // ---------- Bas centre : objet activable + bonus actifs ----------
-  const cx = Math.max(px0 + MAX_PASSIVE_SLOTS * (ps + gap) + 30, W / 2 - 28);
-  const as = 56;
-  const ay = H - as - 22;
-  const act = p.activable;
-  slot(ctx, cx, ay, as, act >= 0 ? PICKUPS[act].color : null);
-  if (act >= 0) {
-    ctx.drawImage(icon('pickup', PICKUPS[act].id), cx + 4, ay + 4, as - 8, as - 8);
-    label(ctx, PICKUPS[act].name, cx + as / 2, ay - 12, 'center', PICKUPS[act].color);
-  } else label(ctx, 'Objet', cx + as / 2, ay - 12, 'center');
-  label(ctx, 'Espace', cx + as / 2, ay + as + 10, 'center', act >= 0 ? '#ffffff' : COLORS.muted);
-  let bx = cx + as + 14;
-  for (const b of BUFFS) {
+  // ---------- Bonus temporaires actifs : juste au-dessus de la barre ----------
+  const active = BUFFS.filter((b) => p[b.field] > s.tick);
+  const bs = 40;
+  let bx = W / 2 - (active.length * (bs + 8) - 8) / 2;
+  const by = top - bs - 14;
+  for (const b of active) {
     const left = p[b.field] - s.tick;
-    if (left <= 0) continue;
     const def = PICKUPS[b.kind];
-    const bs = 40;
-    const by = H - bs - 30;
     slot(ctx, bx, by, bs, def.color);
     ctx.drawImage(icon('pickup', def.id), bx + 3, by + 3, bs - 6, bs - 6);
     const total = (def.duration ?? 5) * TICK_RATE;
@@ -334,30 +335,10 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     bx += bs + 8;
   }
 
-  // ---------- Bas droite : stats ----------
-  const rows = statRows(p.stats);
-  const sw = 168;
-  const lh = 17;
-  const sh = 30 + rows.length * lh;
-  const sx = W - sw - 14;
-  const sy = H - sh - (opt.showFps ? 30 : 14);
-  panel(ctx, sx, sy, sw, sh);
-  label(ctx, 'Stats', sx + 12, sy + 15);
-  ctx.font = TEXT;
-  rows.forEach(([l, val, on], k) => {
-    const y = sy + 34 + k * lh;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = COLORS.muted;
-    ctx.fillText(l, sx + 12, y);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = on ? COLORS.xp : 'rgba(242,234,255,0.5)';
-    ctx.fillText(val, sx + sw - 12, y);
-  });
-
   // Relecture
   if (opt.replay) {
-    label(ctx, `Relecture ×${opt.replay.speed} · 1 / 2 / 4 : vitesse · Échap : quitter`, W / 2, H - 112, 'center', '#ffe14d');
-    bar(ctx, W / 2 - 200, H - 100, 400, 4, opt.replay.progress, '#ffe14d', '');
+    label(ctx, `Relecture ×${opt.replay.speed} · 1 / 2 / 4 : vitesse · Échap : quitter`, W / 2, top - 92, 'center', '#ffe14d');
+    bar(ctx, W / 2 - 200, top - 80, 400, 4, opt.replay.progress, '#ffe14d', '');
   }
 
   if (opt.showFps) {
