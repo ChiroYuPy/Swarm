@@ -28,7 +28,7 @@ import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
 import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
 import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
-import { DEFAULT_SETTINGS, bestScore, defaultSandbox, topScores } from '../storage/storage';
+import { DEFAULT_SETTINGS, TOP_PER_DIFFICULTY, bestScore, defaultSandbox, topScores } from '../storage/storage';
 
 export interface AppApi {
   save: SaveData;
@@ -569,6 +569,14 @@ export class UI {
   /** Déplace la sélection entre les boutons de l'écran courant (flèches / croix de la manette). */
   navigate(dir: NavDir): void {
     if (this.current === 'codex' && this.codexNav(dir)) return;
+    if (this.current === 'scores' && (dir === 'left' || dir === 'right')) {
+      // Records : gauche / droite passent d'une difficulté à l'autre (en boucle).
+      const cur = Number(this.screenEl?.querySelector<HTMLElement>('.tab.on')?.dataset.d ?? 0);
+      const n = DIFFICULTIES.length;
+      this.showScores((cur + (dir === 'left' ? -1 : 1) + n) % n);
+      this.app.uiSound('uiMove');
+      return;
+    }
     if (this.current === 'settings' && (dir === 'left' || dir === 'right') && this.adjustSetting(dir === 'left' ? -1 : 1)) return;
     if (this.current === 'sandbox' && (dir === 'left' || dir === 'right') && this.adjustSandbox(dir === 'left' ? -1 : 1)) return;
     const d = dir === 'left' || dir === 'up' ? -1 : 1;
@@ -760,21 +768,47 @@ export class UI {
   }
 
   // ---------- Choix de la difficulté ----------
+  /**
+   * Une carte par difficulté : niveau de menace, description, jauges comparées (résistance, dégâts,
+   * nombre, rythme d'arrivée des nouveaux types) et le record de la difficulté s'il existe.
+   */
   showDifficulty(): void {
     const save = this.app.save;
+    // Jauges sur 5 crans, relatives à la difficulté la plus dure de chaque critère.
+    const crit: [string, (d: (typeof DIFFICULTIES)[number]) => number, string][] = [
+      ['Résistance', (d) => d.hp, 'PV des ennemis'],
+      ['Dégâts', (d) => d.dmg, 'Dégâts que tu reçois'],
+      ['Nombre', (d) => d.rate, 'Quantité d’ennemis'],
+      ['Rythme', (d) => 1 / d.pace, 'Vitesse d’arrivée des nouveaux types'],
+    ];
+    const meter = (d: (typeof DIFFICULTIES)[number], [label, f, hint]: (typeof crit)[number]) => {
+      const max = Math.max(...DIFFICULTIES.map(f));
+      const n = Math.max(1, Math.round((f(d) / max) * 5));
+      return `<span class="meter" title="${esc(hint)} : ×${dec(f(d))}"><span>${label}</span><span class="segs">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span></span>`;
+    };
     const cards = DIFFICULTIES.map((d, i) => {
-      const best = bestScore(save, i);
-      return `<button class="card nav ${i === save.difficulty ? 'primary' : ''}" data-d="${i}" style="--c:${d.color}">
-        <span class="card-title">${esc(d.name)}</span>
-        <span class="card-text">${esc(d.desc)}</span>
-        <span class="card-meta">${best ? `Record ${pad7(best)}` : 'Pas encore de record'}</span>
+      const best = topScores(save, i)[0];
+      const record = best
+        ? `<small>Record</small><b>${pad7(best.score)}</b><em>${formatTime(best.tempsSurvecu)} · niv. ${best.level || '—'} · ${num(best.kills)} éliminés</em>`
+        : '<small>Record</small><b class="none">———————</b><em>Pas encore de partie</em>';
+      return `<button class="diff nav ${i === save.difficulty ? 'primary' : ''}" data-d="${i}" style="--c:${d.color};--i:${i}">
+        <span class="diff-top">
+          <span class="threat">${DIFFICULTIES.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</span>
+          ${i === save.difficulty ? '<span class="diff-last">Dernier choix</span>' : ''}
+        </span>
+        <span class="diff-name">${esc(d.name)}</span>
+        <span class="diff-desc">${esc(d.desc)}</span>
+        <span class="meters">${crit.map((c) => meter(d, c)).join('')}</span>
+        <span class="diff-record ${best ? '' : 'empty'}">${record}</span>
+        <span class="diff-go">Jouer</span>
       </button>`;
     }).join('');
     const el = this.mount(
       'difficulty',
       `
       <header class="head"><h2>Difficulté</h2><p class="sub">Change la résistance des ennemis et la vitesse à laquelle les nouveaux types arrivent.</p></header>
-      <div class="cards">${cards}</div>
+      <div class="diffs">${cards}</div>
+      <p class="foot">← → : choisir · Entrée : jouer · Échap : retour</p>
       <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
     `,
     );
@@ -953,37 +987,58 @@ export class UI {
   }
 
   // ---------- Records ----------
+  /**
+   * Onglets par difficulté (avec leur record), quatre meilleures performances en tête, puis le top 10
+   * avec médailles pour le podium. Gauche / droite changent de difficulté.
+   */
   showScores(difficulty: number): void {
-    const list = topScores(this.app.save, difficulty);
+    const save = this.app.save;
+    const diff = DIFFICULTIES[difficulty];
+    const list = topScores(save, difficulty);
+    const date = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
     const rows = list
       .map(
-        (r, i) => `<tr class="${i === 0 ? 'first' : ''}">
-          <td class="rank">${i + 1}</td>
+        (r, i) => `<tr class="${i < 3 ? `podium p${i + 1}` : ''}">
+          <td class="rank"><span class="medal">${i + 1}</span></td>
           <td class="num score">${pad7(r.score)}</td>
           <td class="num">${formatTime(r.tempsSurvecu)}</td>
           <td class="num">${r.level || '—'}</td>
           <td class="num">${num(r.kills)}</td>
-          <td class="date">${new Date(r.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
+          <td class="date">${date(r.date)}</td>
         </tr>`,
       )
       .join('');
-    const tabs = DIFFICULTIES.map(
-      (d, i) => `<button class="tab nav ${i === difficulty ? 'on' : ''}" data-d="${i}" style="--c:${d.color}">${esc(d.name)}</button>`,
-    ).join('');
+    const tabs = DIFFICULTIES.map((d, i) => {
+      const best = bestScore(save, i);
+      return `<button class="tab dtab nav ${i === difficulty ? 'on' : ''}" data-d="${i}" style="--c:${d.color}"><span>${esc(d.name)}</span><small>${best ? pad7(best) : '—'}</small></button>`;
+    }).join('');
+    const top = <K extends 'score' | 'tempsSurvecu' | 'level' | 'kills'>(k: K) => Math.max(...list.map((r) => r[k] || 0));
+    const summary = list.length
+      ? `<div class="rec-summary">
+          <div class="main"><small>Meilleur score</small><b>${pad7(top('score'))}</b></div>
+          <div><small>Plus longue survie</small><b>${formatTime(top('tempsSurvecu'))}</b></div>
+          <div><small>Plus haut niveau</small><b>${top('level') || '—'}</b></div>
+          <div><small>Plus d’éliminés</small><b>${num(top('kills'))}</b></div>
+        </div>`
+      : '';
+    const body = rows
+      ? `<table class="scores"><thead><tr><th>#</th><th class="num">Score</th><th class="num">Temps</th><th class="num">Niveau</th><th class="num">Éliminés</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="empty-state"><p class="empty">Aucune partie en ${esc(diff.name)} pour l’instant.</p><button class="btn nav go" id="go">Jouer en ${esc(diff.name)}</button></div>`;
     const el = this.mount(
       'scores',
       `
-      <header class="head"><h2>Records</h2><p class="sub">Tes 10 meilleures parties, par difficulté.</p></header>
+      <header class="head"><h2>Records</h2><p class="sub">Tes ${TOP_PER_DIFFICULTY} meilleures parties, par difficulté.</p></header>
       <div class="tabs">${tabs}</div>
-      <div class="panel wide">${
-        rows
-          ? `<table class="scores"><thead><tr><th>#</th><th class="num">Score</th><th class="num">Temps</th><th class="num">Niveau</th><th class="num">Éliminés</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>`
-          : '<p class="empty">Aucune partie dans cette difficulté pour l’instant.</p>'
-      }</div>
+      <div class="records" style="--c:${diff.color}">
+        ${summary}
+        <div class="panel wide">${body}</div>
+      </div>
+      <p class="foot">← → : difficulté · Échap : retour</p>
       <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
     `,
     );
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) => b.addEventListener('click', () => this.showScores(Number(b.dataset.d))));
+    el.querySelector('#go')?.addEventListener('click', () => this.app.play(difficulty));
     el.querySelector('#back')!.addEventListener('click', () => this.showMenu());
     el.querySelector<HTMLButtonElement>('.tab.on')?.focus({ preventScroll: true });
   }
