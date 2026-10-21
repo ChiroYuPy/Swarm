@@ -2,7 +2,7 @@
 
 A neon survivor-like: survive an endless tide of geometric enemies in an infinite open world.
 
-**▶ Play: https://chiroyuki.github.io/Swarm/**
+**▶ Play: https://chiroyupy.github.io/Swarm/**
 
 Weapons fire on their own. Pick an upgrade at each level, combine maxed weapons into fusions, grab temporary boosts and keep one active item for emergencies. Three difficulty levels, local leaderboard, in-game codex. The game UI is in French.
 
@@ -29,4 +29,4 @@ TypeScript + Vite, Canvas 2D, no game framework. The simulation (`src/sim`) is d
 
 ## Deployment
 
-`.github/workflows/deploy.yml` tests, builds and publishes to GitHub Pages on every push to `main`. One-time setup: **Settings → Pages → Source: GitHub Actions**.
+`.github/workflows/deploy.yml` tests, builds and publishes to GitHub Pages on every push to `main` or `master`. One-time setup: **Settings → Pages → Source: GitHub Actions**.
