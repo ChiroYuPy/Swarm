@@ -25,7 +25,7 @@ export function dmgMul(s: GameState): number {
   return (1 + ((s.tick * DT) / 60) * WAVES.dmgScalePerMinute) * DIFFICULTIES[s.difficulty].dmg;
 }
 export function spdMul(s: GameState): number {
-  return Math.min(WAVES.speedScaleMax, 1 + ((s.tick * DT) / 60) * WAVES.speedScalePerMinute);
+  return Math.min(WAVES.speedScaleMax, 1 + ((s.tick * DT) / 60) * WAVES.speedScalePerMinute) * DIFFICULTIES[s.difficulty].speed;
 }
 
 export function spawnRate(tick: number, difficulty = 1): { rate: number; phase: number } {

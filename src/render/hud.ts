@@ -23,6 +23,7 @@ import {
   weaponDef,
   weaponMaxLevel,
   type GameState,
+  type Player,
   type PlayerStats,
 } from '../sim';
 import { COLORS } from './palette';
@@ -142,25 +143,68 @@ function pips(ctx: Ctx, x: number, y: number, w: number, level: number, max: num
   }
 }
 
-function pct(v: number): string {
-  const n = Math.round(v * 100);
-  return `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} %`;
+/** Nombre à la française, sans zéros inutiles (0,35 / 1,5 / 2). */
+export function dec(v: number, digits = 2): string {
+  return String(Number(v.toFixed(digits))).replace('.', ',');
 }
+
+const rate = (v: number) => `${Math.round(v * 100)} %`;
+
+type StatKey = 'might' | 'cooldown' | 'area' | 'speed' | 'magnet' | 'armor' | 'luck' | 'regen' | 'maxHp';
+
+/** Les stats du héros, dans l'ordre d'affichage. */
+const STATS: { key: StatKey; label: string; hint: string; value: (st: PlayerStats) => string; on: (st: PlayerStats) => boolean }[] = [
+  { key: 'might', label: 'Dégâts', hint: 'Multiplie les dégâts de toutes tes armes.', value: (st) => rate(st.might), on: (st) => st.might !== 1 },
+  { key: 'cooldown', label: 'Recharge', hint: 'Temps de recharge des armes (plus bas = tirs plus fréquents).', value: (st) => rate(st.cooldownMul), on: (st) => st.cooldownMul !== 1 },
+  { key: 'area', label: 'Zone', hint: 'Taille des projectiles, rayons et explosions.', value: (st) => rate(st.area), on: (st) => st.area !== 1 },
+  { key: 'speed', label: 'Vitesse', hint: 'Vitesse de déplacement (unités/s).', value: (st) => String(Math.round(st.speed)), on: (st) => st.speed !== HERO.speed },
+  { key: 'magnet', label: 'Collecte', hint: 'Rayon d’attraction de l’XP et des objets.', value: (st) => String(Math.round(st.magnet)), on: (st) => st.magnet !== HERO.magnet },
+  { key: 'armor', label: 'Armure', hint: 'Part des dégâts reçus annulée (max 60 %).', value: (st) => rate(st.armor), on: (st) => st.armor > 0 },
+  { key: 'luck', label: 'Chance', hint: 'Probabilité que les ennemis lâchent des objets.', value: (st) => rate(st.luck), on: (st) => st.luck !== 1 },
+  { key: 'regen', label: 'Régén.', hint: 'PV rendus chaque seconde.', value: (st) => `${dec(st.regen)} PV/s`, on: (st) => st.regen > HERO.regen + 1e-6 },
+  { key: 'maxHp', label: 'PV max', hint: 'Points de vie maximum.', value: (st) => String(Math.round(st.maxHp)), on: (st) => st.maxHp > HERO.maxHp },
+];
 
 /** Lignes de stats du héros : [libellé, valeur, modifiée par un bonus]. */
 export function statRows(st: PlayerStats): [string, string, boolean][] {
-  const rows: [string, string, boolean][] = [
-    ['Dégâts', pct(st.might - 1), st.might !== 1],
-    ['Recharge', pct(st.cooldownMul - 1), st.cooldownMul !== 1],
-    ['Zone', pct(st.area - 1), st.area !== 1],
-    ['Vitesse', pct(st.speed / HERO.speed - 1), st.speed !== HERO.speed],
-    ['Collecte', pct(st.magnet / HERO.magnet - 1), st.magnet !== HERO.magnet],
-    ['Armure', pct(-st.armor), st.armor > 0],
-    ['Chance', pct(st.luck - 1), st.luck !== 1],
-    ['Régén.', `${st.regen.toFixed(1).replace('.', ',')} PV/s`, st.regen > HERO.regen + 1e-6],
-    ['PV max', String(Math.round(st.maxHp)), st.maxHp > HERO.maxHp],
-  ];
-  return rows.map(([l, v, on]) => [l, on ? v : v === '0 %' ? '—' : v, on]);
+  return STATS.map((d) => [d.label, d.value(st), d.on(st)]);
+}
+
+export interface StatDetail {
+  label: string;
+  value: string;
+  on: boolean;
+  hint: string;
+  /** d'où vient la valeur : base, passifs, bonus temporaires, plafonds */
+  sources: string[];
+}
+
+/** Stats détaillées pour l'écran de pause : valeur réelle et provenance de chaque bonus. */
+export function statDetails(p: Player, tick: number): StatDetail[] {
+  const secs = (until: number) => `${Math.ceil((until - tick) / TICK_RATE)} s`;
+  return STATS.map((d) => {
+    const sources: string[] = [];
+    if (d.key === 'speed') sources.push(`Base ${HERO.speed}`);
+    if (d.key === 'magnet') sources.push(`Base ${HERO.magnet}`);
+    if (d.key === 'regen') sources.push(`Base ${dec(HERO.regen)} PV/s`);
+    if (d.key === 'maxHp') sources.push(`Base ${HERO.maxHp}`);
+    for (const inst of p.passives) {
+      const def = PASSIVES[inst.def];
+      const v = def.perLevel[d.key];
+      if (!v) continue;
+      const total = v * inst.level;
+      const amount =
+        d.key === 'maxHp' ? `+${total}` : d.key === 'regen' ? `+${dec(total)} PV/s` : d.key === 'cooldown' ? `−${Math.round(total * 100)} %` : `+${Math.round(total * 100)} %`;
+      sources.push(`${def.name} niv. ${inst.level} : ${amount}`);
+    }
+    if (d.key === 'might' && p.rageUntil > tick) sources.push(`Rage : ×2 (${secs(p.rageUntil)})`);
+    if (d.key === 'cooldown' && p.frenzyUntil > tick) sources.push(`Frénésie : ×0,5 (${secs(p.frenzyUntil)})`);
+    if (d.key === 'speed' && p.turboUntil > tick) sources.push(`Turbo : ×1,5 (${secs(p.turboUntil)})`);
+    if (d.key === 'cooldown' && p.base.cooldownMul <= 0.35) sources.push('Plafond atteint (−65 %)');
+    if (d.key === 'armor' && p.base.armor >= 0.6) sources.push('Plafond atteint (60 %)');
+    if (!sources.length) sources.push('Aucun bonus');
+    return { label: d.label, value: d.value(p.stats), on: d.on(p.stats), hint: d.hint, sources };
+  });
 }
 
 const BUFFS: { kind: number; field: 'rageUntil' | 'frenzyUntil' | 'turboUntil' | 'shieldUntil' }[] = [

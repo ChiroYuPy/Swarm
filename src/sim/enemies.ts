@@ -153,14 +153,6 @@ export function updateEnemies(s: GameState): void {
       case BEHAVIOR.CHASER:
         pathDir(s, e, dx, dy, dist);
         break;
-      case BEHAVIOR.DASHER: {
-        pathDir(s, e, dx, dy, dist);
-        const dashT = Math.round((d.dashTime ?? 0.5) * TICK_RATE);
-        const restT = Math.round((d.restTime ?? 0.5) * TICK_RATE);
-        const phase = (tick + e.id * 7) % (dashT + restT);
-        speed *= phase < dashT ? (d.dashMul ?? 2) : (d.restMul ?? 0.3);
-        break;
-      }
       case BEHAVIOR.SWARM: {
         pathDir(s, e, dx, dy, dist);
         const w = dsin(tick * 0.12 + e.id * 1.7) * 0.6;

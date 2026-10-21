@@ -49,10 +49,9 @@ export function weaponMaxLevel(i: number): number {
   return ALL_WEAPONS[i].levels.length;
 }
 
-export const BEHAVIOR = { CHASER: 0, DASHER: 1, SHOOTER: 2, KAMIKAZE: 3, SWARM: 4, PROP: 5, BOSS: 6 } as const;
+export const BEHAVIOR = { CHASER: 0, SHOOTER: 2, KAMIKAZE: 3, SWARM: 4, PROP: 5, BOSS: 6 } as const;
 const BEHAVIOR_BY_NAME: Record<string, number> = {
   chaser: BEHAVIOR.CHASER,
-  dasher: BEHAVIOR.DASHER,
   shooter: BEHAVIOR.SHOOTER,
   kamikaze: BEHAVIOR.KAMIKAZE,
   swarm: BEHAVIOR.SWARM,

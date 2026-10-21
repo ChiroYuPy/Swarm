@@ -36,7 +36,7 @@ import { AudioEngine } from './audio/audio';
 import { InputManager, type UiAction } from './input/input';
 import { UI, type AppApi, type BuildInfo, type DeathInfo } from './ui/ui';
 import { randomSeed } from './ui/seeds';
-import { statRows } from './render/hud';
+import { statDetails } from './render/hud';
 import { bestScore, loadSave, recordScore, writeSave, type SaveData, type Settings } from './storage/storage';
 
 type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'dying' | 'dead' | 'replay';
@@ -266,7 +266,7 @@ class App implements AppApi {
         break;
       case 'paused':
         if (a === 'pause' || a === 'back') {
-          if (this.ui.screen === 'settings') this.ui.showPause(this.buildInfo());
+          if (this.ui.screen === 'settings' || this.ui.screen === 'codex') this.ui.showPause(this.buildInfo());
           else this.resume();
         } else if (dir) this.ui.navigate(dir);
         else if (a === 'confirm') this.ui.activate();
@@ -323,7 +323,9 @@ class App implements AppApi {
     return {
       weapons: p.weapons.map((w) => ({ id: weaponDef(w.def).id, level: w.level, fusion: !!weaponDef(w.def).fusion })),
       passives: p.passives.map((x) => ({ id: PASSIVES[x.def].id, level: x.level })),
-      stats: statRows(p.stats),
+      stats: statDetails(p, this.state.tick),
+      might: p.stats.might,
+      cooldownMul: p.stats.cooldownMul,
     };
   }
 

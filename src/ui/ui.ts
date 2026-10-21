@@ -20,12 +20,13 @@ import {
   OFFER_PASSIVE,
   OFFER_WEAPON,
   weaponDef,
+  weaponLevel,
   type Offer,
   type ScoreRecord,
 } from '../sim';
 import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
-import { formatTime, pad7 } from '../render/hud';
+import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
 import type { SaveData, Settings } from '../storage/storage';
 import { bestScore, topScores } from '../storage/storage';
 
@@ -45,7 +46,10 @@ export interface AppApi {
 export interface BuildInfo {
   weapons: { id: string; level: number; fusion: boolean }[];
   passives: { id: string; level: number }[];
-  stats: [string, string, boolean][];
+  stats: StatDetail[];
+  /** multiplicateurs actuels, pour afficher les vrais chiffres des armes */
+  might: number;
+  cooldownMul: number;
 }
 
 export interface DeathInfo {
@@ -97,6 +101,17 @@ export function passiveTotal(def: PassiveDef, level: number): string {
   return out.join(', ');
 }
 
+/** Vrais chiffres d'une arme au niveau donné, bonus du héros compris. */
+function weaponNumbers(id: string, level: number, might: number, cooldownMul: number): string {
+  const L = weaponLevel(ALL_WEAPONS.findIndex((w) => w.id === id), level);
+  const out = [`Dégâts ${dec(L.damage * might, 1)}`];
+  if (L.cooldown) out.push(`recharge ${dec(L.cooldown * cooldownMul)} s`);
+  else if (L.tick) out.push(`toutes les ${dec(L.tick)} s`);
+  else if (L.hitCd) out.push(`touche toutes les ${dec(L.hitCd)} s`);
+  if ((L.count ?? 1) > 1) out.push(`×${L.count}`);
+  return out.join(' · ');
+}
+
 const fusionPartner = (i: number) => {
   const f = FUSIONS[i];
   return f.withKind === 'weapon' ? ALL_WEAPONS.find((x) => x.id === f.with)! : PASSIVES.find((x) => x.id === f.with)!;
@@ -115,7 +130,6 @@ interface CodexItem {
 
 const BEHAVIOR_LABEL: Record<string, string> = {
   chaser: 'Poursuivant',
-  dasher: 'Par à-coups',
   shooter: 'À distance',
   kamikaze: 'Explosif',
   swarm: 'En groupe',
@@ -314,6 +328,9 @@ export class UI {
   private levelFocus = 0;
   private levelCount = 0;
   private settingsReturn: () => void = () => {};
+  private codexReturn: () => void = () => this.showMenu();
+  /** bestiaire ouvert depuis la pause : affiché par-dessus la partie */
+  private codexOverlay = false;
   private countAnim = 0;
   private levelOpenedAt = 0;
 
@@ -404,7 +421,7 @@ export class UI {
       'menu',
       `
       <header class="brand">
-        <h1 class="title">NÉON <span>STOP</span></h1>
+        <h1 class="title">SWARM</h1>
         <p class="sub">Survis à la marée géométrique</p>
       </header>
       <nav class="stack">
@@ -417,7 +434,7 @@ export class UI {
     `,
     );
     el.querySelector('#play')!.addEventListener('click', () => this.showDifficulty());
-    el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes'));
+    el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showMenu()));
     el.querySelector('#scores')!.addEventListener('click', () => this.showScores(this.app.save.difficulty));
     el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showMenu()));
   }
@@ -528,7 +545,11 @@ export class UI {
 
   // ---------- Bestiaire ----------
   /** Catégories : à gauche. Grille d'icônes au centre. Fiche détaillée de l'élément sélectionné à droite. */
-  showCodex(tab: CodexTab, sel = 0): void {
+  showCodex(tab: CodexTab, sel = 0, onBack?: () => void): void {
+    if (onBack) {
+      this.codexReturn = onBack;
+      this.codexOverlay = this.current === 'pause';
+    }
     const cats: [CodexTab, string, number][] = [
       ['regles', 'Comment jouer', 0],
       ['armes', 'Armes', BASE_WEAPONS.length],
@@ -566,6 +587,7 @@ export class UI {
       </div>
       <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
     `,
+      this.codexOverlay,
     );
     paintIcons(el, 52);
     const detail = el.querySelector<HTMLElement>('.detail')!;
@@ -590,7 +612,7 @@ export class UI {
         this.root.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
       }),
     );
-    el.querySelector('#back')!.addEventListener('click', () => this.showMenu());
+    el.querySelector('#back')!.addEventListener('click', () => this.codexReturn());
     if (items.length) {
       const i = Math.min(sel, items.length - 1);
       select(i);
@@ -703,7 +725,9 @@ export class UI {
       .map((x) => {
         const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
         const lvl = x.fusion ? '<span class="lv max">Fusion</span>' : `<span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>`;
-        const info = detailed ? `<small>${esc(x.fusion ? d.levelText[0] : d.levelText[x.level - 1])}</small>` : '';
+        const info = detailed
+          ? `<small>${esc(x.fusion ? d.levelText[0] : d.levelText[x.level - 1])}</small><small class="num">${esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))}</small>`
+          : '';
         return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="weapon" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b>${lvl}${info}</span></div>`;
       })
       .join('');
@@ -723,7 +747,12 @@ export class UI {
 
   // ---------- Pause ----------
   showPause(build: BuildInfo): void {
-    const stats = build.stats.map(([l, v, on]) => `<div class="${on ? 'on' : ''}"><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');
+    const stats = build.stats
+      .map(
+        (st) =>
+          `<div class="${st.on ? 'on' : ''}" title="${esc(st.hint)}"><span>${esc(st.label)}</span><b>${esc(st.value)}</b><small>${st.sources.map(esc).join(' · ')}</small></div>`,
+      )
+      .join('');
     const el = this.mount(
       'pause',
       `
@@ -733,15 +762,17 @@ export class UI {
         <div class="panel statlist"><h3>Stats</h3>${stats}</div>
       </div>
       <footer class="actions">
-        <button class="btn nav primary" id="resume">Reprendre</button>
+        <button class="btn nav primary go" id="resume">Reprendre</button>
+        <button class="btn nav" id="codex">Bestiaire</button>
         <button class="btn nav" id="settings">Options</button>
-        <button class="btn nav" id="quit">Abandonner</button>
+        <button class="btn nav danger" id="quit">Abandonner</button>
       </footer>
     `,
       true,
     );
     this.fillIcons(el, 36);
     el.querySelector('#resume')!.addEventListener('click', () => this.app.resume());
+    el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showPause(build)));
     el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showPause(build)));
     el.querySelector('#quit')!.addEventListener('click', () => this.app.quit());
   }

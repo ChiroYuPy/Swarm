@@ -1,6 +1,6 @@
 /** Ennemis. Les PV / dégâts / vitesses sont multipliés par les courbes de difficulté de waves.ts. */
 
-export type EnemyBehavior = 'chaser' | 'dasher' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss';
+export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss';
 export type EnemyShape = 'triangle' | 'diamond' | 'square' | 'pentagon' | 'circle' | 'dot' | 'box' | 'trapeze';
 
 export interface EnemyDef {
@@ -17,11 +17,6 @@ export interface EnemyDef {
   xp: number;
   /** 0 = subit tout le recul, 1 = insensible */
   kbResist: number;
-  // dasher
-  dashTime?: number;
-  restTime?: number;
-  dashMul?: number;
-  restMul?: number;
   // shooter
   keepMin?: number;
   keepMax?: number;
@@ -42,10 +37,9 @@ export const ENEMIES: EnemyDef[] = [
     hp: 9, speed: 72, damage: 6, radius: 12, xp: 1, kbResist: 0,
   },
   {
-    id: 'losange', name: 'Fonceur', desc: 'Avance par à-coups très rapides.',
-    behavior: 'dasher', shape: 'diamond', color: '#ffe14d',
-    hp: 6, speed: 120, damage: 4, radius: 10, xp: 1, kbResist: 0,
-    dashTime: 0.55, restTime: 0.45, dashMul: 2.0, restMul: 0.25,
+    id: 'losange', name: 'Fonceur', desc: 'Plus rapide que les Chasseurs, mais fragile.',
+    behavior: 'chaser', shape: 'diamond', color: '#ffe14d',
+    hp: 6, speed: 112, damage: 4, radius: 10, xp: 1, kbResist: 0,
   },
   {
     id: 'carre', name: 'Bloc', desc: 'Lent mais très résistant, presque insensible au recul.',

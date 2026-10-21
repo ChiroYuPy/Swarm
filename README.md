@@ -1,4 +1,4 @@
-# NÉON STOP
+# SWARM
 
 A neon survivor-like: survive an endless tide of geometric enemies in an infinite open world.
 

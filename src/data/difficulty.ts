@@ -10,6 +10,8 @@ export interface DifficultyDef {
   /** multiplicateurs ennemis */
   hp: number;
   dmg: number;
+  /** multiplicateur de vitesse de déplacement des ennemis (hors boss) */
+  speed: number;
   /** multiplicateur du débit d'apparition */
   rate: number;
   /** multiplicateur des dates d'arrivée des nouveaux types d'ennemis (> 1 = plus lent) */
@@ -24,6 +26,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     color: '#39ff7a',
     hp: 0.7,
     dmg: 0.6,
+    speed: 1,
     rate: 0.75,
     pace: 1.5,
   },
@@ -34,6 +37,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     color: '#38f6ff',
     hp: 1,
     dmg: 1,
+    speed: 1,
     rate: 1,
     pace: 1,
   },
@@ -44,6 +48,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     color: '#ff3d6e',
     hp: 1.3,
     dmg: 1.3,
+    speed: 1,
     rate: 1.3,
     pace: 0.7,
   },

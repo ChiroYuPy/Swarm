@@ -112,10 +112,6 @@ p {
   color: #eafdff;
   text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
 }
-.title span {
-  color: #ffe9fd;
-  text-shadow: 0 0 18px rgba(255, 61, 245, 0.6);
-}
 h2 {
   font-size: var(--fs-2xl);
   font-weight: 700;
@@ -206,6 +202,26 @@ button:focus {
 .btn.primary:focus,
 .btn.primary:hover {
   background: rgba(56, 246, 255, 0.16);
+  color: #fff;
+}
+.btn.go {
+  border-color: rgba(57, 255, 122, 0.6);
+  color: var(--green);
+}
+.btn.go:focus,
+.btn.go:hover {
+  border-color: var(--green);
+  background: rgba(57, 255, 122, 0.14);
+  color: #fff;
+}
+.btn.danger {
+  border-color: rgba(255, 61, 110, 0.5);
+  color: var(--red);
+}
+.btn.danger:focus,
+.btn.danger:hover {
+  border-color: var(--red);
+  background: rgba(255, 61, 110, 0.16);
   color: #fff;
 }
 .stack {
@@ -765,6 +781,23 @@ table.scores tr.first td.rank {
 }
 .statlist div.on b {
   color: var(--green);
+}
+.statlist div small {
+  flex-basis: 100%;
+  font-size: var(--fs-s);
+  color: rgba(154, 143, 192, 0.75);
+}
+.statlist div {
+  flex-wrap: wrap;
+}
+
+/* ---------- Pause ---------- */
+.screen-pause {
+  width: min(1100px, 100%);
+}
+.build .item .txt small.num {
+  color: var(--text);
+  opacity: 0.8;
 }
 
 /* ---------- Fin de partie ---------- */

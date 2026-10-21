@@ -2,7 +2,7 @@
   "name": "swarm",
   "private": true,
   "version": "0.2.0",
-  "description": "NÉON STOP: a deterministic neon survivor-like (TypeScript + Vite).",
+  "description": "SWARM: a deterministic neon survivor-like (TypeScript + Vite).",
   "type": "module",
   "scripts": {
     "dev": "vite",
