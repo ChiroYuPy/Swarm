@@ -119,8 +119,10 @@ class App implements AppApi {
     if (seedParam) this.config.seed = seedParam;
     const dParam = params.get('difficulty');
     if (dParam !== null) this.config.difficulty = Number(dParam);
-    if (params.get('autostart') === '1' || this.botMode || this.stressMode) this.start(this.config);
-    else this.ui.showIntro();
+    if (params.get('autostart') === '1' || this.botMode || this.stressMode) {
+      document.body.classList.remove('booting');
+      this.start(this.config);
+    } else this.ui.showIntro();
 
     (window as unknown as { __neonawak: App }).__neonawak = this;
     requestAnimationFrame((t) => this.frame(t));
@@ -427,7 +429,11 @@ class App implements AppApi {
     let alpha = 1;
     switch (this.mode) {
       case 'menu': {
-        // Démo en arrière-plan
+        // Démo en arrière-plan. Pendant l'intro elle est masquée et figée : elle démarre avec le menu.
+        if (this.ui.introActive) {
+          this.acc = 0;
+          break;
+        }
         this.acc += dtMs;
         let n = 0;
         while (this.acc >= STEP_MS && n++ < 4) {

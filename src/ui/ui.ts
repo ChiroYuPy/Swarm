@@ -362,6 +362,8 @@ const DEPTH: Record<string, number> = { difficulty: 1, codex: 1, scores: 1, sett
 const depth = (name: string) => DEPTH[name] ?? 0;
 /** Durée de sortie de chaque écran (ms), alignée sur style.css. */
 const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
+/** Durée de l'allumage cathodique (ms), alignée sur style.css. */
+const CRT_MS = 1100;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
@@ -398,7 +400,7 @@ export class UI {
   private screenEl: HTMLElement | null = null;
   private closeTimer = 0;
   /** intro en cours : la prochaine touche ou le prochain clic la termine */
-  private intro: { crt: HTMLElement; stop: () => void } | null = null;
+  private intro: { stop: () => void } | null = null;
 
   constructor(private readonly app: AppApi) {
     this.root = document.getElementById('ui')!;
@@ -568,7 +570,6 @@ export class UI {
       `
       <header class="brand">
         <h1 class="title">${[...'SWARM'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('')}</h1>
-        <p class="sub">Survis à la marée géométrique</p>
       </header>
       <nav class="stack">
         <button class="btn nav primary" id="play">Jouer</button>
@@ -576,7 +577,7 @@ export class UI {
         <button class="btn nav" id="scores">Records</button>
         <button class="btn nav" id="settings">Options</button>
       </nav>
-      <footer class="foot">ZQSD / flèches / manette : bouger · Espace : objet · Échap : pause · M : muet · v${GAME_VERSION}</footer>
+      <p class="version">v${GAME_VERSION}</p>
     `,
     );
     el.querySelector('#play')!.addEventListener('click', () => this.showDifficulty());
@@ -591,19 +592,18 @@ export class UI {
   }
 
   /**
-   * Allumage façon vieil écran (une ligne lumineuse qui s'ouvre), puis le logo s'allume lettre par
-   * lettre comme un néon, puis « Appuie sur une touche ». Ce premier geste autorise le son : la musique
-   * démarre et les boutons du menu arrivent sous le logo, sans changer d'écran.
+   * Allumage façon vieux téléviseur : toute l'image (jeu + interface) part d'une ligne lumineuse et
+   * s'étire jusqu'à plein écran. Le logo, seul au centre, s'allume lettre par lettre comme un néon,
+   * avec « Appuie sur une touche » juste dessous. Ce premier geste autorise le son, puis le logo
+   * remonte à sa place et les boutons du menu se déroulent un par un.
    */
   showIntro(): void {
+    const body = document.body;
     if (reducedMotion()) {
+      body.classList.remove('booting');
       this.showMenu();
       return;
     }
-    const crt = document.createElement('div');
-    crt.className = 'crt';
-    crt.innerHTML = '<i></i>';
-    document.body.appendChild(crt);
     const onKey = (e: KeyboardEvent) => {
       // Capturée avant InputManager : la touche termine l'intro et ne fait rien d'autre.
       e.preventDefault();
@@ -624,27 +624,41 @@ export class UI {
     };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('pointerdown', onPointer, true);
-    this.intro = {
-      crt,
+    // Fond uni pendant l'intro : la partie de démonstration n'apparaît qu'avec le menu.
+    body.classList.add('intro-bg');
+    const intro = {
       stop: () => {
         window.removeEventListener('keydown', onKey, true);
         window.removeEventListener('pointerdown', onPointer, true);
       },
     };
-    // Rien ne s'allume avant la police du titre (sinon on verrait le logo changer de police).
+    this.intro = intro;
+    // Écran noir tant que la police du titre n'est pas là (sinon on verrait le logo changer de police).
     const fontReady = document.fonts?.load('700 88px "Chakra Petch"') ?? Promise.resolve();
     const timeout = new Promise((r) => setTimeout(r, 1500));
     void Promise.race([fontReady, timeout])
       .catch(() => {})
       .then(() => {
-        if (this.intro?.crt !== crt) return;
+        if (this.intro !== intro) return;
         this.showMenu();
         const el = this.screenEl!;
-        // Pas de glissement : l'écran est déjà là, derrière l'écran noir.
+        // Pas de glissement : l'écran est déjà en place quand l'image s'allume.
         el.classList.remove('enter-fwd');
         el.classList.add('intro');
-        el.querySelector('.stack')!.insertAdjacentHTML('beforeend', '<p class="press">Appuie sur une touche</p>');
-        crt.classList.add('go');
+        el.insertAdjacentHTML('beforeend', '<p class="press">Appuie sur une touche</p>');
+        // Le point qui devient trait, puis les deux lignes qui s'écartent (voir style.css).
+        const lines = ['crt-line', 'crt-edge up', 'crt-edge down'].map((c) => {
+          const d = document.createElement('div');
+          d.className = c;
+          body.appendChild(d);
+          return d;
+        });
+        body.classList.remove('booting');
+        body.classList.add('crt-on');
+        setTimeout(() => {
+          lines.forEach((d) => d.remove());
+          body.classList.remove('crt-on');
+        }, CRT_MS);
       });
   }
 
@@ -654,17 +668,37 @@ export class UI {
     if (!intro) return;
     this.intro = null;
     intro.stop();
-    // Passée avant la fin de l'allumage : l'écran noir s'efface vite au lieu de couper net.
-    intro.crt.classList.add('skip');
-    setTimeout(() => intro.crt.remove(), 300);
+    const body = document.body;
+    // Passée pendant l'allumage : l'image se remet d'un coup, sans écran noir. La démo apparaît en fondu.
+    body.classList.remove('booting', 'crt-on', 'intro-bg');
+    document.querySelectorAll('.crt-line, .crt-edge').forEach((d) => d.remove());
     const el = this.screenEl;
-    if (this.current === 'menu' && el?.classList.contains('intro')) {
-      el.classList.remove('intro');
-      el.classList.add('intro-out');
-      const press = el.querySelector('.press');
-      setTimeout(() => press?.remove(), 250);
-      el.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
-    } else if (!this.current) this.showMenu();
+    if (this.current !== 'menu' || !el?.classList.contains('intro')) {
+      if (!this.current) this.showMenu();
+      this.app.introDone();
+      return;
+    }
+    const brand = el.querySelector<HTMLElement>('.brand')!;
+    const press = el.querySelector<HTMLElement>('.press');
+    const first = brand.getBoundingClientRect();
+    // Le message sort du flux (figé à sa place) et s'efface.
+    if (press) {
+      const r = press.getBoundingClientRect();
+      Object.assign(press.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, margin: '0' });
+      press.animate([{ opacity: getComputedStyle(press).opacity }, { opacity: 0 }], { duration: 200, fill: 'forwards' });
+      setTimeout(() => press.remove(), 220);
+    }
+    el.classList.remove('intro');
+    el.classList.add('intro-out');
+    // Le logo glisse du centre jusqu'à sa place (FLIP : on part de l'ancienne position).
+    const last = brand.getBoundingClientRect();
+    const dy = first.top + first.height / 2 - (last.top + last.height / 2);
+    const sc = first.width / last.width;
+    brand.animate([{ transform: `translateY(${dy}px) scale(${sc})` }, { transform: 'none' }], {
+      duration: 650,
+      easing: 'cubic-bezier(0.65, 0, 0.35, 1)',
+    });
+    el.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
     this.app.introDone();
   }
 
