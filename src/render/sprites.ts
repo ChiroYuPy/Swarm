@@ -134,7 +134,7 @@ function enemySprite(d: EnemyDef, color: string): Sprite {
   return make(d.radius * 1.5 + 8, (ctx) => paintEnemy(ctx, d, color));
 }
 
-/** Petit canvas d'aperçu d'un ennemi pour l'interface (aide, bestiaire). */
+/** Petit canvas d'aperçu d'un ennemi pour l'interface (aide, codex). */
 export function enemyPreview(id: string, size: number): HTMLCanvasElement {
   const d = ENEMIES.find((e) => e.id === id)!;
   const [cv, ctx] = makeCanvas(size);

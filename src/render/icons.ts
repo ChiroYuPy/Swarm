@@ -404,7 +404,7 @@ export const PICKUP_COLORS: Record<PickupIcon, string> = {
 };
 
 /**
- * Objets ramassables (monde, HUD, bestiaire).
+ * Objets ramassables (monde, HUD, codex).
  * Bonus (soin et temporaires) dans un cercle, activables dans un losange, coffre sans cadre.
  * `framed = false` : pictogramme seul (HUD).
  */

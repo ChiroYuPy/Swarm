@@ -151,7 +151,7 @@ const fusionPartner = (i: number) => {
   return f.withKind === 'weapon' ? ALL_WEAPONS.find((x) => x.id === f.with)! : PASSIVES.find((x) => x.id === f.with)!;
 };
 
-// ---------- Bestiaire : données ----------
+// ---------- Codex : données ----------
 interface CodexItem {
   tab: CodexTab;
   id: string;
@@ -226,7 +226,7 @@ function codexItems(tab: CodexTab): CodexItem[] {
   }
 }
 
-/** Petit lien vers une autre fiche du bestiaire. */
+/** Petit lien vers une autre fiche du codex. */
 function chip(tab: CodexTab, id: string, suffix = ''): string {
   const it = codexItems(tab).find((x) => x.id === id);
   if (!it) return '';
@@ -363,6 +363,22 @@ const depth = (name: string) => DEPTH[name] ?? 0;
 const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/**
+ * Fait défiler verticalement le premier conteneur défilant pour montrer `el`. Jamais de défilement
+ * horizontal : `scrollIntoView` décalerait #ui de côté pendant qu'un écran arrive en glissant.
+ */
+function reveal(el: HTMLElement): void {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy !== 'auto' && oy !== 'scroll') || p.scrollHeight <= p.clientHeight) continue;
+    const r = el.getBoundingClientRect();
+    const pr = p.getBoundingClientRect();
+    if (r.top < pr.top) p.scrollTop -= pr.top - r.top + 8;
+    else if (r.bottom > pr.bottom) p.scrollTop += r.bottom - pr.bottom + 8;
+    return;
+  }
+}
+
 export class UI {
   private readonly root: HTMLElement;
   private readonly toasts: HTMLElement;
@@ -372,7 +388,7 @@ export class UI {
   private levelCount = 0;
   private settingsReturn: () => void = () => {};
   private codexReturn: () => void = () => this.showMenu();
-  /** bestiaire ouvert depuis la pause : affiché par-dessus la partie */
+  /** codex ouvert depuis la pause : affiché par-dessus la partie */
   private codexOverlay = false;
   private codexTab: CodexTab = 'armes';
   private countAnim = 0;
@@ -390,6 +406,10 @@ export class UI {
       this.muteBtn.blur(); // Espace ne doit pas re-déclencher le bouton en jeu
     });
     this.refreshMute();
+    // Garde-fou : #ui ne défile jamais de côté (les écrans qui glissent dépassent volontairement).
+    this.root.addEventListener('scroll', () => {
+      if (this.root.scrollLeft) this.root.scrollLeft = 0;
+    });
   }
 
   get screen(): string {
@@ -413,8 +433,15 @@ export class UI {
     el.className = `screen screen-${name}`;
     el.innerHTML = html;
     if (prev && prevName === name && TAB_SCREENS.has(name)) {
-      // Même écran, autre onglet (bestiaire, records) : seul le contenu change.
+      // Même écran, autre onglet (codex, records) : seul le contenu change.
       el.classList.add('same');
+      // Si l'écran est encore en train d'arriver, le nouveau reprend le glissement là où il en était.
+      const run = prev.getAnimations().find((an) => an.playState === 'running');
+      const enter = [...prev.classList].find((c) => c.startsWith('enter-'));
+      if (run && enter && typeof run.currentTime === 'number') {
+        el.classList.add(enter);
+        el.style.animationDelay = `${-run.currentTime}ms`;
+      }
       prev.replaceWith(el);
     } else {
       // Tout circule de droite à gauche ; revenir en arrière (ou quitter la fin de partie, dont le
@@ -490,7 +517,8 @@ export class UI {
     if (!items.length) return;
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
     const next = items[(i < 0 ? 0 : i + d + items.length) % items.length];
-    next.focus({ preventScroll: false });
+    next.focus({ preventScroll: true });
+    reveal(next);
     this.app.uiSound('uiMove');
   }
 
@@ -541,7 +569,7 @@ export class UI {
       </header>
       <nav class="stack">
         <button class="btn nav primary" id="play">Jouer</button>
-        <button class="btn nav" id="codex">Bestiaire</button>
+        <button class="btn nav" id="codex">Codex</button>
         <button class="btn nav" id="scores">Records</button>
         <button class="btn nav" id="settings">Options</button>
       </nav>
@@ -727,7 +755,7 @@ export class UI {
     }
   }
 
-  // ---------- Bestiaire ----------
+  // ---------- Codex ----------
   /** Catégories : à gauche. Grille d'icônes au centre. Fiche détaillée de l'élément sélectionné à droite. */
   showCodex(tab: CodexTab, sel = 0, onBack?: () => void): void {
     if (onBack) {
@@ -764,7 +792,7 @@ export class UI {
     const el = this.mount(
       'codex',
       `
-      <header class="head"><h2>Bestiaire</h2></header>
+      <header class="head"><h2>Codex</h2></header>
       <div class="codex ${items.length ? '' : 'solo'}">
         <nav class="cats">${side}</nav>
         ${items.length ? `<div class="panel list">${center}</div>` : ''}
@@ -807,12 +835,12 @@ export class UI {
       const i = Math.min(sel, items.length - 1);
       select(i);
       tiles[i].focus({ preventScroll: true });
-      tiles[i].scrollIntoView({ block: 'nearest' });
+      reveal(tiles[i]);
     } else el.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
   }
 
   /**
-   * Bestiaire au clavier / à la manette : haut et bas changent de catégorie, gauche et droite
+   * Codex au clavier / à la manette : haut et bas changent de catégorie, gauche et droite
    * changent d'élément. Les deux bouclent.
    */
   private codexNav(dir: NavDir): boolean {
@@ -830,7 +858,7 @@ export class UI {
     if (i < 0) i = Math.max(0, tiles.findIndex((t) => t.classList.contains('on')));
     const next = tiles[(i + (dir === 'left' ? -1 : 1) + tiles.length) % tiles.length];
     next.focus({ preventScroll: true });
-    next.scrollIntoView({ block: 'nearest' });
+    reveal(next);
     this.app.uiSound('uiMove');
     return true;
   }
@@ -977,7 +1005,7 @@ export class UI {
       </div>
       <footer class="actions">
         <button class="btn nav primary go" id="resume">Reprendre</button>
-        <button class="btn nav" id="codex">Bestiaire</button>
+        <button class="btn nav" id="codex">Codex</button>
         <button class="btn nav" id="settings">Options</button>
         <button class="btn nav danger" id="quit">Abandonner</button>
       </footer>

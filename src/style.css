@@ -192,7 +192,7 @@ body.dead #game {
   box-shadow: 0 0 34px color-mix(in srgb, var(--c) 60%, transparent);
   transform: translateY(-3px) scale(1.04);
 }
-/* Onglets (bestiaire, records) : l'écran ne bouge pas, seul le contenu change, en fondu. */
+/* Onglets (codex, records) : l'écran ne bouge pas, seul le contenu change, en fondu. */
 .screen.same .list,
 .screen.same .detail,
 .screen.same table {
@@ -754,7 +754,7 @@ table.scores tr.first td.rank {
   font-weight: 700;
 }
 
-/* ---------- Bestiaire : catégories | grille | fiche ---------- */
+/* ---------- Codex : catégories | grille | fiche ---------- */
 .screen-codex {
   width: min(1180px, 100%);
 }
