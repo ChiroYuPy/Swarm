@@ -57,8 +57,6 @@ body.dead #game {
 
 /* ---------- Conteneur des écrans ---------- */
 #ui {
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   position: fixed;
   inset: 0;
   z-index: 6;
@@ -91,10 +89,10 @@ body.dead #game {
   background: rgba(7, 6, 15, 0.72);
 }
 #ui.visible::before {
-  animation: fade-in 0.25s ease-out both;
+  animation: fade-in var(--push-time) var(--ease-io) both;
 }
 #ui.closing::before {
-  animation: fade-out 0.24s ease-in both;
+  animation: fade-out var(--push-time) var(--ease-io) both;
 }
 
 .screen {
@@ -106,29 +104,51 @@ body.dead #game {
   margin: auto;
 }
 
-/* Entrées : plus profond = arrive de la droite, retour = arrive de la gauche, sinon léger zoom. */
+/*
+ * Transitions d'écran « push » : l'écran sortant file entièrement d'un côté pendant que l'entrant
+ * arrive de l'autre, avec la même courbe et exactement un écran d'écart : ils ne se chevauchent jamais.
+ * fwd = l'ancien part à gauche, le nouveau vient de la droite ; back = l'inverse.
+ */
+#ui {
+  --push: 110vw;
+  --push-time: 0.46s;
+  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  overflow-x: hidden;
+}
 .screen.enter-fwd {
-  animation: in-from-right 0.34s var(--ease-out) both;
+  animation: push-in-right var(--push-time) var(--ease-io) both;
 }
 .screen.enter-back {
-  animation: in-from-left 0.34s var(--ease-out) both;
+  animation: push-in-left var(--push-time) var(--ease-io) both;
 }
-.screen.enter-swap {
-  animation: in-zoom 0.3s var(--ease-out) both;
-}
-/* Sorties : l'écran figé glisse dans l'autre sens, ou s'efface en remontant légèrement. */
 .screen.leaving {
   pointer-events: none;
 }
 .screen.leave-fwd {
-  animation: out-to-left 0.24s var(--ease-in) forwards;
+  animation: push-out-left var(--push-time) var(--ease-io) forwards;
 }
 .screen.leave-back {
-  animation: out-to-right 0.24s var(--ease-in) forwards;
+  animation: push-out-right var(--push-time) var(--ease-io) forwards;
 }
-.screen.leave-swap,
-.screen.leave-out {
-  animation: out-zoom 0.22s var(--ease-in) forwards;
+@keyframes push-in-right {
+  from {
+    transform: translateX(var(--push));
+  }
+}
+@keyframes push-in-left {
+  from {
+    transform: translateX(calc(-1 * var(--push)));
+  }
+}
+@keyframes push-out-left {
+  to {
+    transform: translateX(calc(-1 * var(--push)));
+  }
+}
+@keyframes push-out-right {
+  to {
+    transform: translateX(var(--push));
+  }
 }
 @keyframes fade-in {
   from {
@@ -140,53 +160,10 @@ body.dead #game {
     opacity: 0;
   }
 }
-@keyframes in-from-right {
-  from {
-    opacity: 0;
-    transform: translateX(48px);
-  }
-}
-@keyframes in-from-left {
-  from {
-    opacity: 0;
-    transform: translateX(-48px);
-  }
-}
-@keyframes in-zoom {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-}
-@keyframes out-to-left {
-  to {
-    opacity: 0;
-    transform: translateX(-48px);
-  }
-}
-@keyframes out-to-right {
-  to {
-    opacity: 0;
-    transform: translateX(48px);
-  }
-}
-@keyframes out-zoom {
-  to {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-  }
-}
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-}
 
-/* ---------- Détails animés par écran ---------- */
-/* Menu : le titre s'allume comme un néon, les boutons arrivent un par un. */
+/* Menu : le titre s'allume comme un néon une fois arrivé (pas au retour d'un sous-menu). */
 .screen-menu:not(.enter-back) .title {
-  animation: neon-on 0.9s steps(1, end) both;
+  animation: neon-on 0.9s var(--push-time) steps(1, end) both;
 }
 @keyframes neon-on {
   0% {
@@ -209,88 +186,20 @@ body.dead #game {
     opacity: 1;
   }
 }
-.screen-menu .stack .btn {
-  animation: rise-in 0.42s var(--ease-out) backwards;
-}
-.screen-menu .stack .btn:nth-child(1) {
-  animation-delay: 0.08s;
-}
-.screen-menu .stack .btn:nth-child(2) {
-  animation-delay: 0.13s;
-}
-.screen-menu .stack .btn:nth-child(3) {
-  animation-delay: 0.18s;
-}
-.screen-menu .stack .btn:nth-child(4) {
-  animation-delay: 0.23s;
-}
-/* Cartes (difficulté, level-up) : en cascade. */
-.screen-difficulty .card,
-.screen-levelup .card {
-  animation: rise-in 0.42s var(--ease-out) backwards;
-}
-.screen-difficulty .card:nth-child(2),
-.screen-levelup .card:nth-child(2) {
-  animation-delay: 0.06s;
-}
-.screen-difficulty .card:nth-child(3),
-.screen-levelup .card:nth-child(3) {
-  animation-delay: 0.12s;
-}
-/* Level-up : la carte choisie s'illumine et grossit, les autres tombent. */
-.screen-levelup.leaving {
-  animation: none;
-}
-.screen-levelup.leaving .head {
-  animation: fade-out 0.2s ease-in forwards;
-}
-.screen-levelup.leaving .card {
-  animation: card-drop 0.24s var(--ease-in) forwards;
-}
+/* Level-up : la carte choisie s'illumine pendant que l'écran file. */
 .screen-levelup.leaving .card.picked {
-  animation: card-picked 0.34s var(--ease-out) forwards;
+  border-color: var(--c);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--c) 60%, transparent);
+  transform: translateY(-3px) scale(1.04);
 }
-@keyframes card-drop {
-  to {
-    opacity: 0;
-    transform: translateY(24px) scale(0.96);
-  }
-}
-@keyframes card-picked {
-  0% {
-    transform: translateY(-3px);
-  }
-  35% {
-    opacity: 1;
-    transform: translateY(-6px) scale(1.06);
-    box-shadow: 0 0 34px color-mix(in srgb, var(--c) 60%, transparent);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-16px) scale(1.1);
-  }
-}
-/* Pause : les deux panneaux arrivent de chaque côté. */
-.screen-pause.enter-swap .split > .panel:first-child {
-  animation: in-from-left 0.36s var(--ease-out) backwards;
-}
-.screen-pause.enter-swap .split > .panel:last-child {
-  animation: in-from-right 0.36s var(--ease-out) backwards;
-}
-/* Onglets (bestiaire, records) : seul le contenu change, en fondu. */
+/* Onglets (bestiaire, records) : l'écran ne bouge pas, seul le contenu change, en fondu. */
 .screen.same .list,
 .screen.same .detail,
 .screen.same table {
-  animation: rise-in 0.22s var(--ease-out) backwards;
+  animation: fade-in 0.2s ease-out backwards;
 }
 .detail.swap {
-  animation: detail-in 0.2s var(--ease-out) backwards;
-}
-@keyframes detail-in {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
-  }
+  animation: fade-in 0.18s ease-out backwards;
 }
 
 /* ---------- Typographie ---------- */
@@ -1280,44 +1189,22 @@ h2.go {
     transform: translateY(14px);
   }
 }
-/* Entrée : le bandeau fait tout le spectacle, l'écran lui-même ne bouge pas. */
-.screen-death.enter-swap {
-  animation: none;
-}
-/* Sortie : le bandeau file vers la droite en accélérant, le reste retombe. */
-.screen-death.leaving {
-  animation: none;
-}
+/* Sortie : tout l'écran file vers la droite, le bandeau en tête. */
 .screen-death.leaving .banner-band {
-  animation: band-out 0.5s var(--ease-in) forwards;
-}
-.screen-death.leaving .banner-content {
-  animation: content-out 0.42s var(--ease-in) forwards;
+  animation: band-out 0.5s var(--ease-io) forwards;
 }
 .screen-death.leaving .stamp {
-  animation: fade-out 0.18s ease-in forwards;
+  animation: fade-out 0.15s ease-in forwards;
   /* son délai d'entrée est posé en ligne par ui.ts */
   animation-delay: 0s !important;
 }
 .screen-death.leaving .reveal {
-  animation: drop-out 0.26s var(--ease-in) forwards;
-  animation-delay: calc(var(--i, 0) * 30ms);
+  /* déjà arrivés : on fige leur état final pendant que l'écran file */
+  animation: none;
 }
 @keyframes band-out {
   to {
     transform: translateX(105%);
-  }
-}
-@keyframes content-out {
-  to {
-    opacity: 0;
-    transform: translateX(45vw);
-  }
-}
-@keyframes drop-out {
-  to {
-    opacity: 0;
-    transform: translateY(16px);
   }
 }
 @media (prefers-reduced-motion: reduce) {

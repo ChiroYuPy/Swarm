@@ -360,7 +360,7 @@ const TAB_SCREENS = new Set(['codex', 'scores']);
 const DEPTH: Record<string, number> = { difficulty: 1, codex: 1, scores: 1, settings: 1 };
 const depth = (name: string) => DEPTH[name] ?? 0;
 /** Durée de sortie de chaque écran (ms), alignée sur style.css. */
-const LEAVE_MS: Record<string, number> = { default: 240, death: 560, levelup: 340 };
+const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export class UI {
@@ -417,9 +417,12 @@ export class UI {
       el.classList.add('same');
       prev.replaceWith(el);
     } else {
-      const dir = depth(name) > depth(prevName) ? 'fwd' : depth(name) < depth(prevName) ? 'back' : 'swap';
+      // Tout circule de droite à gauche ; revenir en arrière (ou quitter la fin de partie, dont le
+      // bandeau file vers la droite) inverse le sens.
+      const dir = depth(name) < depth(prevName) || prevName === 'death' ? 'back' : 'fwd';
       if (prev) this.leave(prev, prevName, dir);
-      el.classList.add(`enter-${dir}`);
+      // La fin de partie n'arrive pas en glissant : c'est son bandeau qui fait l'entrée.
+      el.classList.add(name === 'death' ? 'enter-none' : `enter-${dir}`);
       this.root.appendChild(el);
     }
     this.screenEl = el;
@@ -431,7 +434,7 @@ export class UI {
   }
 
   /** Fait sortir un écran : figé à sa place, inerte (ni focus ni clic), retiré à la fin de son animation. */
-  private leave(el: HTMLElement, name: string, dir: 'fwd' | 'back' | 'swap' | 'out'): void {
+  private leave(el: HTMLElement, name: string, dir: 'fwd' | 'back'): void {
     if (reducedMotion()) {
       el.remove();
       return;
@@ -443,7 +446,7 @@ export class UI {
     el.style.top = `${r.top}px`;
     el.style.width = `${r.width}px`;
     el.style.margin = '0';
-    el.classList.remove('enter-fwd', 'enter-back', 'enter-swap', 'same');
+    el.classList.remove('enter-fwd', 'enter-back', 'enter-none', 'same');
     el.classList.add('leaving', `leave-${dir}`);
     setTimeout(() => el.remove(), LEAVE_MS[name] ?? LEAVE_MS.default);
   }
@@ -460,7 +463,7 @@ export class UI {
       this.root.className = '';
       return;
     }
-    this.leave(prev, prevName, 'out');
+    this.leave(prev, prevName, prevName === 'death' ? 'back' : 'fwd');
     // Le fond s'efface en même temps que l'écran ; #ui reste affiché (sans capter la souris) jusqu'à la fin.
     this.root.classList.remove('visible');
     this.root.classList.add('closing');
