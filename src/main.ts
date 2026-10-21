@@ -171,6 +171,7 @@ class App implements AppApi {
     if (this.mode !== 'levelup') return;
     const s = this.state;
     if (i < 0 || i >= s.players[0].offers.length) return;
+    this.ui.markPicked(i);
     const code = choiceCode(i);
     this.log.push(code);
     step(s, [code]);

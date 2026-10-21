@@ -354,6 +354,15 @@ function paintIcons(root: HTMLElement, size: number): void {
   });
 }
 
+/** Écrans à onglets : changer d'onglet redessine l'écran sans transition d'écran. */
+const TAB_SCREENS = new Set(['codex', 'scores']);
+/** Profondeur de navigation : aller plus profond glisse vers la gauche, revenir glisse vers la droite. */
+const DEPTH: Record<string, number> = { difficulty: 1, codex: 1, scores: 1, settings: 1 };
+const depth = (name: string) => DEPTH[name] ?? 0;
+/** Durée de sortie de chaque écran (ms), alignée sur style.css. */
+const LEAVE_MS: Record<string, number> = { default: 240, death: 560, levelup: 340 };
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export class UI {
   private readonly root: HTMLElement;
   private readonly toasts: HTMLElement;
@@ -368,6 +377,9 @@ export class UI {
   private codexTab: CodexTab = 'armes';
   private countAnim = 0;
   private levelOpenedAt = 0;
+  /** écran affiché (ceux qui sortent restent un instant dans #ui, inertes) */
+  private screenEl: HTMLElement | null = null;
+  private closeTimer = 0;
 
   constructor(private readonly app: AppApi) {
     this.root = document.getElementById('ui')!;
@@ -384,14 +396,33 @@ export class UI {
     return this.current;
   }
 
-  /** Monte un écran. `overlay` : par-dessus la partie (fond assombri), sinon écran de menu. */
+  /**
+   * Monte un écran. `overlay` : par-dessus la partie (fond assombri), sinon écran de menu.
+   * L'écran précédent n'est pas effacé d'un coup : il reste un instant en place, inerte, le temps
+   * de jouer sa sortie pendant que le nouveau entre (glissement selon le sens de navigation).
+   */
   private mount(name: string, html: string, overlay = false): HTMLElement {
     cancelAnimationFrame(this.countAnim);
+    clearTimeout(this.closeTimer);
+    const prev = this.screenEl;
+    const prevName = this.current;
     this.current = name;
     this.toasts.replaceChildren(); // les messages de jeu ne doivent pas traîner sur un écran
     this.root.className = `visible ${overlay ? 'overlay' : 'menu'}`;
-    this.root.innerHTML = `<div class="screen screen-${name}">${html}</div>`;
-    const el = this.root.firstElementChild as HTMLElement;
+    const el = document.createElement('div');
+    el.className = `screen screen-${name}`;
+    el.innerHTML = html;
+    if (prev && prevName === name && TAB_SCREENS.has(name)) {
+      // Même écran, autre onglet (bestiaire, records) : seul le contenu change.
+      el.classList.add('same');
+      prev.replaceWith(el);
+    } else {
+      const dir = depth(name) > depth(prevName) ? 'fwd' : depth(name) < depth(prevName) ? 'back' : 'swap';
+      if (prev) this.leave(prev, prevName, dir);
+      el.classList.add(`enter-${dir}`);
+      this.root.appendChild(el);
+    }
+    this.screenEl = el;
     el.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this.app.uiSound('ui')));
     // Survol à la souris = même sélection qu'au clavier.
     el.querySelectorAll<HTMLButtonElement>('.nav').forEach((b) => b.addEventListener('mouseenter', () => b.focus({ preventScroll: true })));
@@ -399,11 +430,51 @@ export class UI {
     return el;
   }
 
+  /** Fait sortir un écran : figé à sa place, inerte (ni focus ni clic), retiré à la fin de son animation. */
+  private leave(el: HTMLElement, name: string, dir: 'fwd' | 'back' | 'swap' | 'out'): void {
+    if (reducedMotion()) {
+      el.remove();
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    el.inert = true;
+    el.style.position = 'fixed';
+    el.style.left = `${r.left}px`;
+    el.style.top = `${r.top}px`;
+    el.style.width = `${r.width}px`;
+    el.style.margin = '0';
+    el.classList.remove('enter-fwd', 'enter-back', 'enter-swap', 'same');
+    el.classList.add('leaving', `leave-${dir}`);
+    setTimeout(() => el.remove(), LEAVE_MS[name] ?? LEAVE_MS.default);
+  }
+
   hide(): void {
     cancelAnimationFrame(this.countAnim);
+    const prev = this.screenEl;
+    const prevName = this.current;
     this.current = '';
-    this.root.innerHTML = '';
-    this.root.className = '';
+    this.screenEl = null;
+    clearTimeout(this.closeTimer);
+    if (!prev || reducedMotion()) {
+      this.root.replaceChildren();
+      this.root.className = '';
+      return;
+    }
+    this.leave(prev, prevName, 'out');
+    // Le fond s'efface en même temps que l'écran ; #ui reste affiché (sans capter la souris) jusqu'à la fin.
+    this.root.classList.remove('visible');
+    this.root.classList.add('closing');
+    this.closeTimer = window.setTimeout(() => {
+      if (this.current) return;
+      this.root.replaceChildren();
+      this.root.className = '';
+    }, LEAVE_MS[prevName] ?? LEAVE_MS.default);
+  }
+
+  /** Carte choisie au level-up : elle s'illumine pendant que l'écran sort. */
+  markPicked(i: number): void {
+    if (this.current !== 'levelup') return;
+    this.screenEl?.querySelectorAll<HTMLElement>('.card')[i]?.classList.add('picked');
   }
 
   /** Déplace la sélection entre les boutons de l'écran courant (flèches / croix de la manette). */
@@ -411,7 +482,8 @@ export class UI {
     if (this.current === 'codex' && this.codexNav(dir)) return;
     if (this.current === 'settings' && (dir === 'left' || dir === 'right') && this.adjustSetting(dir === 'left' ? -1 : 1)) return;
     const d = dir === 'left' || dir === 'up' ? -1 : 1;
-    const items = [...this.root.querySelectorAll<HTMLButtonElement>('.nav')].filter((b) => !b.disabled);
+    if (!this.screenEl) return;
+    const items = [...this.screenEl.querySelectorAll<HTMLButtonElement>('.nav')].filter((b) => !b.disabled);
     if (!items.length) return;
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
     const next = items[(i < 0 ? 0 : i + d + items.length) % items.length];
@@ -422,7 +494,7 @@ export class UI {
   /** Valide le bouton sélectionné (bouton A de la manette). */
   activate(): boolean {
     const ae = document.activeElement as HTMLElement | null;
-    if (ae && ae.tagName === 'BUTTON' && this.root.contains(ae)) {
+    if (ae && ae.tagName === 'BUTTON' && this.screenEl?.contains(ae)) {
       ae.click();
       return true;
     }
@@ -439,7 +511,7 @@ export class UI {
     const m = this.app.save.settings.muted;
     this.muteBtn.textContent = m ? '🔇' : '🔊';
     this.muteBtn.title = m ? 'Son coupé (M)' : 'Couper le son (M)';
-    const row = this.root.querySelector<HTMLElement>('.set[data-key="muted"]');
+    const row = this.screenEl?.querySelector<HTMLElement>('.set[data-key="muted"]');
     if (row) this.paintSetting(row);
   }
 
@@ -604,7 +676,7 @@ export class UI {
     if (this.app.save.settings[key] === value) return;
     this.app.applySettings({ ...this.app.save.settings, [key]: value });
     this.refreshMute();
-    const row = this.root.querySelector<HTMLButtonElement>(`.set[data-key="${key}"]`);
+    const row = this.screenEl?.querySelector<HTMLButtonElement>(`.set[data-key="${key}"]`);
     if (row) this.paintSetting(row);
   }
 
@@ -623,7 +695,7 @@ export class UI {
 
   private adjustSetting(delta: number): boolean {
     const row = document.activeElement as HTMLElement | null;
-    if (!row || !row.classList.contains('set') || !this.root.contains(row)) return false;
+    if (!row || !row.classList.contains('set') || !this.screenEl?.contains(row)) return false;
     this.stepSetting(row, delta);
     this.app.uiSound('uiMove');
     return true;
@@ -707,6 +779,10 @@ export class UI {
       if (!items[i]) return;
       tiles.forEach((t, k) => t.classList.toggle('on', k === i));
       detail.innerHTML = codexDetail(items[i]);
+      // relance le petit fondu de la fiche à chaque changement d'élément
+      detail.classList.remove('swap');
+      void detail.offsetWidth;
+      detail.classList.add('swap');
       paintIcons(detail, 72);
       detail.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) =>
         b.addEventListener('click', () => {
@@ -720,7 +796,7 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('.cat').forEach((b) =>
       b.addEventListener('click', () => {
         this.showCodex(b.dataset.tab as CodexTab);
-        this.root.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
+        this.screenEl?.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
       }),
     );
     el.querySelector('#back')!.addEventListener('click', () => this.codexReturn());
@@ -737,14 +813,15 @@ export class UI {
    * changent d'élément. Les deux bouclent.
    */
   private codexNav(dir: NavDir): boolean {
-    const cats = [...this.root.querySelectorAll<HTMLButtonElement>('.cat')].map((b) => b.dataset.tab as CodexTab);
+    if (!this.screenEl) return false;
+    const cats = [...this.screenEl.querySelectorAll<HTMLButtonElement>('.cat')].map((b) => b.dataset.tab as CodexTab);
     if (dir === 'up' || dir === 'down') {
       const i = cats.indexOf(this.codexTab);
       this.showCodex(cats[(i + (dir === 'up' ? -1 : 1) + cats.length) % cats.length]);
       this.app.uiSound('uiMove');
       return true;
     }
-    const tiles = [...this.root.querySelectorAll<HTMLButtonElement>('.tile')];
+    const tiles = [...this.screenEl.querySelectorAll<HTMLButtonElement>('.tile')];
     if (!tiles.length) return true;
     let i = tiles.indexOf(document.activeElement as HTMLButtonElement);
     if (i < 0) i = Math.max(0, tiles.findIndex((t) => t.classList.contains('on')));
@@ -843,7 +920,7 @@ export class UI {
   focusCard(i: number): void {
     if (this.current !== 'levelup') return;
     this.levelFocus = (i + this.levelCount) % this.levelCount;
-    this.root.querySelectorAll<HTMLElement>('.card').forEach((c, k) => c.classList.toggle('focus', k === this.levelFocus));
+    this.screenEl?.querySelectorAll<HTMLElement>('.card').forEach((c, k) => c.classList.toggle('focus', k === this.levelFocus));
   }
   moveCard(d: number): void {
     this.app.uiSound('uiMove');
