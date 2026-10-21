@@ -1,0 +1,17 @@
+{
+  "//": "Garde-fou d'architecture : la simulation et les données compilent SANS la lib DOM. Toute référence à window/document/canvas dans src/sim ou src/data casse ce typecheck.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/sim", "src/data"]
+}
