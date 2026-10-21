@@ -1,5 +1,5 @@
-# Publie le jeu sur GitHub Pages à chaque push sur main (ou à la main depuis l'onglet Actions).
-name: Déploiement GitHub Pages
+# Builds and publishes the game to GitHub Pages on every push to main (or manually from the Actions tab).
+name: Deploy to GitHub Pages
 
 on:
   push:
