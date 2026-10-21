@@ -166,7 +166,7 @@ export class AudioEngine {
     src.stop(t + dur + 0.02);
   }
 
-  play(name: SfxName | 'ui' | 'uiMove', v = 0): void {
+  play(name: SfxName | 'ui' | 'uiMove' | 'powerOn', v = 0): void {
     const ctx = this.ctx;
     if (!ctx || this.muted) return;
     const now = ctx.currentTime;
@@ -272,6 +272,12 @@ export class AudioEngine {
         break;
       case 'uiMove':
         this.tone('triangle', 520, 520, 0.03, 0.025);
+        break;
+      case 'powerOn':
+        // Fin de l'intro : montée électrique puis accord, comme un néon qui s'allume en grand.
+        this.tone('sawtooth', 70, 420, 0.45, 0.06, 0, this.sfxBus, { type: 'lowpass', freq: 1400 });
+        this.noiseHit(0.25, 0.06, 'highpass', 3500);
+        [262, 392, 523, 784].forEach((f, i) => this.tone('triangle', f, f, 0.7, 0.045, 0.28 + i * 0.05));
         break;
     }
   }

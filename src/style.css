@@ -162,7 +162,7 @@ body.dead #game {
 }
 
 /* Menu : le titre s'allume comme un néon une fois arrivé (pas au retour d'un sous-menu). */
-.screen-menu:not(.enter-back) .title {
+.screen-menu:not(.enter-back):not(.intro):not(.intro-out) .title {
   animation: neon-on 0.9s var(--push-time) steps(1, end) both;
 }
 @keyframes neon-on {
@@ -186,6 +186,172 @@ body.dead #game {
     opacity: 1;
   }
 }
+/* ---------- Intro du premier chargement ---------- */
+/* 1. Allumage cathodique : écran noir, une ligne lumineuse s'étire, puis l'image s'ouvre du centre. */
+.crt {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.crt::before,
+.crt::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50.5%;
+  background: #000;
+}
+.crt::before {
+  top: 0;
+}
+.crt::after {
+  bottom: 0;
+}
+.crt i {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: #eafdff;
+  box-shadow:
+    0 0 12px #38f6ff,
+    0 0 36px #38f6ff;
+  transform: scaleX(0);
+}
+.crt.go i {
+  animation: crt-line 0.8s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.crt.go::before {
+  animation: crt-open-top 0.5s 0.32s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.crt.go::after {
+  animation: crt-open-bottom 0.5s 0.32s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.crt.skip {
+  transition: opacity 0.25s ease-out;
+  opacity: 0;
+}
+@keyframes crt-line {
+  0% {
+    transform: scaleX(0);
+  }
+  38% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1) scaleY(60);
+    opacity: 0;
+  }
+}
+@keyframes crt-open-top {
+  to {
+    transform: translateY(-100%);
+  }
+}
+@keyframes crt-open-bottom {
+  to {
+    transform: translateY(100%);
+  }
+}
+/* 2. Le logo s'allume lettre par lettre, chaque tube grésille avant de tenir. */
+.screen-menu.intro .title span {
+  opacity: 0.1;
+  text-shadow: none;
+  animation: letter-on 0.6s steps(1, end) forwards;
+  animation-delay: calc(0.9s + var(--i) * 0.2s);
+}
+@keyframes letter-on {
+  0% {
+    opacity: 0.9;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+  14% {
+    opacity: 0.15;
+    text-shadow: none;
+  }
+  30% {
+    opacity: 1;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+  44% {
+    opacity: 0.3;
+    text-shadow: none;
+  }
+  58%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+}
+.screen-menu.intro .brand .sub {
+  animation: fade-in 0.6s 2s ease-out backwards;
+}
+/* 3. « Appuie sur une touche » à la place des boutons, qui restent invisibles jusque-là. */
+.screen-menu .stack {
+  position: relative;
+}
+.screen-menu.intro .stack,
+.screen-menu.intro .foot {
+  visibility: hidden;
+}
+.press {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  visibility: visible;
+  font-size: var(--fs-l);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text);
+  text-shadow: 0 0 12px rgba(56, 246, 255, 0.5);
+  animation:
+    fade-in 0.5s 2.4s ease-out backwards,
+    press-blink 1.4s 2.9s ease-in-out infinite;
+}
+@keyframes press-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+/* Fin de l'intro : le message s'efface, les boutons montent un par un sous le logo. */
+.screen-menu.intro-out .press {
+  animation: fade-out 0.2s ease-in forwards;
+}
+.screen-menu.intro-out .stack .btn {
+  animation: rise-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.screen-menu.intro-out .stack .btn:nth-child(1) {
+  animation-delay: 0.12s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.screen-menu.intro-out .foot {
+  animation: fade-in 0.5s 0.35s ease-out backwards;
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
 /* Level-up : la carte choisie s'illumine pendant que l'écran file. */
 .screen-levelup.leaving .card.picked {
   border-color: var(--c);

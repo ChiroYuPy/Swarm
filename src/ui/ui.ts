@@ -41,6 +41,7 @@ export interface AppApi {
   watchLastRun(): void;
   applySettings(s: Settings): void;
   uiSound(kind: 'ui' | 'uiMove'): void;
+  introDone(): void;
 }
 
 export interface BuildInfo {
@@ -396,6 +397,8 @@ export class UI {
   /** écran affiché (ceux qui sortent restent un instant dans #ui, inertes) */
   private screenEl: HTMLElement | null = null;
   private closeTimer = 0;
+  /** intro en cours : la prochaine touche ou le prochain clic la termine */
+  private intro: { crt: HTMLElement; stop: () => void } | null = null;
 
   constructor(private readonly app: AppApi) {
     this.root = document.getElementById('ui')!;
@@ -564,7 +567,7 @@ export class UI {
       'menu',
       `
       <header class="brand">
-        <h1 class="title">SWARM</h1>
+        <h1 class="title">${[...'SWARM'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('')}</h1>
         <p class="sub">Survis à la marée géométrique</p>
       </header>
       <nav class="stack">
@@ -580,6 +583,89 @@ export class UI {
     el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showMenu()));
     el.querySelector('#scores')!.addEventListener('click', () => this.showScores(this.app.save.difficulty));
     el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showMenu()));
+  }
+
+  // ---------- Intro (premier chargement) ----------
+  get introActive(): boolean {
+    return this.intro !== null;
+  }
+
+  /**
+   * Allumage façon vieil écran (une ligne lumineuse qui s'ouvre), puis le logo s'allume lettre par
+   * lettre comme un néon, puis « Appuie sur une touche ». Ce premier geste autorise le son : la musique
+   * démarre et les boutons du menu arrivent sous le logo, sans changer d'écran.
+   */
+  showIntro(): void {
+    if (reducedMotion()) {
+      this.showMenu();
+      return;
+    }
+    const crt = document.createElement('div');
+    crt.className = 'crt';
+    crt.innerHTML = '<i></i>';
+    document.body.appendChild(crt);
+    const onKey = (e: KeyboardEvent) => {
+      // Capturée avant InputManager : la touche termine l'intro et ne fait rien d'autre.
+      e.preventDefault();
+      e.stopPropagation();
+      this.finishIntro();
+    };
+    const onPointer = (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Le clic qui suit ce geste ne doit rien déclencher d'autre (bouton du son, etc.).
+      const block = (c: Event) => {
+        c.preventDefault();
+        c.stopPropagation();
+      };
+      window.addEventListener('click', block, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', block, true), 600);
+      this.finishIntro();
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onPointer, true);
+    this.intro = {
+      crt,
+      stop: () => {
+        window.removeEventListener('keydown', onKey, true);
+        window.removeEventListener('pointerdown', onPointer, true);
+      },
+    };
+    // Rien ne s'allume avant la police du titre (sinon on verrait le logo changer de police).
+    const fontReady = document.fonts?.load('700 88px "Chakra Petch"') ?? Promise.resolve();
+    const timeout = new Promise((r) => setTimeout(r, 1500));
+    void Promise.race([fontReady, timeout])
+      .catch(() => {})
+      .then(() => {
+        if (this.intro?.crt !== crt) return;
+        this.showMenu();
+        const el = this.screenEl!;
+        // Pas de glissement : l'écran est déjà là, derrière l'écran noir.
+        el.classList.remove('enter-fwd');
+        el.classList.add('intro');
+        el.querySelector('.stack')!.insertAdjacentHTML('beforeend', '<p class="press">Appuie sur une touche</p>');
+        crt.classList.add('go');
+      });
+  }
+
+  /** Termine l'intro (ou la passe si elle est encore en cours) et révèle le menu. */
+  finishIntro(): void {
+    const intro = this.intro;
+    if (!intro) return;
+    this.intro = null;
+    intro.stop();
+    // Passée avant la fin de l'allumage : l'écran noir s'efface vite au lieu de couper net.
+    intro.crt.classList.add('skip');
+    setTimeout(() => intro.crt.remove(), 300);
+    const el = this.screenEl;
+    if (this.current === 'menu' && el?.classList.contains('intro')) {
+      el.classList.remove('intro');
+      el.classList.add('intro-out');
+      const press = el.querySelector('.press');
+      setTimeout(() => press?.remove(), 250);
+      el.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
+    } else if (!this.current) this.showMenu();
+    this.app.introDone();
   }
 
   // ---------- Choix de la difficulté ----------

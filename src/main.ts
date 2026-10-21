@@ -120,7 +120,7 @@ class App implements AppApi {
     const dParam = params.get('difficulty');
     if (dParam !== null) this.config.difficulty = Number(dParam);
     if (params.get('autostart') === '1' || this.botMode || this.stressMode) this.start(this.config);
-    else this.ui.showMenu();
+    else this.ui.showIntro();
 
     (window as unknown as { __neonawak: App }).__neonawak = this;
     requestAnimationFrame((t) => this.frame(t));
@@ -130,6 +130,13 @@ class App implements AppApi {
   uiSound(kind: 'ui' | 'uiMove'): void {
     this.audio.unlock();
     this.audio.play(kind);
+  }
+
+  /** Fin de l'intro : c'est le geste du joueur qui autorise le son, la musique démarre avec un accord. */
+  introDone(): void {
+    this.audio.unlock();
+    this.audio.startMusic();
+    this.audio.play('powerOn');
   }
 
   play(difficulty: number): void {
@@ -243,6 +250,11 @@ class App implements AppApi {
 
   // ---------------- Logique ----------------
   private onAction(a: UiAction): void {
+    // Pendant l'intro, n'importe quelle touche (ou bouton de manette) la termine, sans autre effet.
+    if (this.ui.introActive) {
+      this.ui.finishIntro();
+      return;
+    }
     if (a === 'mute') {
       this.ui.toggleMute();
       return;
