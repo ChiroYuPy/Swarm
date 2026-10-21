@@ -231,6 +231,7 @@ class App implements AppApi {
     this.save.settings = s;
     this.audio.setVolume(s.volume);
     this.audio.setMusicVolume(s.music);
+    this.audio.setSfxVolume(s.sfx);
     this.audio.setMuted(s.muted);
     this.fx.damageNumbers = s.damageNumbers;
     this.fx.lowQuality = s.quality === 'low';
@@ -249,7 +250,7 @@ class App implements AppApi {
       this.applySettings({ ...this.save.settings, showFps: !this.save.settings.showFps });
       return;
     }
-    const dir = a === 'left' || a === 'up' ? -1 : a === 'right' || a === 'down' ? 1 : 0;
+    const dir = a === 'left' || a === 'up' || a === 'right' || a === 'down' ? a : null;
     switch (this.mode) {
       case 'playing':
         if (a === 'pause') this.pause();
@@ -304,7 +305,7 @@ class App implements AppApi {
   }
 
   private autoPause(): void {
-    if (params.get('nopause') === '1') return; // outil de test : pas de pause sur perte de focus
+    if (params.get('nopause') === '1' || !this.save.settings.autoPause) return; // outil de test / réglage
     if (this.mode === 'playing' || this.mode === 'levelup') this.pause();
   }
 

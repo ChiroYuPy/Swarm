@@ -15,11 +15,15 @@ export interface Settings {
   volume: number;
   /** volume de la musique 0..1 */
   music: number;
+  /** volume des effets sonores 0..1 */
+  sfx: number;
   muted: boolean;
   quality: 'high' | 'low';
   shake: boolean;
   damageNumbers: boolean;
   showFps: boolean;
+  /** met la partie en pause quand la fenêtre perd le focus */
+  autoPause: boolean;
 }
 
 export interface SaveData {
@@ -34,11 +38,13 @@ export interface SaveData {
 export const DEFAULT_SETTINGS: Settings = {
   volume: 0.7,
   music: 0.45,
+  sfx: 0.8,
   muted: false,
   quality: 'high',
   shake: true,
   damageNumbers: true,
   showFps: false,
+  autoPause: true,
 };
 
 export function defaultSave(): SaveData {

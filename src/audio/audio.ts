@@ -42,6 +42,7 @@ export class AudioEngine {
   private readonly last: Record<string, number> = {};
   private volume = 0.7;
   private musicVolume = 0.45;
+  private sfxVolume = 0.8;
   private muted = false;
   private duck = 1;
   private musicOn = false;
@@ -85,6 +86,10 @@ export class AudioEngine {
     this.musicVolume = v;
     this.applyVolumes();
   }
+  setSfxVolume(v: number): void {
+    this.sfxVolume = v;
+    this.applyVolumes();
+  }
   setMuted(m: boolean): void {
     this.muted = m;
     this.applyVolumes();
@@ -103,7 +108,7 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume, t, 0.03);
     this.musicBus.gain.setTargetAtTime(this.musicVolume * 0.5 * this.duck, t, 0.1);
-    this.sfxBus.gain.setTargetAtTime(0.9, t, 0.03);
+    this.sfxBus.gain.setTargetAtTime(0.9 * (this.sfxVolume / 0.8), t, 0.03);
   }
 
   private tone(

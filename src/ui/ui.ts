@@ -28,7 +28,7 @@ import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
 import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
 import type { SaveData, Settings } from '../storage/storage';
-import { bestScore, topScores } from '../storage/storage';
+import { DEFAULT_SETTINGS, bestScore, topScores } from '../storage/storage';
 
 export interface AppApi {
   save: SaveData;
@@ -65,6 +65,40 @@ export interface DeathInfo {
 }
 
 type CodexTab = 'regles' | 'armes' | 'bonus' | 'objets' | 'ennemis' | 'fusions';
+export type NavDir = 'left' | 'right' | 'up' | 'down';
+
+type SettingDef =
+  | { key: 'volume' | 'music' | 'sfx'; kind: 'range'; label: string; hint?: string }
+  | { key: 'muted' | 'shake' | 'damageNumbers' | 'showFps' | 'autoPause'; kind: 'toggle'; label: string; hint?: string }
+  | { key: 'quality'; kind: 'choice'; label: string; hint?: string; options: [Settings['quality'], string][] };
+
+/** Page Options : groupes et réglages, dans l'ordre d'affichage. */
+const SETTINGS_UI: { title: string; items: SettingDef[] }[] = [
+  {
+    title: 'Son',
+    items: [
+      { key: 'volume', kind: 'range', label: 'Volume général' },
+      { key: 'music', kind: 'range', label: 'Musique' },
+      { key: 'sfx', kind: 'range', label: 'Effets sonores' },
+      { key: 'muted', kind: 'toggle', label: 'Couper le son', hint: 'M' },
+    ],
+  },
+  {
+    title: 'Affichage',
+    items: [
+      { key: 'quality', kind: 'choice', label: 'Qualité graphique', options: [['high', 'Élevée'], ['low', 'Basse']] },
+      { key: 'shake', kind: 'toggle', label: 'Secousses d’écran' },
+      { key: 'damageNumbers', kind: 'toggle', label: 'Chiffres de dégâts' },
+      { key: 'showFps', kind: 'toggle', label: 'Afficher les FPS', hint: 'F3' },
+    ],
+  },
+  {
+    title: 'Jeu',
+    items: [{ key: 'autoPause', kind: 'toggle', label: 'Pause auto si la fenêtre perd le focus' }],
+  },
+];
+
+const settingDef = (row: HTMLElement): SettingDef => SETTINGS_UI.flatMap((g) => g.items).find((x) => x.key === row.dataset.key)!;
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
@@ -331,6 +365,7 @@ export class UI {
   private codexReturn: () => void = () => this.showMenu();
   /** bestiaire ouvert depuis la pause : affiché par-dessus la partie */
   private codexOverlay = false;
+  private codexTab: CodexTab = 'armes';
   private countAnim = 0;
   private levelOpenedAt = 0;
 
@@ -372,7 +407,10 @@ export class UI {
   }
 
   /** Déplace la sélection entre les boutons de l'écran courant (flèches / croix de la manette). */
-  navigate(d: number): void {
+  navigate(dir: NavDir): void {
+    if (this.current === 'codex' && this.codexNav(dir)) return;
+    if (this.current === 'settings' && (dir === 'left' || dir === 'right') && this.adjustSetting(dir === 'left' ? -1 : 1)) return;
+    const d = dir === 'left' || dir === 'up' ? -1 : 1;
     const items = [...this.root.querySelectorAll<HTMLButtonElement>('.nav')].filter((b) => !b.disabled);
     if (!items.length) return;
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -401,6 +439,8 @@ export class UI {
     const m = this.app.save.settings.muted;
     this.muteBtn.textContent = m ? '🔇' : '🔊';
     this.muteBtn.title = m ? 'Son coupé (M)' : 'Couper le son (M)';
+    const row = this.root.querySelector<HTMLElement>('.set[data-key="muted"]');
+    if (row) this.paintSetting(row);
   }
 
   toast(text: string, color = '#ffffff'): void {
@@ -499,48 +539,117 @@ export class UI {
   }
 
   // ---------- Options ----------
+  /** Contrôles maison (curseurs, interrupteurs, choix) : même look partout, valeurs visibles, pilotables au clavier. */
   showSettings(onBack: () => void): void {
     this.settingsReturn = onBack;
-    const s = this.app.save.settings;
     const overlay = this.current === 'pause';
+    const groups = SETTINGS_UI.map(
+      (g) =>
+        `<h3>${g.title}</h3>${g.items
+          .map(
+            (it) =>
+              `<button class="set nav" data-key="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? ` <kbd>${it.hint}</kbd>` : ''}</span><span class="ctl"></span></button>`,
+          )
+          .join('')}`,
+    );
     const el = this.mount(
       'settings',
       `
       <header class="head"><h2>Options</h2></header>
-      <div class="panel form">
-        <label>Volume général <input type="range" id="volume" min="0" max="1" step="0.05" value="${s.volume}" /></label>
-        <label>Musique <input type="range" id="music" min="0" max="1" step="0.05" value="${s.music}" /></label>
-        <label class="check"><input type="checkbox" id="muted" ${s.muted ? 'checked' : ''}/> Couper le son</label>
-        <label>Qualité graphique
-          <select id="quality">
-            <option value="high" ${s.quality === 'high' ? 'selected' : ''}>Élevée</option>
-            <option value="low" ${s.quality === 'low' ? 'selected' : ''}>Basse</option>
-          </select>
-        </label>
-        <label class="check"><input type="checkbox" id="shake" ${s.shake ? 'checked' : ''}/> Secousses d’écran</label>
-        <label class="check"><input type="checkbox" id="dmg" ${s.damageNumbers ? 'checked' : ''}/> Chiffres de dégâts</label>
-        <label class="check"><input type="checkbox" id="fps" ${s.showFps ? 'checked' : ''}/> Afficher les FPS (F3)</label>
-      </div>
-      <footer class="actions"><button class="btn nav primary" id="back">Retour</button></footer>
+      <div class="panel form">${groups.join('')}</div>
+      <p class="foot">↑ ↓ : choisir · ← → : régler · Échap : retour</p>
+      <footer class="actions">
+        <button class="btn nav primary" id="back">Retour</button>
+        <button class="btn nav" id="reset">Réinitialiser</button>
+      </footer>
     `,
       overlay,
     );
-    const read = (): Settings => ({
-      volume: Number(el.querySelector<HTMLInputElement>('#volume')!.value),
-      music: Number(el.querySelector<HTMLInputElement>('#music')!.value),
-      muted: el.querySelector<HTMLInputElement>('#muted')!.checked,
-      quality: el.querySelector<HTMLSelectElement>('#quality')!.value as 'high' | 'low',
-      shake: el.querySelector<HTMLInputElement>('#shake')!.checked,
-      damageNumbers: el.querySelector<HTMLInputElement>('#dmg')!.checked,
-      showFps: el.querySelector<HTMLInputElement>('#fps')!.checked,
+    el.querySelectorAll<HTMLButtonElement>('.set').forEach((row) => {
+      const def = settingDef(row);
+      this.paintSetting(row);
+      if (def.kind === 'range') {
+        // Clic ou glisser sur la piste : la valeur suit le pointeur.
+        const track = row.querySelector<HTMLElement>('.track')!;
+        const fromPointer = (e: PointerEvent) => {
+          const r = track.getBoundingClientRect();
+          this.setSetting(def.key, Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 20) / 20);
+        };
+        track.addEventListener('pointerdown', (e) => {
+          track.setPointerCapture(e.pointerId);
+          row.focus({ preventScroll: true });
+          row.classList.add('drag');
+          fromPointer(e);
+        });
+        track.addEventListener('pointermove', (e) => {
+          if (track.hasPointerCapture(e.pointerId)) fromPointer(e);
+        });
+        const end = () => row.classList.remove('drag');
+        track.addEventListener('pointerup', end);
+        track.addEventListener('pointercancel', end);
+      } else {
+        row.addEventListener('click', (e) => this.stepSetting(row, (e.target as HTMLElement).closest('.arrow.prev') ? -1 : 1));
+      }
     });
-    el.querySelectorAll('input, select').forEach((i) =>
-      i.addEventListener('input', () => {
-        this.app.applySettings(read());
-        this.refreshMute();
-      }),
-    );
+    el.querySelector<HTMLButtonElement>('.set')!.focus({ preventScroll: true });
     el.querySelector('#back')!.addEventListener('click', () => this.settingsReturn());
+    el.querySelector('#reset')!.addEventListener('click', () => {
+      this.app.applySettings({ ...DEFAULT_SETTINGS });
+      this.refreshMute();
+      el.querySelectorAll<HTMLButtonElement>('.set').forEach((row) => this.paintSetting(row));
+    });
+  }
+
+  private setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    if (this.app.save.settings[key] === value) return;
+    this.app.applySettings({ ...this.app.save.settings, [key]: value });
+    this.refreshMute();
+    const row = this.root.querySelector<HTMLButtonElement>(`.set[data-key="${key}"]`);
+    if (row) this.paintSetting(row);
+  }
+
+  /** Gauche / droite (ou clic) sur une ligne : curseur ±5 %, interrupteur inversé, choix suivant / précédent. */
+  private stepSetting(row: HTMLElement, delta: number): void {
+    const def = settingDef(row);
+    const cur = this.app.save.settings;
+    if (def.kind === 'range') this.setSetting(def.key, Math.round(Math.max(0, Math.min(1, cur[def.key] + delta * 0.05)) * 20) / 20);
+    else if (def.kind === 'toggle') this.setSetting(def.key, !cur[def.key]);
+    else {
+      const opts = def.options;
+      const i = opts.findIndex(([v]) => v === cur[def.key]);
+      this.setSetting(def.key, opts[(i + delta + opts.length) % opts.length][0]);
+    }
+  }
+
+  private adjustSetting(delta: number): boolean {
+    const row = document.activeElement as HTMLElement | null;
+    if (!row || !row.classList.contains('set') || !this.root.contains(row)) return false;
+    this.stepSetting(row, delta);
+    this.app.uiSound('uiMove');
+    return true;
+  }
+
+  private paintSetting(row: HTMLElement): void {
+    const def = settingDef(row);
+    const ctl = row.querySelector<HTMLElement>('.ctl')!;
+    if (def.kind === 'range') {
+      const n = this.app.save.settings[def.key];
+      if (!ctl.firstChild) ctl.innerHTML = '<span class="track"><span class="fill"></span><span class="thumb"></span></span><b class="val"></b>';
+      ctl.style.setProperty('--v', String(n));
+      ctl.querySelector('.val')!.textContent = `${Math.round(n * 100)} %`;
+      row.setAttribute('role', 'slider');
+      row.setAttribute('aria-valuenow', String(Math.round(n * 100)));
+    } else if (def.kind === 'toggle') {
+      const on = this.app.save.settings[def.key];
+      ctl.innerHTML = `<span class="switch"><i></i></span><b class="val">${on ? 'Oui' : 'Non'}</b>`;
+      row.classList.toggle('on', on);
+      row.setAttribute('role', 'switch');
+      row.setAttribute('aria-checked', String(on));
+    } else {
+      const v = this.app.save.settings[def.key];
+      const label = def.options.find(([o]) => o === v)?.[1] ?? '';
+      ctl.innerHTML = `<span class="arrow prev">‹</span><b class="val">${esc(label)}</b><span class="arrow next">›</span>`;
+    }
   }
 
   // ---------- Bestiaire ----------
@@ -550,6 +659,7 @@ export class UI {
       this.codexReturn = onBack;
       this.codexOverlay = this.current === 'pause';
     }
+    this.codexTab = tab;
     const cats: [CodexTab, string, number][] = [
       ['regles', 'Comment jouer', 0],
       ['armes', 'Armes', BASE_WEAPONS.length],
@@ -585,6 +695,7 @@ export class UI {
         ${items.length ? `<div class="panel list">${center}</div>` : ''}
         <article class="panel detail">${items.length ? '' : codexRules()}</article>
       </div>
+      <p class="foot">↑ ↓ : catégorie · ← → : élément · Échap : retour</p>
       <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
     `,
       this.codexOverlay,
@@ -619,6 +730,29 @@ export class UI {
       tiles[i].focus({ preventScroll: true });
       tiles[i].scrollIntoView({ block: 'nearest' });
     } else el.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
+  }
+
+  /**
+   * Bestiaire au clavier / à la manette : haut et bas changent de catégorie, gauche et droite
+   * changent d'élément. Les deux bouclent.
+   */
+  private codexNav(dir: NavDir): boolean {
+    const cats = [...this.root.querySelectorAll<HTMLButtonElement>('.cat')].map((b) => b.dataset.tab as CodexTab);
+    if (dir === 'up' || dir === 'down') {
+      const i = cats.indexOf(this.codexTab);
+      this.showCodex(cats[(i + (dir === 'up' ? -1 : 1) + cats.length) % cats.length]);
+      this.app.uiSound('uiMove');
+      return true;
+    }
+    const tiles = [...this.root.querySelectorAll<HTMLButtonElement>('.tile')];
+    if (!tiles.length) return true;
+    let i = tiles.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0) i = Math.max(0, tiles.findIndex((t) => t.classList.contains('on')));
+    const next = tiles[(i + (dir === 'left' ? -1 : 1) + tiles.length) % tiles.length];
+    next.focus({ preventScroll: true });
+    next.scrollIntoView({ block: 'nearest' });
+    this.app.uiSound('uiMove');
+    return true;
   }
 
   // ---------- Level-up ----------
@@ -778,29 +912,42 @@ export class UI {
   }
 
   // ---------- Fin de partie ----------
+  /**
+   * Un bandeau en pente traverse l'écran de gauche à droite (rouge, doré si record), le score défile
+   * une fois le bandeau posé, puis le reste de l'écran apparaît en cascade.
+   */
   showDeath(d: DeathInfo): void {
     const r = d.record;
     const diff = DIFFICULTIES[r.difficulty];
-    const badge = d.isReplay
+    const record = !d.isReplay && d.rank === 1;
+    const variant = d.isReplay ? 'replay' : record ? 'record' : '';
+    const badge = d.isReplay || record
       ? ''
-      : d.rank === 1
-        ? '<span class="badge gold">Nouveau record</span>'
-        : d.rank > 0
-          ? `<span class="badge">${d.rank}<sup>e</sup> meilleure partie</span>`
-          : `<span class="badge">Record : ${pad7(d.bestBefore)}</span>`;
+      : d.rank > 0
+        ? `<span class="badge">${d.rank}<sup>e</sup> meilleure partie</span>`
+        : `<span class="badge">Record : ${pad7(d.bestBefore)}</span>`;
+    const reveal = (i: number) => `reveal" style="--i:${i}`;
     const el = this.mount(
       'death',
       `
-      <header class="head"><h2 class="go">${d.isReplay ? 'Relecture terminée' : 'Game over'}</h2><p class="sub">${esc(deathLine(d))}</p></header>
-      <div class="go-score"><small>Score · <span style="color:${diff.color}">${esc(diff.name)}</span></small><b id="count">${pad7(0)}</b>${badge}</div>
-      <div class="stats">
+      <div class="banner ${variant}">
+        <div class="banner-band"></div>
+        <div class="banner-content">
+          <h2 class="go">${d.isReplay ? 'Relecture terminée' : 'Game over'}</h2>
+          <div class="go-score"><small>Score · <span style="color:${diff.color}">${esc(diff.name)}</span></small><b id="count">${pad7(0)}</b></div>
+        </div>
+        ${record ? '<span class="stamp">Nouveau record</span>' : ''}
+      </div>
+      <p class="sub ${reveal(0)}">${esc(deathLine(d))}</p>
+      ${badge ? `<div class="${reveal(1)}">${badge}</div>` : ''}
+      <div class="stats ${reveal(2)}">
         <div><small>Temps</small><b>${formatTime(r.tempsSurvecu)}</b></div>
         <div><small>Éliminés</small><b>${num(r.kills)}</b></div>
         <div><small>Niveau</small><b>${r.level}</b></div>
         <div><small>Boss vaincus</small><b>${d.bossKills}</b></div>
       </div>
-      <div class="panel build wide"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
-      <footer class="actions">
+      <div class="panel build wide ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
+      <footer class="actions ${reveal(4)}">
         <button class="btn nav primary" id="retry">Rejouer</button>
         ${d.canReplay ? '<button class="btn nav" id="watch">Revoir la partie</button>' : ''}
         <button class="btn nav" id="menu">Menu</button>
@@ -812,12 +959,15 @@ export class UI {
     el.querySelector('#retry')!.addEventListener('click', () => this.app.retry());
     el.querySelector('#watch')?.addEventListener('click', () => this.app.watchLastRun());
     el.querySelector('#menu')!.addEventListener('click', () => this.app.toMenu());
-    // Le score défile comme sur une borne.
+    // Le score défile comme sur une borne, une fois le bandeau posé.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const out = el.querySelector<HTMLElement>('#count')!;
-    const t0 = performance.now();
-    const dur = Math.min(1400, 300 + r.score / 8);
+    const delay = reduced ? 0 : 620;
+    const dur = reduced ? 1 : Math.min(1400, 300 + r.score / 8);
+    el.querySelector<HTMLElement>('.stamp')?.style.setProperty('animation-delay', `${delay + dur}ms`);
+    const t0 = performance.now() + delay;
     const tick = (now: number) => {
-      const f = Math.min(1, (now - t0) / dur);
+      const f = Math.max(0, Math.min(1, (now - t0) / dur));
       out.textContent = pad7(r.score * (1 - (1 - f) ** 3));
       if (f < 1) this.countAnim = requestAnimationFrame(tick);
     };
