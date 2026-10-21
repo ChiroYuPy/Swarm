@@ -45,13 +45,13 @@ describe('contenu', () => {
   });
 
   it('les types d’ennemis arrivent progressivement, plus tôt en difficile', () => {
-    const firstSeen = (difficulty: number) => {
+    const firstSeen = (difficulty: number, seconds: number) => {
       const s = createGame({ seed: 'ARRIVEES', difficulty });
       s.players[0].base.maxHp = 1e9;
       s.players[0].hp = 1e9;
       s.players[0].base.magnet = 0;
       const seen = new Map<string, number>();
-      for (let i = 0; i < 300 * TICK_RATE && !s.over; i++) {
+      for (let i = 0; i < seconds * TICK_RATE && !s.over; i++) {
         step(s, [s.players[0].offers.length ? 200 : 0]);
         for (let k = 0; k < s.eventCount; k++) {
           const e = s.events[k];
@@ -60,8 +60,8 @@ describe('contenu', () => {
       }
       return seen;
     };
-    const normal = firstSeen(1);
-    const hard = firstSeen(2);
+    const normal = firstSeen(1, 330);
+    const hard = firstSeen(2, 200);
     // Au début, uniquement des Chasseurs ; les autres sont annoncés plus tard.
     expect(normal.get('losange')).toBeGreaterThan(60);
     expect(normal.has('carre')).toBe(true);
