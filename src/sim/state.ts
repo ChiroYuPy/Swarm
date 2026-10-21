@@ -222,6 +222,8 @@ export class Player {
   hurtTick = -1000;
   invulnUntil = 0;
   deathTick = -1;
+  /** multiplicateur de dégâts fixe (réglage du bac à sable, 1 sinon) */
+  mightMul = 1;
 }
 
 export const EV_HIT = 1;
@@ -267,6 +269,18 @@ export class SimEvent {
   p = 0;
 }
 
+/** Règles du bac à sable appliquées pendant la partie (voir sandbox.ts). */
+export interface SandboxRules {
+  invincible: boolean;
+  /** multiplicateur du nombre d'ennemis (0 = aucun) */
+  enemyMul: number;
+  /** types d'ennemis autorisés (index), null = progression normale */
+  enemies: number[] | null;
+  bosses: boolean;
+  /** multiplicateur de l'XP ramassée */
+  xp: number;
+}
+
 export interface GameState {
   version: number;
   seed: number;
@@ -298,6 +312,8 @@ export interface GameState {
   totalKills: number;
   /** ennemis figés (Gel) jusqu'à ce tick */
   freezeUntil: number;
+  /** règles du bac à sable (null = partie normale) */
+  sandbox: SandboxRules | null;
   // Caches dérivés (non sérialisés, reconstruits à la volée).
   grid: SpatialGrid;
   nav: NavField;

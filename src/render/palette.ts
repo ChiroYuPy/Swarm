@@ -21,6 +21,8 @@ export const COLORS = {
   text: '#f2eaff',
   muted: '#9a8fc0',
   gold: '#ffd23a',
+  /** parties de bac à sable (même teinte que dans l'interface) */
+  sandbox: '#b48cff',
 };
 
 /** Palette indexée des particules (dessin groupé par couleur). */

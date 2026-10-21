@@ -24,6 +24,7 @@ import { updateProjectiles } from './projectiles';
 import { updateGems, updatePickups } from './pickups';
 import { compactEnemies } from './entities';
 import { weaponId } from './registry';
+import { applySandbox, type SandboxConfig } from './sandbox';
 
 export interface GameConfig {
   seed: string;
@@ -31,6 +32,8 @@ export interface GameConfig {
   difficulty?: number;
   /** nombre de joueurs dans la même partie (1 pour cette version) */
   players?: number;
+  /** réglages du bac à sable : partie libre, jamais classée */
+  sandbox?: SandboxConfig;
 }
 
 /** Normalise une seed texte : majuscules, espaces retirés aux bords. */
@@ -72,6 +75,7 @@ export function createGame(cfg: GameConfig): GameState {
     chestCount: 0,
     totalKills: 0,
     freezeUntil: 0,
+    sandbox: null,
     grid: new SpatialGrid(),
     nav: new NavField(),
     events: pools.events,
@@ -90,6 +94,7 @@ export function createGame(cfg: GameConfig): GameState {
     addWeapon(p, weaponId(HERO.startWeapon));
     s.players.push(p);
   }
+  if (cfg.sandbox) applySandbox(s, cfg.sandbox);
   return s;
 }
 

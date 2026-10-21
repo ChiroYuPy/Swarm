@@ -2,7 +2,7 @@
  * Écrans DOM. Tous suivent le même gabarit (en-tête, contenu, actions) et les mêmes composants
  * (.btn, .tabs, .card, .panel), avec une seule police et une échelle de tailles commune (style.css).
  */
-import { ALL_WEAPONS, BASE_WEAPONS } from '../data/weapons';
+import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
 import { ENEMIES } from '../data/enemies';
@@ -27,17 +27,18 @@ import {
 import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
 import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
-import type { SaveData, Settings } from '../storage/storage';
-import { DEFAULT_SETTINGS, bestScore, topScores } from '../storage/storage';
+import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
+import { DEFAULT_SETTINGS, bestScore, defaultSandbox, topScores } from '../storage/storage';
 
 export interface AppApi {
   save: SaveData;
   play(difficulty: number): void;
+  playSandbox(setup: SandboxSetup): void;
   retry(): void;
   pickOffer(i: number): void;
   resume(): void;
   quit(): void;
-  toMenu(): void;
+  toMenu(screen?: 'menu' | 'sandbox'): void;
   watchLastRun(): void;
   applySettings(s: Settings): void;
   uiSound(kind: 'ui' | 'uiMove'): void;
@@ -63,6 +64,9 @@ export interface DeathInfo {
   build: BuildInfo;
   canReplay: boolean;
   isReplay: boolean;
+  /** partie de bac à sable (non classée) ; `survived` : terminée sans mourir */
+  sandbox: boolean;
+  survived: boolean;
 }
 
 type CodexTab = 'regles' | 'armes' | 'bonus' | 'objets' | 'ennemis' | 'fusions';
@@ -99,6 +103,55 @@ const SETTINGS_UI: { title: string; items: SettingDef[] }[] = [
   },
 ];
 
+type SandboxKey = 'difficulty' | 'startMinute' | 'invincible' | 'level' | 'might' | 'xp' | 'item' | 'enemyMul' | 'bosses' | 'custom';
+type SandboxValue = number | boolean | string | null;
+type SandboxDef = { key: SandboxKey; label: string; hint?: string } & ({ kind: 'toggle' } | { kind: 'choice'; options: [SandboxValue, string][] });
+
+const times = (v: number) => `×${String(v).replace('.', ',')}`;
+
+/** Écran Sandbox : réglages de la partie, dans l'ordre d'affichage. */
+const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
+  {
+    title: 'Partie',
+    items: [
+      { key: 'difficulty', kind: 'choice', label: 'Difficulté de base', options: DIFFICULTIES.map((d, i) => [i, d.name]) },
+      {
+        key: 'startMinute',
+        kind: 'choice',
+        label: 'Commencer à',
+        hint: 'Ennemis aussi forts qu’à ce moment de la partie.',
+        options: [0, 1, 2, 3, 5, 8, 10, 15, 20, 30].map((m) => [m, m ? formatTime(m * 60) : 'Début']),
+      },
+    ],
+  },
+  {
+    title: 'Héros',
+    items: [
+      { key: 'invincible', kind: 'toggle', label: 'Invincible' },
+      { key: 'level', kind: 'choice', label: 'Niveau de départ', options: [1, 5, 10, 15, 20, 30, 40, 50].map((l) => [l, `Niv. ${l}`]) },
+      { key: 'might', kind: 'choice', label: 'Dégâts', options: [0.5, 1, 2, 5, 10, 50].map((v) => [v, times(v)]) },
+      { key: 'xp', kind: 'choice', label: 'XP gagnée', hint: 'Aucune : pas de level-up.', options: [0, 0.5, 1, 2, 5, 10].map((v) => [v, v ? times(v) : 'Aucune']) },
+      {
+        key: 'item',
+        kind: 'choice',
+        label: 'Objet en réserve',
+        options: [[null, 'Aucun'], ...PICKUPS.filter((k) => k.kind === 'active').map((k): [string, string] => [k.id, k.name])],
+      },
+    ],
+  },
+  {
+    title: 'Ennemis',
+    items: [
+      { key: 'enemyMul', kind: 'choice', label: 'Quantité', options: [0, 0.25, 0.5, 1, 2, 3, 5].map((v) => [v, v ? times(v) : 'Aucun']) },
+      { key: 'bosses', kind: 'toggle', label: `Boss toutes les ${WAVES.bossEvery / 60} min` },
+      { key: 'custom', kind: 'choice', label: 'Types', options: [[false, 'Progression normale'], [true, 'Sur mesure']] },
+    ],
+  },
+];
+const sandboxDef = (row: HTMLElement): SandboxDef => SANDBOX_UI.flatMap((g) => g.items).find((x) => x.key === row.dataset.sb)!;
+/** Ennemis qu'on peut choisir dans le bac à sable (ni boss, ni caisse bonus). */
+const SANDBOX_FOES = ENEMIES.filter((e) => e.behavior !== 'boss' && e.behavior !== 'prop');
+
 const settingDef = (row: HTMLElement): SettingDef => SETTINGS_UI.flatMap((g) => g.items).find((x) => x.key === row.dataset.key)!;
 
 const esc = (s: string) =>
@@ -111,6 +164,7 @@ function deathLine(d: DeathInfo): string {
   const t = d.record.tempsSurvecu;
   const k = d.record.kills;
   if (d.isReplay) return 'Fin de la relecture.';
+  if (d.sandbox) return 'Partie sandbox : rien n’est enregistré dans les records.';
   if (d.rank === 1 && d.bestBefore > 0) return 'Nouveau record. Tu progresses.';
   if (t < 60) return 'Moins d’une minute… on respire et on y retourne.';
   if (d.bossKills >= 2) return `${d.bossKills} boss vaincus. Respect.`;
@@ -358,7 +412,7 @@ function paintIcons(root: HTMLElement, size: number): void {
 /** Écrans à onglets : changer d'onglet redessine l'écran sans transition d'écran. */
 const TAB_SCREENS = new Set(['codex', 'scores']);
 /** Profondeur de navigation : aller plus profond glisse vers la gauche, revenir glisse vers la droite. */
-const DEPTH: Record<string, number> = { difficulty: 1, codex: 1, scores: 1, settings: 1 };
+const DEPTH: Record<string, number> = { difficulty: 1, sandbox: 1, codex: 1, scores: 1, settings: 1 };
 const depth = (name: string) => DEPTH[name] ?? 0;
 /** Durée de sortie de chaque écran (ms), alignée sur style.css. */
 const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
@@ -516,6 +570,7 @@ export class UI {
   navigate(dir: NavDir): void {
     if (this.current === 'codex' && this.codexNav(dir)) return;
     if (this.current === 'settings' && (dir === 'left' || dir === 'right') && this.adjustSetting(dir === 'left' ? -1 : 1)) return;
+    if (this.current === 'sandbox' && (dir === 'left' || dir === 'right') && this.adjustSandbox(dir === 'left' ? -1 : 1)) return;
     const d = dir === 'left' || dir === 'up' ? -1 : 1;
     if (!this.screenEl) return;
     const items = [...this.screenEl.querySelectorAll<HTMLButtonElement>('.nav')].filter((b) => !b.disabled);
@@ -573,6 +628,7 @@ export class UI {
       </header>
       <nav class="stack">
         <button class="btn nav primary" id="play">Jouer</button>
+        <button class="btn nav" id="sandbox">Sandbox</button>
         <button class="btn nav" id="codex">Codex</button>
         <button class="btn nav" id="scores">Records</button>
         <button class="btn nav" id="settings">Options</button>
@@ -581,6 +637,7 @@ export class UI {
     `,
     );
     el.querySelector('#play')!.addEventListener('click', () => this.showDifficulty());
+    el.querySelector('#sandbox')!.addEventListener('click', () => this.showSandbox());
     el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showMenu()));
     el.querySelector('#scores')!.addEventListener('click', () => this.showScores(this.app.save.difficulty));
     el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showMenu()));
@@ -723,6 +780,176 @@ export class UI {
     );
     el.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) => b.addEventListener('click', () => this.app.play(Number(b.dataset.d))));
     el.querySelector('#back')!.addEventListener('click', () => this.showMenu());
+  }
+
+  // ---------- Sandbox ----------
+  /**
+   * Partie libre pour tester : réglages à gauche (mêmes contrôles que les Options), équipement de
+   * départ à droite (chaque tuile monte d'un niveau par clic). Rien n'est enregistré dans les records.
+   */
+  showSandbox(): void {
+    const rowsHtml = SANDBOX_UI.map(
+      (g) =>
+        `<h3>${g.title}</h3>${g.items
+          .map(
+            (it) =>
+              `<button class="set nav" data-sb="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><span class="ctl"></span></button>`,
+          )
+          .join('')}`,
+    ).join('');
+    const foes = SANDBOX_FOES.map(
+      (e) =>
+        `<button class="tile foe nav" data-foe="${e.id}" style="--c:${e.color}" title="${esc(e.name)}"><span class="ico" data-icon="enemy:${e.id}" data-size="34"></span><span class="nm">${esc(e.name)}</span></button>`,
+    ).join('');
+    const kit = (kind: 'w' | 'p', id: string, name: string, color: string, icon: string) =>
+      `<button class="tile kit nav" data-kit="${kind}:${id}" style="--c:${color}" title="${esc(name)}"><span class="ico" data-icon="${icon}" data-size="40"></span><span class="nm">${esc(name)}</span><span class="lv"></span></button>`;
+    const el = this.mount(
+      'sandbox',
+      `
+      <header class="head"><h2>Sandbox</h2><p class="sub">Compose ta partie et teste ce que tu veux. Rien n’est enregistré dans les records.</p></header>
+      <div class="sandbox-grid">
+        <div class="panel form">${rowsHtml}<div class="tiles foes">${foes}</div></div>
+        <div class="panel loadout">
+          <h3>Armes <small class="slots" data-slots="w"></small></h3>
+          <div class="tiles">${BASE_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
+          <h3>Fusions</h3>
+          <div class="tiles">${FUSED_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
+          <h3>Passifs <small class="slots" data-slots="p"></small></h3>
+          <div class="tiles">${PASSIVES.map((x) => kit('p', x.id, x.name, x.color, `passive:${x.id}`)).join('')}</div>
+        </div>
+      </div>
+      <p class="foot">← → : régler · Clic : niveau suivant · Clic droit : niveau précédent · Échap : retour</p>
+      <footer class="actions">
+        <button class="btn nav primary go" id="start">Lancer</button>
+        <button class="btn nav" id="reset">Réinitialiser</button>
+        <button class="btn nav" id="back">Retour</button>
+      </footer>
+    `,
+    );
+    paintIcons(el, 40);
+    el.querySelectorAll<HTMLButtonElement>('.set').forEach((row) =>
+      row.addEventListener('click', (e) => this.stepSandbox(row, (e.target as HTMLElement).closest('.arrow.prev') ? -1 : 1)),
+    );
+    el.querySelectorAll<HTMLButtonElement>('.kit').forEach((t) => {
+      t.addEventListener('click', () => this.stepKit(t, 1));
+      t.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        this.stepKit(t, -1);
+        this.app.uiSound('ui');
+      });
+    });
+    el.querySelectorAll<HTMLButtonElement>('.foe').forEach((t) => t.addEventListener('click', () => this.toggleFoe(t)));
+    el.querySelector('#start')!.addEventListener('click', () => this.app.playSandbox(this.app.save.sandbox));
+    el.querySelector('#reset')!.addEventListener('click', () => {
+      this.app.save.sandbox = defaultSandbox();
+      this.paintSandbox();
+    });
+    el.querySelector('#back')!.addEventListener('click', () => this.showMenu());
+    this.paintSandbox();
+  }
+
+  private sandboxValue(key: SandboxKey): SandboxValue {
+    const sb = this.app.save.sandbox;
+    if (key === 'difficulty') return sb.difficulty;
+    if (key === 'custom') return sb.rules.enemies !== null;
+    return sb.rules[key];
+  }
+
+  /** Gauche / droite (ou clic) sur une ligne : choix suivant / précédent, interrupteur inversé. */
+  private stepSandbox(row: HTMLElement, delta: number): void {
+    const def = sandboxDef(row);
+    const sb = this.app.save.sandbox;
+    const cur = this.sandboxValue(def.key);
+    let v: SandboxValue;
+    if (def.kind === 'toggle') v = !cur;
+    else {
+      // Valeur inconnue (vieille sauvegarde) : on repart du premier choix.
+      const opts = def.options;
+      const i = opts.findIndex(([o]) => o === cur);
+      v = opts[i < 0 ? 0 : (i + delta + opts.length) % opts.length][0];
+    }
+    if (def.key === 'difficulty') sb.difficulty = v as number;
+    // « Sur mesure » part de tous les types : il n'y a plus qu'à retirer ceux dont on ne veut pas.
+    else if (def.key === 'custom') sb.rules.enemies = v ? SANDBOX_FOES.map((e) => e.id) : null;
+    else (sb.rules as unknown as Record<string, SandboxValue>)[def.key] = v;
+    this.paintSandbox();
+  }
+
+  /** Tuile d'équipement : niveau suivant (ou précédent), retour à « absent » après le niveau max. */
+  private stepKit(tile: HTMLElement, delta: number): void {
+    const r = this.app.save.sandbox.rules;
+    const [kind, id] = tile.dataset.kit!.split(':');
+    const list = kind === 'w' ? r.weapons : r.passives;
+    const max = kind === 'w' ? ALL_WEAPONS.find((w) => w.id === id)!.levels.length : 5;
+    const cap = kind === 'w' ? MAX_WEAPON_SLOTS : MAX_PASSIVE_SLOTS;
+    const cur = list.find((x) => x.id === id);
+    const next = ((cur?.level ?? 0) + delta + max + 1) % (max + 1);
+    if (!cur && next > 0 && list.length >= cap) {
+      // Emplacements pleins : le compteur clignote, rien ne change.
+      const slots = this.screenEl?.querySelector<HTMLElement>(`[data-slots="${kind}"]`);
+      slots?.classList.remove('full');
+      void slots?.offsetWidth;
+      slots?.classList.add('full');
+      return;
+    }
+    if (cur && next === 0) list.splice(list.indexOf(cur), 1);
+    else if (cur) cur.level = next;
+    else list.push({ id, level: next });
+    this.paintSandbox();
+  }
+
+  private toggleFoe(tile: HTMLElement): void {
+    const r = this.app.save.sandbox.rules;
+    if (!r.enemies) return;
+    const id = tile.dataset.foe!;
+    r.enemies = r.enemies.includes(id) ? r.enemies.filter((x) => x !== id) : [...r.enemies, id];
+    this.paintSandbox();
+  }
+
+  private adjustSandbox(delta: number): boolean {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el || !this.screenEl?.contains(el)) return false;
+    if (el.classList.contains('set')) this.stepSandbox(el, delta);
+    else if (el.classList.contains('kit')) this.stepKit(el, delta);
+    else if (el.classList.contains('foe')) this.toggleFoe(el);
+    else return false;
+    this.app.uiSound('uiMove');
+    return true;
+  }
+
+  /** Redessine toutes les valeurs de l'écran Sandbox à partir des réglages en mémoire. */
+  private paintSandbox(): void {
+    const el = this.screenEl;
+    if (this.current !== 'sandbox' || !el) return;
+    const r = this.app.save.sandbox.rules;
+    el.querySelectorAll<HTMLElement>('.set').forEach((row) => {
+      const def = sandboxDef(row);
+      const v = this.sandboxValue(def.key);
+      const ctl = row.querySelector<HTMLElement>('.ctl')!;
+      if (def.kind === 'toggle') {
+        ctl.innerHTML = `<span class="switch"><i></i></span><b class="val">${v ? 'Oui' : 'Non'}</b>`;
+        row.classList.toggle('on', !!v);
+        row.setAttribute('role', 'switch');
+        row.setAttribute('aria-checked', String(!!v));
+      } else {
+        const label = def.options.find(([o]) => o === v)?.[1] ?? String(v);
+        ctl.innerHTML = `<span class="arrow prev">‹</span><b class="val">${esc(label)}</b><span class="arrow next">›</span>`;
+      }
+    });
+    el.querySelector('.foes')!.classList.toggle('off', !r.enemies);
+    el.querySelectorAll<HTMLButtonElement>('.foe').forEach((t) => {
+      t.disabled = !r.enemies;
+      t.classList.toggle('on', !!r.enemies?.includes(t.dataset.foe!));
+    });
+    el.querySelectorAll<HTMLElement>('.kit').forEach((t) => {
+      const [kind, id] = t.dataset.kit!.split(':');
+      const it = (kind === 'w' ? r.weapons : r.passives).find((x) => x.id === id);
+      const fusion = kind === 'w' && !!ALL_WEAPONS.find((w) => w.id === id)!.fusion;
+      t.classList.toggle('on', !!it);
+      t.querySelector('.lv')!.textContent = it ? (fusion ? 'Équipée' : `Niv. ${it.level}`) : '—';
+    });
+    el.querySelector('[data-slots="w"]')!.textContent = `${r.weapons.length}/${MAX_WEAPON_SLOTS}`;
+    el.querySelector('[data-slots="p"]')!.textContent = `${r.passives.length}/${MAX_PASSIVE_SLOTS}`;
   }
 
   // ---------- Records ----------
@@ -1147,10 +1374,12 @@ export class UI {
   showDeath(d: DeathInfo): void {
     const r = d.record;
     const diff = DIFFICULTIES[r.difficulty];
-    const record = !d.isReplay && d.rank === 1;
-    const variant = d.isReplay ? 'replay' : record ? 'record' : '';
+    const record = !d.isReplay && !d.sandbox && d.rank === 1;
+    const variant = d.isReplay ? 'replay' : d.sandbox ? 'sandbox' : record ? 'record' : '';
     const badge = d.isReplay || record
       ? ''
+      : d.sandbox
+        ? '<span class="badge">Sandbox · non classé</span>'
       : d.rank > 0
         ? `<span class="badge">${d.rank}<sup>e</sup> meilleure partie</span>`
         : `<span class="badge">Record : ${pad7(d.bestBefore)}</span>`;
@@ -1161,8 +1390,8 @@ export class UI {
       <div class="banner ${variant}">
         <div class="banner-band"></div>
         <div class="banner-content">
-          <h2 class="go">${d.isReplay ? 'Relecture terminée' : 'Game over'}</h2>
-          <div class="go-score"><small>Score · <span style="color:${diff.color}">${esc(diff.name)}</span></small><b id="count">${pad7(0)}</b></div>
+          <h2 class="go">${d.isReplay ? 'Relecture terminée' : d.sandbox && d.survived ? 'Fin du test' : 'Game over'}</h2>
+          <div class="go-score"><small>Score · ${d.sandbox ? 'Sandbox · ' : ''}<span style="color:${diff.color}">${esc(diff.name)}</span></small><b id="count">${pad7(0)}</b></div>
         </div>
         ${record ? '<span class="stamp">Nouveau record</span>' : ''}
       </div>
@@ -1177,6 +1406,7 @@ export class UI {
       <div class="panel build wide ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
       <footer class="actions ${reveal(4)}">
         <button class="btn nav primary" id="retry">Rejouer</button>
+        ${d.sandbox ? '<button class="btn nav" id="edit">Modifier</button>' : ''}
         ${d.canReplay ? '<button class="btn nav" id="watch">Revoir la partie</button>' : ''}
         <button class="btn nav" id="menu">Menu</button>
       </footer>
@@ -1185,6 +1415,7 @@ export class UI {
     );
     this.fillIcons(el, 32);
     el.querySelector('#retry')!.addEventListener('click', () => this.app.retry());
+    el.querySelector('#edit')?.addEventListener('click', () => this.app.toMenu('sandbox'));
     el.querySelector('#watch')?.addEventListener('click', () => this.app.watchLastRun());
     el.querySelector('#menu')!.addEventListener('click', () => this.app.toMenu());
     // Le score défile comme sur une borne, une fois le bandeau posé.

@@ -154,7 +154,7 @@ export function explode(
  */
 export function hurtPlayer(s: GameState, p: Player, amount: number, environment = false): boolean {
   if (!p.alive || amount <= 0) return false;
-  if (p.shieldUntil > s.tick) return false;
+  if (p.shieldUntil > s.tick || s.sandbox?.invincible) return false;
   if (!environment) {
     if (s.tick < p.invulnUntil) return false;
     p.invulnUntil = s.tick + IFRAME_TICKS;

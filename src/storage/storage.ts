@@ -1,10 +1,11 @@
 /**
  * Sauvegarde locale versionnée (localStorage, toujours sous try/catch) : réglages, dernière difficulté,
- * classement local (top 10 par difficulté).
+ * classement local (top 10 par difficulté), derniers réglages du bac à sable.
  * Pour faire évoluer le format : incrémenter SAVE_VERSION et ajouter une étape dans `migrate`.
  */
-import type { ScoreRecord } from '../sim';
+import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
+import { HERO } from '../data/hero';
 
 export const SAVE_KEY = 'neonawak.save';
 export const SAVE_VERSION = 2;
@@ -33,6 +34,33 @@ export interface SaveData {
   difficulty: number;
   /** meilleurs scores, au plus TOP_PER_DIFFICULTY par difficulté */
   scores: ScoreRecord[];
+  /** derniers réglages du bac à sable */
+  sandbox: SandboxSetup;
+}
+
+/** Une partie de bac à sable : difficulté de base + réglages. */
+export interface SandboxSetup {
+  difficulty: number;
+  rules: SandboxConfig;
+}
+
+export function defaultSandbox(): SandboxSetup {
+  return {
+    difficulty: DEFAULT_DIFFICULTY,
+    rules: {
+      invincible: true,
+      level: 1,
+      startMinute: 0,
+      enemyMul: 1,
+      enemies: null,
+      bosses: true,
+      might: 1,
+      xp: 1,
+      weapons: [{ id: HERO.startWeapon, level: 1 }],
+      passives: [],
+      item: null,
+    },
+  };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,7 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function defaultSave(): SaveData {
-  return { version: SAVE_VERSION, settings: { ...DEFAULT_SETTINGS }, difficulty: DEFAULT_DIFFICULTY, scores: [] };
+  return { version: SAVE_VERSION, settings: { ...DEFAULT_SETTINGS }, difficulty: DEFAULT_DIFFICULTY, scores: [], sandbox: defaultSandbox() };
 }
 
 /** Migre n'importe quelle version connue vers la version courante. */
@@ -80,7 +108,30 @@ export function migrate(raw: unknown): SaveData {
     settings: { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) },
     difficulty: Math.max(0, Math.min(DIFFICULTIES.length - 1, d)),
     scores: Array.isArray(data.scores) ? (data.scores as ScoreRecord[]).filter(isScore) : [],
+    sandbox: readSandbox(data.sandbox),
   };
+}
+
+/** Réglages du bac à sable relus avec prudence : tout champ manquant ou invalide reprend sa valeur par défaut. */
+function readSandbox(raw: unknown): SandboxSetup {
+  const def = defaultSandbox();
+  if (!raw || typeof raw !== 'object') return def;
+  const r = raw as Partial<SandboxSetup>;
+  const rules = (r.rules && typeof r.rules === 'object' ? r.rules : {}) as Partial<SandboxConfig>;
+  const out = { ...def.rules };
+  for (const k of Object.keys(out) as (keyof SandboxConfig)[]) {
+    const v = rules[k];
+    const d = def.rules[k];
+    const ok =
+      k === 'enemies' || k === 'item'
+        ? v === null || (k === 'item' ? typeof v === 'string' : Array.isArray(v))
+        : k === 'weapons' || k === 'passives'
+          ? Array.isArray(v)
+          : typeof v === typeof d;
+    if (ok) (out as Record<string, unknown>)[k] = v;
+  }
+  const d = typeof r.difficulty === 'number' ? r.difficulty : def.difficulty;
+  return { difficulty: Math.max(0, Math.min(DIFFICULTIES.length - 1, d)), rules: out };
 }
 
 function isScore(x: unknown): x is ScoreRecord {

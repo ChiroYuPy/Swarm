@@ -5,7 +5,7 @@
  * - `serializeState` / `deserializeState` : instantané JSON complet, restaurable.
  */
 import { createGame } from './game';
-import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState } from './state';
+import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState, type SandboxRules } from './state';
 
 const ENEMY_KEYS = Object.keys(new Enemy()).filter((k) => k !== 'immune');
 const PROJ_KEYS = Object.keys(new Projectile()).filter((k) => k !== 'hitIds');
@@ -111,6 +111,7 @@ export interface Snapshot {
   seedLabel: string;
   difficulty: number;
   playerCount: number;
+  sandbox?: SandboxRules | null;
   core: Rec;
   players: Rec[];
   enemies: Rec[];
@@ -126,6 +127,7 @@ export function serializeState(s: GameState): string {
     seedLabel: s.seedLabel,
     difficulty: s.difficulty,
     playerCount: s.players.length,
+    sandbox: s.sandbox,
     core: {
       tick: s.tick,
       over: s.over,
@@ -177,6 +179,7 @@ export function deserializeState(json: string): GameState {
   s.chestCount = c.chestCount as number;
   s.totalKills = c.totalKills as number;
   s.freezeUntil = c.freezeUntil as number;
+  s.sandbox = snap.sandbox ?? null;
   snap.players.forEach((pd, i) => {
     const p = s.players[i];
     assign(p, pd, PLAYER_SCALAR_KEYS);

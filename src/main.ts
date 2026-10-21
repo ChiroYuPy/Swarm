@@ -37,7 +37,7 @@ import { InputManager, type UiAction } from './input/input';
 import { UI, type AppApi, type BuildInfo, type DeathInfo } from './ui/ui';
 import { randomSeed } from './ui/seeds';
 import { statDetails } from './render/hud';
-import { bestScore, loadSave, recordScore, writeSave, type SaveData, type Settings } from './storage/storage';
+import { bestScore, loadSave, recordScore, writeSave, type SandboxSetup, type SaveData, type Settings } from './storage/storage';
 
 type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'dying' | 'dead' | 'replay';
 
@@ -147,14 +147,23 @@ class App implements AppApi {
     this.start({ seed: randomSeed(), difficulty });
   }
 
+  /** Bac à sable : réglages libres, jamais classé. Les réglages sont gardés pour la prochaine fois. */
+  playSandbox(setup: SandboxSetup): void {
+    this.save.sandbox = setup;
+    writeSave(this.save);
+    // Copie : l'écran Sandbox modifie ses réglages en place, la partie (et sa relecture) ne doit pas suivre.
+    this.start({ seed: randomSeed(), difficulty: setup.difficulty, sandbox: structuredClone(setup.rules) });
+  }
+
   retry(): void {
-    this.play(this.config.difficulty ?? this.save.difficulty);
+    if (this.config.sandbox) this.start({ ...this.config, seed: randomSeed() });
+    else this.play(this.config.difficulty ?? this.save.difficulty);
   }
 
   private start(cfg: GameConfig): void {
     this.config = cfg;
     this.state = createGame(cfg);
-    this.bestAtStart = bestScore(this.save, this.state.difficulty);
+    this.bestAtStart = cfg.sandbox ? 0 : bestScore(this.save, this.state.difficulty);
     if (this.stressMode) {
       debugBigBuild(this.state);
       debugSpawnHorde(this.state, 800);
@@ -210,7 +219,7 @@ class App implements AppApi {
     this.finishRun();
   }
 
-  toMenu(): void {
+  toMenu(screen: 'menu' | 'sandbox' = 'menu'): void {
     this.mode = 'menu';
     this.replay = null;
     this.demo = true;
@@ -218,7 +227,8 @@ class App implements AppApi {
     this.fx.reset(this.state.seed);
     this.audio.intensity = 0;
     this.audio.setDuck(1);
-    this.ui.showMenu();
+    if (screen === 'sandbox') this.ui.showSandbox();
+    else this.ui.showMenu();
   }
 
   watchLastRun(): void {
@@ -379,7 +389,7 @@ class App implements AppApi {
     if (this.runFinished) return;
     this.runFinished = true;
     const s = this.state;
-    const ranked = !this.botMode && !this.stressMode;
+    const ranked = !this.botMode && !this.stressMode && !this.config.sandbox;
     const rec = makeScoreRecord(s, new Date().toISOString());
     const bestBefore = bestScore(this.save, s.difficulty);
     let rank = 0;
@@ -401,6 +411,8 @@ class App implements AppApi {
       build: this.buildInfo(),
       canReplay: !!this.lastRun,
       isReplay,
+      sandbox: !!this.config.sandbox,
+      survived: this.state.players[0].alive,
     };
     this.mode = 'dead';
     this.audio.intensity = 0;
@@ -510,6 +522,7 @@ class App implements AppApi {
       fps: this.fps,
       replay: this.replay ? { speed: this.replay.speed, progress: this.replay.cursor.progress } : null,
       best: this.bestAtStart,
+      sandbox: this.state.sandbox,
       difficulty: DIFFICULTIES[this.state.difficulty],
       deathFade: this.mode === 'dying' ? 1 - Math.max(0, this.deathTimer) / this.deathTotal : 0,
     });

@@ -70,7 +70,7 @@ export function applyBuffs(p: Player, tick: number): void {
   st.area = b.area;
   st.armor = b.armor;
   st.luck = b.luck;
-  st.might = b.might * (p.rageUntil > tick ? 2 : 1);
+  st.might = b.might * p.mightMul * (p.rageUntil > tick ? 2 : 1);
   st.cooldownMul = b.cooldownMul * (p.frenzyUntil > tick ? 0.5 : 1);
   st.speed = b.speed * (p.turboUntil > tick ? 1.5 : 1);
 }
@@ -140,7 +140,7 @@ export function useActivable(s: GameState, p: Player): void {
 }
 
 export function addXp(s: GameState, p: Player, v: number): void {
-  p.xp += v;
+  p.xp += s.sandbox ? v * s.sandbox.xp : v;
   while (p.xp >= p.xpNext) {
     p.xp -= p.xpNext;
     p.level++;

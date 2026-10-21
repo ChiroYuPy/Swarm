@@ -15,6 +15,7 @@
   --gold: #ffd23a;
   --yellow: #ffe14d;
   --red: #ff3d6e;
+  --violet: #b48cff;
   --font: 'Chakra Petch', 'Trebuchet MS', system-ui, sans-serif;
   /* Échelle de tailles */
   --fs-s: 12px;
@@ -380,8 +381,11 @@ body.crt-on #mute {
 .screen-menu.intro-out .stack .btn:nth-child(4) {
   animation-delay: 0.62s;
 }
+.screen-menu.intro-out .stack .btn:nth-child(5) {
+  animation-delay: 0.72s;
+}
 .screen-menu.intro-out .version {
-  animation: fade-in 0.6s 1.1s ease-out backwards;
+  animation: fade-in 0.6s 1.2s ease-out backwards;
 }
 @keyframes unroll-clip {
   from {
@@ -908,6 +912,105 @@ button:focus {
   }
 }
 
+/* ---------- Sandbox : réglages | équipement de départ ---------- */
+.screen-sandbox {
+  width: min(1180px, 100%);
+}
+.screen-sandbox .head h2 {
+  color: var(--violet);
+}
+.sandbox-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 14px;
+  width: 100%;
+  height: min(64vh, 600px);
+}
+.screen-sandbox .panel {
+  width: 100%;
+  overflow-y: auto;
+}
+.screen-sandbox .set {
+  min-height: 42px;
+  padding: 6px 12px;
+}
+.set-label small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.screen-sandbox .set[data-kind='choice'] .val {
+  min-width: 96px;
+}
+.screen-sandbox .tiles {
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.screen-sandbox .tile {
+  padding: 8px 4px 6px;
+  gap: 4px;
+}
+.screen-sandbox .tile .ico {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  transition:
+    opacity 0.12s,
+    filter 0.12s;
+}
+.screen-sandbox .tile.on .ico {
+  opacity: 1;
+  filter: none;
+}
+.tile .lv {
+  font-size: var(--fs-s);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.tile.on .lv {
+  color: var(--c);
+}
+.loadout h3 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 16px 0 8px;
+}
+.loadout h3:first-child {
+  margin-top: 0;
+}
+.slots {
+  font-size: var(--fs-s);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.slots.full {
+  animation: slots-full 0.5s ease-out;
+}
+@keyframes slots-full {
+  0%,
+  40% {
+    color: var(--red);
+    transform: scale(1.25);
+  }
+}
+.foes {
+  margin: 6px 0 2px;
+}
+.foes.off {
+  opacity: 0.35;
+}
+.foes .tile:disabled {
+  cursor: default;
+}
+@media (max-width: 860px) {
+  .sandbox-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
 /* ---------- Barres de défilement ---------- */
 * {
   scrollbar-width: thin;
@@ -1314,6 +1417,10 @@ table.scores tr.first td.rank {
 .banner.replay {
   --bc: var(--accent);
   --bg-glow: rgba(56, 246, 255, 0.3);
+}
+.banner.sandbox {
+  --bc: var(--violet);
+  --bg-glow: rgba(180, 140, 255, 0.32);
 }
 .banner-band {
   position: absolute;

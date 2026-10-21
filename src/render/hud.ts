@@ -25,6 +25,7 @@ import {
   type GameState,
   type Player,
   type PlayerStats,
+  type SandboxRules,
 } from '../sim';
 import { COLORS } from './palette';
 import { iconCanvas } from './icons';
@@ -40,6 +41,8 @@ export interface HudOptions {
   replay: { speed: number; progress: number } | null;
   /** meilleur score enregistré dans cette difficulté (0 si aucun) */
   best: number;
+  /** partie de bac à sable : pas de record, éventuellement pas de boss */
+  sandbox: SandboxRules | null;
   difficulty: DifficultyDef;
   /** temps réel (animations) */
   time: number;
@@ -192,6 +195,7 @@ export function statDetails(p: Player, tick: number): StatDetail[] {
         d.key === 'maxHp' ? `+${total}` : d.key === 'regen' ? `+${dec(total)} PV/s` : d.key === 'cooldown' ? `−${Math.round(total * 100)} %` : `+${Math.round(total * 100)} %`;
       sources.push(`${def.name} niv. ${inst.level} : ${amount}`);
     }
+    if (d.key === 'might' && p.mightMul !== 1) sources.push(`Sandbox : ×${dec(p.mightMul)}`);
     if (d.key === 'might' && p.rageUntil > tick) sources.push(`Rage : ×2 (${secs(p.rageUntil)})`);
     if (d.key === 'cooldown' && p.frenzyUntil > tick) sources.push(`Frénésie : ×0,5 (${secs(p.frenzyUntil)})`);
     if (d.key === 'speed' && p.turboUntil > tick) sources.push(`Turbo : ×1,5 (${secs(p.turboUntil)})`);
@@ -225,7 +229,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     const name = BOSS.names[Math.min(boss.aux2, BOSS.names.length - 1)];
     label(ctx, `Boss · ${name}`, W / 2, 60, 'center', COLORS.boss);
     bar(ctx, W / 2 - bw / 2, 70, bw, 10, boss.hp / boss.maxHp, COLORS.boss, '');
-  } else {
+  } else if (!opt.sandbox || opt.sandbox.bosses) {
     const every = WAVES.bossEvery;
     const left = every - ((s.tick / TICK_RATE) % every);
     const soon = left <= 10;
@@ -241,7 +245,8 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   ctx.textAlign = 'left';
   glowText(ctx, pad7(score.score), lx, 44, '#ffe14d');
   const beaten = opt.best > 0 && score.score > opt.best;
-  label(ctx, beaten ? 'Nouveau record' : `Record ${pad7(opt.best)}`, lx, 68, 'left', beaten ? COLORS.gold : COLORS.muted);
+  if (opt.sandbox) label(ctx, opt.sandbox.invincible ? 'Sandbox · invincible' : 'Sandbox · non classé', lx, 68, 'left', COLORS.sandbox);
+  else label(ctx, beaten ? 'Nouveau record' : `Record ${pad7(opt.best)}`, lx, 68, 'left', beaten ? COLORS.gold : COLORS.muted);
   ctx.font = TEXT;
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.text;

@@ -90,18 +90,23 @@ export function updateSpawner(s: GameState): void {
   const phases = WAVE_PHASES_BY_DIFFICULTY[s.difficulty];
   const { rate, phase } = spawnRate(tick, s.difficulty);
   const ph = phases[phase];
+  // Bac à sable : nombre d'ennemis multiplié, types choisis (tous disponibles d'emblée), boss facultatifs.
+  const sb = s.sandbox;
+  const mul = sb ? sb.enemyMul : 1;
+  const pool = sb?.enemies ?? null;
+  const flux = pool ? pool.filter((t) => t !== SWARM_TYPE) : null;
 
   // Arrivée d'un nouveau type d'ennemi : annonce.
-  if (ph.atTick === tick) for (const nt of ph.newTypes) emit(s, EV_NEW_ENEMY, 0, 0, 0, nt);
+  if (ph.atTick === tick && !pool) for (const nt of ph.newTypes) emit(s, EV_NEW_ENEMY, 0, 0, 0, nt);
 
-  s.spawnBudget += rate * DT;
+  s.spawnBudget += rate * DT * mul;
   while (s.spawnBudget >= 1) {
     s.spawnBudget -= 1;
     // Toujours 3 tirages par apparition, quoi qu'il arrive ensuite.
-    const type = rngW.weighted(ph.weights, ph.total);
+    const type = flux ? flux[Math.min(flux.length - 1, Math.floor(rngW.next() * flux.length))] : rngW.weighted(ph.weights, ph.total);
     const a = rngW.next() * TWO_PI;
     const j = rngW.next();
-    if (s.enemyCount >= WAVES.enemyCap) continue;
+    if (s.enemyCount >= WAVES.enemyCap || type === undefined) continue;
     // Boss en vie : on saute une partie des apparitions (sans changer le nombre de tirages).
     if (s.bossId >= 0 && j < 1 - WAVES.bossRateMul) continue;
     spawnAround(s, type, a, WAVES.spawnRadius + j * WAVES.spawnJitter, targetPlayer(s));
@@ -109,14 +114,15 @@ export function updateSpawner(s: GameState): void {
 
   // Essaims
   const sw = WAVES.swarm;
-  const swFirst = Math.round(sw.firstAt * diff.pace * TICK_RATE);
+  const swFirst = pool ? 10 * TICK_RATE : Math.round(sw.firstAt * diff.pace * TICK_RATE);
   const swEvery = Math.round(sw.every * TICK_RATE);
-  if (tick >= swFirst && (tick - swFirst) % swEvery === 0) {
-    if (tick === swFirst) emit(s, EV_NEW_ENEMY, 0, 0, 0, SWARM_TYPE);
+  const swOn = mul > 0 && (!pool || pool.includes(SWARM_TYPE));
+  if (swOn && tick >= swFirst && (tick - swFirst) % swEvery === 0) {
+    if (tick === swFirst && !pool) emit(s, EV_NEW_ENEMY, 0, 0, 0, SWARM_TYPE);
     const a = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
     const p = s.players[target];
-    const count = Math.round((sw.count + Math.floor((t / 60) * sw.countPerMinute)) * diff.rate);
+    const count = Math.round((sw.count + Math.floor((t / 60) * sw.countPerMinute)) * diff.rate * Math.min(mul, 3));
     const cx = p.x + dcos(a) * WAVES.spawnRadius;
     const cy = p.y + dsin(a) * WAVES.spawnRadius;
     for (let k = 0; k < count; k++) {
@@ -129,13 +135,14 @@ export function updateSpawner(s: GameState): void {
 
   // Encerclements
   const rg = WAVES.ring;
-  const rgFirst = Math.round(rg.firstAt * diff.pace * TICK_RATE);
+  const rgFirst = pool ? 20 * TICK_RATE : Math.round(rg.firstAt * diff.pace * TICK_RATE);
   const rgEvery = Math.round(rg.every * TICK_RATE);
-  if (tick >= rgFirst && (tick - rgFirst) % rgEvery === 0) {
+  const rgOn = mul > 0 && (!pool || pool.includes(RING_TYPE));
+  if (rgOn && tick >= rgFirst && (tick - rgFirst) % rgEvery === 0) {
     const a0 = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
     const p = s.players[target];
-    const count = Math.round((rg.count + Math.floor((t / 60) * rg.countPerMinute)) * diff.rate);
+    const count = Math.round((rg.count + Math.floor((t / 60) * rg.countPerMinute)) * diff.rate * Math.min(mul, 3));
     for (let k = 0; k < count; k++) {
       const a = a0 + (k * TWO_PI) / count;
       spawnAt(s, RING_TYPE, p.x + dcos(a) * rg.radius, p.y + dsin(a) * rg.radius, target);
@@ -160,7 +167,7 @@ export function updateSpawner(s: GameState): void {
 
   // Boss
   const bossEvery = Math.round(WAVES.bossEvery * TICK_RATE);
-  if (tick > 0 && tick % bossEvery === 0) {
+  if (tick > 0 && tick % bossEvery === 0 && (!sb || sb.bosses)) {
     const a = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
     const k = s.bossSpawned;
