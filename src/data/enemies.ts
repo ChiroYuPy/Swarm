@@ -1,7 +1,7 @@
 /** Ennemis. Les PV / dégâts / vitesses sont multipliés par les courbes de difficulté de waves.ts. */
 
-export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss';
-export type EnemyShape = 'triangle' | 'diamond' | 'square' | 'pentagon' | 'circle' | 'dot' | 'box' | 'trapeze';
+export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'leader' | 'blinker' | 'orbiter';
+export type EnemyShape = 'triangle' | 'diamond' | 'square' | 'pentagon' | 'circle' | 'dot' | 'box' | 'trapeze' | 'rock' | 'sun' | 'ring' | 'dart';
 
 export interface EnemyDef {
   id: string;
@@ -17,6 +17,20 @@ export interface EnemyDef {
   xp: number;
   /** 0 = subit tout le recul, 1 = insensible */
   kbResist: number;
+  /** absent du codex et du bac à sable (n'apparaît que via un autre ennemi) */
+  hidden?: boolean;
+  /** à sa mort, se coupe en `splitCount` ennemis `splitInto` */
+  splitInto?: string;
+  splitCount?: number;
+  /** nombre maximal en vie : `capStart` à son arrivée, + `capPerMinute` par minute ensuite, au plus `capMax` */
+  capStart?: number;
+  capPerMinute?: number;
+  capMax?: number;
+  // meneur : les autres ennemis à moins de `auraRadius` vont `auraSpeed` plus vite
+  auraRadius?: number;
+  auraSpeed?: number;
+  // téléporteur : marque le sol sous le joueur, s'y téléporte après `fuse` s (dégâts de zone), toutes les `blinkEvery` s
+  blinkEvery?: number;
   // shooter
   keepMin?: number;
   keepMax?: number;
@@ -51,6 +65,40 @@ export const ENEMIES: EnemyDef[] = [
     behavior: 'shooter', shape: 'pentagon', color: '#c46bff',
     hp: 20, speed: 62, damage: 6, radius: 14, xp: 3, kbResist: 0.2,
     keepMin: 240, keepMax: 340, shootEvery: 2.6, bulletSpeed: 190, bulletDamage: 7,
+  },
+  {
+    id: 'orbiteur', name: 'Orbiteur', desc: 'Tourne autour de toi en spirale de plus en plus serrée, puis plonge.',
+    behavior: 'orbiter', shape: 'dart', color: '#3dffb4',
+    hp: 12, speed: 128, damage: 5, radius: 11, xp: 2, kbResist: 0,
+  },
+  {
+    id: 'golem', name: 'Golem', desc: 'Énorme, très lent, encaisse beaucoup. À sa mort il se coupe en 2 Golems moyens, qui se coupent chacun en 2 petits.',
+    behavior: 'chaser', shape: 'rock', color: '#c8ff3d',
+    hp: 110, speed: 30, damage: 12, radius: 30, xp: 6, kbResist: 0.95,
+    splitInto: 'golem2', splitCount: 2, capStart: 1, capPerMinute: 1, capMax: 10,
+  },
+  {
+    id: 'golem2', name: 'Golem moyen', desc: 'Moitié de Golem.',
+    behavior: 'chaser', shape: 'rock', color: '#c8ff3d', hidden: true,
+    hp: 36, speed: 44, damage: 8, radius: 20, xp: 3, kbResist: 0.7,
+    splitInto: 'golem3', splitCount: 2,
+  },
+  {
+    id: 'golem3', name: 'Petit golem', desc: 'Quart de Golem.',
+    behavior: 'chaser', shape: 'rock', color: '#c8ff3d', hidden: true,
+    hp: 12, speed: 62, damage: 5, radius: 12, xp: 1, kbResist: 0.3,
+  },
+  {
+    id: 'meneur', name: 'Meneur', desc: 'Ne se bat pas vraiment : il reste en retrait et rend les ennemis autour de lui plus rapides. Abats-le en premier.',
+    behavior: 'leader', shape: 'sun', color: '#3d9bff',
+    hp: 30, speed: 58, damage: 5, radius: 15, xp: 5, kbResist: 0.4,
+    keepMin: 200, keepMax: 300, auraRadius: 170, auraSpeed: 0.3,
+  },
+  {
+    id: 'teleporteur', name: 'Téléporteur', desc: 'Marque le sol sous tes pieds puis s’y téléporte : sors du cercle avant qu’il arrive.',
+    behavior: 'blinker', shape: 'ring', color: '#8f5bff',
+    hp: 24, speed: 50, damage: 6, radius: 14, xp: 3, kbResist: 0.2,
+    blinkEvery: 3.5, fuse: 1.0, blastRadius: 52, blastDamage: 11,
   },
   {
     id: 'cercle', name: 'Bombe', desc: 'Explose près de toi : sors du cercle rouge pointillé.',

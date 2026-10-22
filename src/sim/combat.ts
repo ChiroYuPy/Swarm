@@ -2,10 +2,13 @@
 import { LOOT, PICKUPS } from '../data/loot';
 import { HERO } from '../data/hero';
 import { TICK_RATE } from './constants';
-import { TWO_PI, dcos, dsin } from './dmath';
-import { spawnGem, spawnPickup } from './entities';
+import { PI, TWO_PI, datan2, dcos, dsin } from './dmath';
+import { spawnEnemy, spawnGem, spawnPickup } from './entities';
+import { circleHitsObstacle } from './map';
 import { clearShotsIn } from './shots';
-import { BEHAVIOR, ENEMY_BEHAVIOR } from './registry';
+import { BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO } from './registry';
+import { dmgMul, hpMul, spdMul } from './spawner';
+import { ENEMIES } from '../data/enemies';
 import {
   EV_BOSS_DEAD,
   EV_DEATH,
@@ -71,6 +74,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
     dropPropLoot(s, e.x, e.y);
     return;
   }
+  if (SPLIT_INTO[e.type] >= 0) split(s, e.x, e.y, e.vx, e.vy, e.type, e.target);
   if (owner >= 0) s.players[owner].kills++;
   s.totalKills++;
   if (beh === BEHAVIOR.BOSS) {
@@ -99,6 +103,37 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
   const pick = s.rngLoot.next();
   if (r < LOOT.activeChance * mul) spawnPickup(s, pickFrom(ACTIVE_KINDS, ACTIVE_W, pick), e.x, e.y);
   else if (r < (LOOT.activeChance + LOOT.bonusChance) * mul) spawnPickup(s, pickFrom(BONUS_KINDS, BONUS_W, pick), e.x, e.y);
+}
+
+/**
+ * Golem : ses moitiés partent de chaque côté, perpendiculairement à sa marche. Elles naissent en
+ * fin de pool (hors de la grille de ce tick) : aucune requête en cours n'est perturbée.
+ */
+function split(s: GameState, x: number, y: number, fx: number, fy: number, type: number, target: number): void {
+  const d = ENEMIES[type];
+  const into = SPLIT_INTO[type];
+  const n = d.splitCount ?? 2;
+  const r = ENEMIES[into].radius;
+  const fl = Math.sqrt(fx * fx + fy * fy) || 1;
+  const a0 = datan2(fy / fl, fx / fl) + PI / 2;
+  for (let k = 0; k < n; k++) {
+    const a = a0 + (k * TWO_PI) / n;
+    const ux = dcos(a);
+    const uy = dsin(a);
+    let cx = x + ux * d.radius * 0.6;
+    let cy = y + uy * d.radius * 0.6;
+    if (circleHitsObstacle(s.map, cx, cy, r)) {
+      cx = x;
+      cy = y;
+    }
+    const f = spawnEnemy(s, into, cx, cy, hpMul(s), dmgMul(s), spdMul(s), target);
+    if (!f) return;
+    f.kbx = ux * 260;
+    f.kby = uy * 260;
+    f.vx = ux;
+    f.vy = uy;
+    f.stunUntil = s.tick + 12;
+  }
 }
 
 // Familles d'objets (codes PK_* = index dans PICKUPS).

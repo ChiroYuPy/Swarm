@@ -10,7 +10,8 @@ import { PICKUPS } from '../data/loot';
 import { DIFFICULTIES } from '../data/difficulty';
 import { WAVES } from '../data/waves';
 import { SCORE } from '../data/hero';
-import { WAVE_PHASES_BY_DIFFICULTY } from '../sim/registry';
+import { MIX_TICKS, UNLOCK_SLOT } from '../sim/registry';
+import { TICK_RATE } from '../sim/constants';
 import {
   FUSION_TABLE,
   GAME_VERSION,
@@ -150,7 +151,7 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
 ];
 const sandboxDef = (row: HTMLElement): SandboxDef => SANDBOX_UI.flatMap((g) => g.items).find((x) => x.key === row.dataset.sb)!;
 /** Ennemis qu'on peut choisir dans le bac à sable (ni boss, ni caisse bonus). */
-const SANDBOX_FOES = ENEMIES.filter((e) => e.behavior !== 'boss' && e.behavior !== 'prop');
+const SANDBOX_FOES = ENEMIES.filter((e) => e.behavior !== 'boss' && e.behavior !== 'prop' && !e.hidden);
 
 const settingDef = (row: HTMLElement): SettingDef => SETTINGS_UI.flatMap((g) => g.items).find((x) => x.key === row.dataset.key)!;
 
@@ -223,6 +224,9 @@ const BEHAVIOR_LABEL: Record<string, string> = {
   kamikaze: 'Explosif',
   swarm: 'En groupe',
   boss: 'Boss',
+  leader: 'Soutien',
+  blinker: 'Téléportation',
+  orbiter: 'Tournoyant',
 };
 
 /** Seconde d'apparition de chaque type d'ennemi, par difficulté (-1 : jamais). */
@@ -230,13 +234,8 @@ function enemyArrival(id: string): number[] {
   const t = ENEMIES.findIndex((e) => e.id === id);
   return DIFFICULTIES.map((d, di) => {
     if (id === 'boss') return WAVES.bossEvery;
-    let at = -1;
-    for (const ph of WAVE_PHASES_BY_DIFFICULTY[di]) {
-      if (ph.newTypes.includes(t)) {
-        at = ph.atTick / 60;
-        break;
-      }
-    }
+    const slot = UNLOCK_SLOT[di][t];
+    let at = slot < 0 ? -1 : (slot * MIX_TICKS) / TICK_RATE;
     if (id === WAVES.swarm.type) {
       const sw = WAVES.swarm.firstAt * d.pace;
       at = at < 0 ? sw : Math.min(at, sw);
@@ -273,7 +272,7 @@ function codexItems(tab: CodexTab): CodexItem[] {
     }
     case 'ennemis': {
       const normal = DIFFICULTIES.findIndex((d) => d.id === 'normal');
-      return ENEMIES.filter((e) => e.behavior !== 'prop')
+      return ENEMIES.filter((e) => e.behavior !== 'prop' && !e.hidden)
         .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 : enemyArrival(e.id)[Math.max(0, normal)] }))
         .sort((a, b) => a.at - b.at)
         .map(({ e }) => ({ tab, id: e.id, name: e.name, color: e.color, icon: `enemy:${e.id}` }));
@@ -367,6 +366,14 @@ function codexDetail(it: CodexItem): string {
       if (e.behavior === 'kamikaze') st.push(['Explosion', `${e.blastDamage ?? 0} dégâts`]);
       else st.push(['Contact', `${e.damage} dégâts`]);
       if (e.behavior === 'shooter') st.push(['Tir', `${e.bulletDamage ?? 0} dégâts`]);
+      if (e.behavior === 'blinker') st.push(['Atterrissage', `${e.blastDamage ?? 0} dégâts`]);
+      if (e.behavior === 'leader') st.push(['Aura', `+${Math.round((e.auraSpeed ?? 0) * 100)} % de vitesse aux voisins`]);
+      if (e.capMax) st.push(['Nombre', `${e.capStart} à son arrivée, jusqu’à ${e.capMax} en même temps`]);
+      if (e.splitInto) {
+        const f = ENEMIES.find((x) => x.id === e.splitInto)!;
+        const g = f.splitInto ? ENEMIES.find((x) => x.id === f.splitInto) : undefined;
+        st.push(['À sa mort', `${e.splitCount ?? 2} × ${f.name} (${f.hp} PV)${g ? `, puis ${(e.splitCount ?? 2) * (f.splitCount ?? 2)} × ${g.name} (${g.hp} PV)` : ''}`]);
+      }
       if (e.behavior !== 'boss') st.push(['XP', String(e.xp)]);
       body = `<h3>Statistiques de base</h3>${rows(st)}<p class="hint">Les PV augmentent avec le temps et selon la difficulté.</p>`;
       const at = enemyArrival(e.id);

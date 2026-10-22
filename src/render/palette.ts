@@ -47,6 +47,10 @@ export const FX_COLORS = [
   '#5cf2d6', // 17 clone
   '#7f9cff', // 18 horloge
   '#b8ff3d', // 19 fièvre
+  '#3dffb4', // 20 orbiteur
+  '#c8ff3d', // 21 diviseur
+  '#3d9bff', // 22 gardien
+  '#8f5bff', // 23 téléporteur
 ];
 
 export function fxColorIndex(hex: string): number {

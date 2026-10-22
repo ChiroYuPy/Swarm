@@ -96,6 +96,39 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       ctx.lineTo(-r * 0.6, -r * 0.8);
       ctx.closePath();
       break;
+    case 'rock': {
+      // Bloc de pierre irrégulier.
+      const k = [1, 0.84, 0.96, 0.8, 1, 0.86, 0.94, 0.82];
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4 + Math.PI / 8;
+        if (i === 0) ctx.moveTo(Math.cos(a) * r * k[i], Math.sin(a) * r * k[i]);
+        else ctx.lineTo(Math.cos(a) * r * k[i], Math.sin(a) * r * k[i]);
+      }
+      ctx.closePath();
+      break;
+    }
+    case 'sun':
+      // Soleil : un disque et des rayons (il rayonne sur ses voisins).
+      ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        ctx.moveTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95);
+        ctx.lineTo(Math.cos(a) * r * 1.3, Math.sin(a) * r * 1.3);
+      }
+      break;
+    case 'ring':
+      // Portail : deux anneaux.
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.moveTo(r * 0.55, 0);
+      ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+      break;
+    case 'dart':
+      ctx.moveTo(r * 1.3, 0);
+      ctx.lineTo(-r * 0.9, r);
+      ctx.lineTo(-r * 0.35, 0);
+      ctx.lineTo(-r * 0.9, -r);
+      ctx.closePath();
+      break;
   }
 }
 

@@ -7,9 +7,9 @@ import { PI, TWO_PI, dcos, datan2, dsin } from './dmath';
 import { AVOID, avoidance, circleHitsObstacle, moveCircle, segmentClear } from './map';
 import { spawnEnemy, spawnProjectile } from './entities';
 import { explode, hurtPlayer, nearestPlayer } from './combat';
-import { BEHAVIOR, BOSS_SUMMON_TYPE, ENEMY_BEHAVIOR } from './registry';
+import { BEHAVIOR, BOSS_SUMMON_TYPE, ENEMY_BEHAVIOR, LEADER_SPEED } from './registry';
 import { dmgMul, hpMul, spdMul } from './spawner';
-import { EV_ENEMY_SHOT, EV_FUSE, PJ_EBULLET, emit, type Enemy, type GameState, type Player } from './state';
+import { EF_BOSS, EF_PROP, EV_BLINK, EV_ENEMY_SHOT, EV_FUSE, PJ_EBULLET, emit, type Enemy, type GameState, type Player } from './state';
 
 const SEP_STRENGTH = 95;
 const KB_DECAY = 0.82;
@@ -69,6 +69,35 @@ function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, spee
   b.r = 6;
   b.damage = damage;
   b.life = 4 * TICK_RATE;
+}
+
+/** Garde ses distances : s'approche, recule, ou tourne autour du joueur entre `keepMin` et `keepMax`. */
+function keepAway(s: GameState, e: Enemy, dx: number, dy: number, dist: number, keepMin: number, keepMax: number): void {
+  if (dist > keepMax) pathDir(s, e, dx, dy, dist);
+  else if (dist < keepMin) {
+    DX = -dx / dist;
+    DY = -dy / dist;
+  } else {
+    const side = e.id & 1 ? 1 : -1;
+    DX = (-dy / dist) * side * 0.8;
+    DY = (dx / dist) * side * 0.8;
+  }
+}
+
+/** Meneur : galvanise les ennemis autour de lui jusqu'au tick suivant (l'effet tombe avec lui). */
+function boostAround(s: GameState, e: Enemy, self: number, R: number): void {
+  const until = s.tick + 2;
+  const n = s.grid.query(s.enemies, e.x, e.y, R);
+  const out = s.grid.out;
+  for (let k = 0; k < n; k++) {
+    const j = out[k];
+    if (j === self) continue;
+    const o = s.enemies[j];
+    if (!o.alive || o.flags & (EF_PROP | EF_BOSS)) continue;
+    const ox = o.x - e.x;
+    const oy = o.y - e.y;
+    if (ox * ox + oy * oy < R * R) o.boostUntil = until;
+  }
 }
 
 function relocate(s: GameState, e: Enemy, p: Player, dx: number, dy: number): void {
@@ -147,6 +176,7 @@ export function updateEnemies(s: GameState): void {
 
     const d = ENEMIES[e.type];
     let speed = e.speed;
+    if (e.boostUntil > tick) speed *= 1 + LEADER_SPEED;
     if (e.slowUntil > tick) speed *= 1 - e.slowFactor;
     const stunned = e.stunUntil > tick;
     if (stunned) speed = 0;
@@ -170,17 +200,7 @@ export function updateEnemies(s: GameState): void {
         break;
       }
       case BEHAVIOR.SHOOTER: {
-        const keepMin = d.keepMin ?? 240;
-        const keepMax = d.keepMax ?? 340;
-        if (dist > keepMax) pathDir(s, e, dx, dy, dist);
-        else if (dist < keepMin) {
-          DX = -dx / dist;
-          DY = -dy / dist;
-        } else {
-          const side = e.id & 1 ? 1 : -1;
-          DX = (-dy / dist) * side * 0.8;
-          DY = (dx / dist) * side * 0.8;
-        }
+        keepAway(s, e, dx, dy, dist, d.keepMin ?? 240, d.keepMax ?? 340);
         e.timer -= tf;
         if (e.timer <= 0) {
           if (dist < 560 && !stunned) {
@@ -210,6 +230,61 @@ export function updateEnemies(s: GameState): void {
             e.hp = 0;
             explode(s, e.x, e.y, d.blastRadius ?? 85, (d.blastDamage ?? 20) * 1.5, ti, 200, (d.blastDamage ?? 20) * dmgMul(s));
             continue;
+          }
+        }
+        break;
+      }
+      case BEHAVIOR.LEADER:
+        keepAway(s, e, dx, dy, dist, d.keepMin ?? 200, d.keepMax ?? 300);
+        boostAround(s, e, i, d.auraRadius ?? 170);
+        break;
+      case BEHAVIOR.ORBITER: {
+        // Spirale qui se resserre : surtout de côté, un peu vers l'intérieur ; tout près, il plonge.
+        if (dist > 420 || dist < 70) pathDir(s, e, dx, dy, dist);
+        else {
+          const side = e.id & 1 ? 1 : -1;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          DX = -uy * side * 0.92 + ux * 0.39;
+          DY = ux * side * 0.92 + uy * 0.39;
+        }
+        break;
+      }
+      case BEHAVIOR.BLINKER: {
+        // ai 0 : avance lentement. ai 1 : le sol est marqué en (aux, aux2), il y apparaît au bout de `fuse`.
+        if (e.ai === 0) {
+          pathDir(s, e, dx, dy, dist);
+          e.timer -= tf;
+          if (e.timer <= 0) {
+            if (dist > 120 && dist < 620 && !stunned && !circleHitsObstacle(s.map, p.x, p.y, e.r)) {
+              e.ai = 1;
+              e.aux = p.x;
+              e.aux2 = p.y;
+              e.timer = Math.round((d.fuse ?? 1) * TICK_RATE);
+              emit(s, EV_FUSE, p.x, p.y, 1, e.type);
+            } else {
+              e.timer = 20;
+            }
+          }
+        } else {
+          speed = 0;
+          e.timer -= tf;
+          if (e.timer <= 0) {
+            e.x = e.px = e.aux;
+            e.y = e.py = e.aux2;
+            e.kbx = e.kby = 0;
+            e.ai = 0;
+            e.timer = Math.round((d.blinkEvery ?? 3.5) * TICK_RATE) + (e.id % 23);
+            const R = d.blastRadius ?? 52;
+            const dmg = (d.blastDamage ?? 10) * dmgMul(s);
+            for (const q of s.players) {
+              if (!q.alive) continue;
+              const qx = q.x - e.x;
+              const qy = q.y - e.y;
+              const rr = R + q.r;
+              if (qx * qx + qy * qy < rr * rr) hurtPlayer(s, q, dmg);
+            }
+            emit(s, EV_BLINK, e.x, e.y, R, e.type);
           }
         }
         break;

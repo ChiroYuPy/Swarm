@@ -258,7 +258,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     fusion: true,
     levelText: ['Trois boomerangs qui sèment des mines sur leur trajet.'],
     levels: [
-      { damage: 30, cooldown: 1.3, speed: 460, range: 330, count: 3, size: 15, knockback: 110, dropEvery: 0.14, mineDamage: 28, mineRadius: 62 },
+      { damage: 26, cooldown: 1.5, speed: 460, range: 330, count: 3, size: 15, knockback: 110, dropEvery: 0.3, mineDamage: 20, mineRadius: 52 },
     ],
   },
   {

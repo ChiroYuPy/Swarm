@@ -44,6 +44,8 @@ export class Enemy {
   stunUntil = 0;
   /** gelé (objet Gel) jusqu'à ce tick : immobile, fragile, éclate à sa mort */
   frozenUntil = 0;
+  /** galvanisé par un Meneur jusqu'à ce tick (plus rapide) */
+  boostUntil = 0;
   hitTick = -1000;
   attackReady = 0;
   /** état d'IA (phase), minuteur et variables auxiliaires */
@@ -276,6 +278,8 @@ export const EV_SHATTER = 29;
 export const EV_REVIVE = 30;
 /** le clone disparaît */
 export const EV_CLONE_END = 31;
+/** Téléporteur : x, y = arrivée, v = rayon de l'impact */
+export const EV_BLINK = 32;
 
 /** Événement émis par la sim pour le rendu et l'audio. Purement informatif : la sim ne les relit jamais. */
 export class SimEvent {

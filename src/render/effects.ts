@@ -38,6 +38,7 @@ import {
   EV_WALL_HIT,
   EV_SHOT_DOWN,
   EV_SHATTER,
+  EV_BLINK,
   EV_REVIVE,
   EV_CLONE_END,
   OFFER_FUSION,
@@ -83,7 +84,8 @@ export type SfxName =
   | 'shatter'
   | 'clock'
   | 'clone'
-  | 'revive';
+  | 'revive'
+  | 'blink';
 
 export interface FxHooks {
   sfx(name: SfxName, v?: number): void;
@@ -169,7 +171,8 @@ export class Effects {
   }
 
   addShake(v: number): void {
-    if (this.shakeEnabled) this.shake = Math.min(18, this.shake + v);
+    // Douce et plafonnée : l'écran doit rester lisible même quand tout explose.
+    if (this.shakeEnabled) this.shake = Math.min(7, this.shake + v * 0.6);
   }
 
   burst(x: number, y: number, n: number, col: number, speed: number, life = 0.45, size = 3): void {
@@ -275,7 +278,8 @@ export class Effects {
         case EV_EXPLOSION:
           this.ring(e.x, e.y, e.v, e.k === 1 ? 6 : 13, 0.3);
           this.burst(e.x, e.y, 14, e.k === 1 ? 6 : 13, 300, 0.45, 3);
-          this.addShake(e.k === 1 ? 4 : 1.5);
+          // Seules les explosions qui te visent secouent (pas tes mines).
+          if (e.k === 1) this.addShake(4);
           h.sfx('explosion', e.v);
           break;
         case EV_LINE:
@@ -397,6 +401,11 @@ export class Effects {
           h.toast('Totem : tu reviens !', '#ffb347');
           h.sfx('revive');
           break;
+        case EV_BLINK:
+          this.burst(e.x, e.y, 14, 23, 220, 0.4, 3);
+          this.ring(e.x, e.y, e.v, 23, 0.3);
+          h.sfx('blink');
+          break;
         case EV_CLONE_END:
           this.burst(e.x, e.y, 18, 17, 160, 0.5, 3);
           break;
@@ -404,6 +413,8 @@ export class Effects {
           this.burst(e.x, e.y, 2, e.v === 1 ? 6 : 15, 90, 0.15, 2);
           break;
         case EV_SWARM:
+          // k > 0 : horde (k = type + 1)
+          if (e.k > 0) h.toast(`Horde : ${ENEMIES[e.k - 1].name} !`, ENEMIES[e.k - 1].color);
           h.sfx('alert');
           break;
         case EV_RING_WAVE:

@@ -23,6 +23,7 @@ import {
   PJ_RING,
   PK_CHEST,
   MAX_ENEMIES,
+  TICK_RATE,
   weaponDef,
   weaponLevel,
   type GameState,
@@ -49,6 +50,11 @@ export interface RenderOptions extends HudOptions {
 const ENEMY_KAMIKAZE = ENEMIES.findIndex((e) => e.behavior === 'kamikaze');
 const KAMIKAZE_BLAST = ENEMIES[ENEMY_KAMIKAZE]?.blastRadius ?? 80;
 const NUM_TYPES = ENEMIES.length;
+const ENEMY_BLINKER = ENEMIES.findIndex((e) => e.behavior === 'blinker');
+const ENEMY_LEADER = ENEMIES.findIndex((e) => e.behavior === 'leader');
+const BLINK_DEF = ENEMIES[ENEMY_BLINKER];
+const BLINK_FUSE = Math.round((BLINK_DEF?.fuse ?? 1) * TICK_RATE);
+const LEADER_DEF = ENEMIES[ENEMY_LEADER];
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -411,6 +417,102 @@ export class Renderer {
     }
   }
 
+  /** Meneurs : leur zone (pointillés), et une traînée derrière chaque ennemi qu'ils accélèrent. */
+  private drawLeaders(s: GameState, alpha: number, time: number): void {
+    if (ENEMY_LEADER < 0) return;
+    const ctx = this.ctx;
+    const tick = s.tick;
+    const color = LEADER_DEF.color;
+    const R = LEADER_DEF.auraRadius ?? 170;
+    let zones = false;
+    let trails = false;
+    ctx.beginPath();
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.type !== ENEMY_LEADER || e.frozenUntil > tick) continue;
+      const x = lerp(e.px, e.x, alpha);
+      const y = lerp(e.py, e.y, alpha);
+      if (!this.visible(x, y, R)) continue;
+      ctx.moveTo(x + R, y);
+      ctx.arc(x, y, R, 0, Math.PI * 2);
+      zones = true;
+    }
+    if (zones) {
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 10]);
+      ctx.lineDashOffset = -time * 20;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      ctx.globalAlpha = 1;
+    }
+    ctx.beginPath();
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.boostUntil <= tick) continue;
+      const x = lerp(e.px, e.x, alpha);
+      const y = lerp(e.py, e.y, alpha);
+      if (!this.visible(x, y, e.r * 3)) continue;
+      // Deux traits de vitesse derrière lui.
+      const fx = e.vx || 1;
+      const fy = e.vy || 0;
+      const nx = -fy * e.r * 0.5;
+      const ny = fx * e.r * 0.5;
+      const bx = x - fx * e.r * 1.2;
+      const by = y - fy * e.r * 1.2;
+      const L = e.r * 1.3;
+      ctx.moveTo(bx + nx, by + ny);
+      ctx.lineTo(bx + nx - fx * L, by + ny - fy * L);
+      ctx.moveTo(bx - nx, by - ny);
+      ctx.lineTo(bx - nx - fx * L, by - ny - fy * L);
+      trails = true;
+    }
+    if (trails) {
+      ctx.globalAlpha = 0.75;
+      this.glow(color, 1.6);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /** Téléporteurs : cercle d'impact au sol qui se remplit, relié au téléporteur. */
+  private drawBlinks(s: GameState, alpha: number): void {
+    if (ENEMY_BLINKER < 0) return;
+    const ctx = this.ctx;
+    const color = BLINK_DEF.color;
+    const R = BLINK_DEF.blastRadius ?? 52;
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.type !== ENEMY_BLINKER || e.ai !== 1) continue;
+      const tx = e.aux;
+      const ty = e.aux2;
+      if (!this.visible(tx, ty, R)) continue;
+      const prog = Math.min(1, Math.max(0, 1 - e.timer / BLINK_FUSE));
+      const x = lerp(e.px, e.x, alpha);
+      const y = lerp(e.py, e.y, alpha);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(tx, ty);
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 9]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(tx, ty, R * prog, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.18 + 0.12 * prog;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(tx, ty, R, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.5 + 0.4 * prog;
+      this.glow(color, 2);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   private drawEnemies(s: GameState, alpha: number, time: number): void {
     const ctx = this.ctx;
     const n = this.bucketN;
@@ -442,7 +544,8 @@ export class Renderer {
         if (!rotates) this.worldTransform();
         for (let k = 0; k < cnt; k++) {
           const e = s.enemies[list[k]];
-          const flash = e.frozenUntil > tick || tick - e.hitTick < 5 || (t === ENEMY_KAMIKAZE && e.ai === 1 && ((tick >> 2) & 1) === 1);
+          const flash =
+            e.frozenUntil > tick || tick - e.hitTick < 5 || ((t === ENEMY_KAMIKAZE || t === ENEMY_BLINKER) && e.ai === 1 && ((tick >> 2) & 1) === 1);
           if (flash !== (pass === 1)) continue;
           const x = lerp(e.px, e.x, alpha);
           const y = lerp(e.py, e.y, alpha);
@@ -468,6 +571,9 @@ export class Renderer {
       this.glow('#9feaff', 1.6);
       ctx.globalAlpha = 1;
     }
+
+    this.drawLeaders(s, alpha, time);
+    this.drawBlinks(s, alpha);
 
     // Zone d'explosion des bulles prêtes à éclater
     if (ENEMY_KAMIKAZE >= 0 && n[ENEMY_KAMIKAZE] > 0) {

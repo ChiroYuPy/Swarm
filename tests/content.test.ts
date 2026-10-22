@@ -60,7 +60,7 @@ describe('contenu', () => {
       }
       return seen;
     };
-    const normal = firstSeen(1, 330);
+    const normal = firstSeen(1, 380);
     const hard = firstSeen(2, 200);
     // Au début, uniquement des Chasseurs ; les autres sont annoncés plus tard.
     expect(normal.get('losange')).toBeGreaterThan(60);
@@ -110,7 +110,7 @@ describe('contenu', () => {
     expect(s.clockUntil).toBeGreaterThan(tick);
     // La relecture doit refaire exactement la même chose... à condition d'avoir le même objet en réserve :
     // on rejoue donc une partie où l'objet a été obtenu en jeu (le bot s'en sert tout seul).
-    const g = createGame({ seed: 'ACTIVABLE-2' });
+    const g = createGame({ seed: 'ACTIVABLE-4' });
     const log: number[] = [];
     let used = 0;
     for (let i = 0; i < 300 * TICK_RATE && !g.over; i++) {
@@ -119,7 +119,7 @@ describe('contenu', () => {
       log.push(c);
       step(g, [c]);
     }
-    const replayed = replayToEnd({ seed: 'ACTIVABLE-2' }, decodeLog(encodeLog(Uint8Array.from(log))));
+    const replayed = replayToEnd({ seed: 'ACTIVABLE-4' }, decodeLog(encodeLog(Uint8Array.from(log))));
     expect(hashState(replayed)).toBe(hashState(g));
     expect(used).toBeGreaterThan(0);
   });
