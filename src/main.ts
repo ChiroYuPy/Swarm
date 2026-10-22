@@ -44,17 +44,21 @@ import { bestScore, loadSave, recordScore, writeSave, type SandboxSetup, type Sa
 type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'dying' | 'dead' | 'replay';
 
 const STEP_MS = 1000 / TICK_RATE;
+/** pas de simulation rattrapés au plus par image (en partie / démo du menu) */
+const PLAY_CATCHUP = 4;
+const MENU_CATCHUP = 2;
 const params = new URLSearchParams(location.search);
 
 /**
  * Démo derrière le menu : le bot joue une partie « bac à sable » déjà lancée (minute 6, ennemis plus
  * nombreux, héros équipé et invincible) pour qu'il y ait tout de suite un vrai essaim à l'écran.
+ * Sans excès : elle tourne derrière les menus, qui doivent rester fluides (le curseur en dépend).
  */
 const DEMO_SANDBOX: SandboxConfig = {
   invincible: true,
   level: 14,
   startMinute: 6,
-  enemyMul: 2.5,
+  enemyMul: 1.5,
   enemies: null,
   bosses: false,
   might: 1,
@@ -593,13 +597,13 @@ class App implements AppApi {
         }
         this.acc += dtMs;
         let n = 0;
-        while (this.acc >= STEP_MS && n++ < 4) {
+        while (this.acc >= STEP_MS && n++ < MENU_CATCHUP) {
           this.acc -= STEP_MS;
           const s = this.state;
           step(s, [botInput(s, 0)]);
           this.fx.consume(s);
         }
-        if (n >= 4) this.acc = 0;
+        if (n >= MENU_CATCHUP) this.acc = 0;
         alpha = this.acc / STEP_MS;
         break;
       }
@@ -621,8 +625,9 @@ class App implements AppApi {
             this.acc = 0;
             break;
           }
-          if (++n >= 8) {
-            // Machine trop lente : on ne rattrape pas indéfiniment.
+          if (++n >= PLAY_CATCHUP) {
+            // Machine trop lente : on ne rattrape pas indéfiniment (sinon chaque image coûte encore plus
+            // cher que la précédente, et tout rame, curseur compris). La partie ralentit un peu à la place.
             this.acc = 0;
             break;
           }

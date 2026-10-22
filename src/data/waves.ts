@@ -14,9 +14,14 @@ export interface RatePoint {
 export const WAVES = {
   spawnRadius: 900,
   spawnJitter: 120,
-  enemyCap: 700,
-  /** au-delà, un ennemi est replacé de l'autre côté du joueur */
-  relocateDistance: 1500,
+  /**
+   * Plafonds d'ennemis en vie (performances) : le flux continu s'arrête à `fluxCap`, les temps forts
+   * (essaim, horde, encerclement) peuvent monter jusqu'à `enemyCap`. Caisses et boss n'en tiennent pas compte.
+   */
+  fluxCap: 340,
+  enemyCap: 440,
+  /** au-delà (loin de tous les joueurs), un ennemi semé disparaît, sans rien lâcher */
+  lostDistance: 1500,
   rates: [
     { at: 0, rate: 1.0 },
     { at: 45, rate: 1.6 },

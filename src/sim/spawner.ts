@@ -156,7 +156,9 @@ function spawnAround(s: GameState, type: number, angle: number, radius: number, 
   return null;
 }
 
+/** Temps forts (essaim, horde, encerclement) : plafonnés à WAVES.enemyCap ennemis en vie. */
 function spawnAt(s: GameState, type: number, x: number, y: number, target: number): Enemy | null {
+  if (s.enemyCount >= WAVES.enemyCap) return null;
   if (circleHitsObstacle(s.map, x, y, ENEMIES[type].radius)) return null;
   return spawnEnemy(s, type, x, y, hpMul(s), dmgMul(s), spdMul(s), target);
 }
@@ -263,7 +265,7 @@ export function updateSpawner(s: GameState): void {
     const type = flux ? flux[Math.min(flux.length - 1, Math.floor(rngW.next() * flux.length))] : rngW.weighted(mix.weights, mix.total);
     const a = rngW.next() * TWO_PI;
     const j = rngW.next();
-    if (s.enemyCount >= WAVES.enemyCap || type === undefined) continue;
+    if (s.enemyCount >= WAVES.fluxCap || type === undefined) continue;
     if (!underCap(s, type)) continue;
     spawnAround(s, type, a, WAVES.spawnRadius + j * WAVES.spawnJitter, targetPlayer(s));
   }

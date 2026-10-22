@@ -1,9 +1,9 @@
 import { MAP_GEN } from '../data/map';
 
 /** Version de la simulation : à incrémenter dès qu'un changement casse la compatibilité des replays. */
-export const SIM_VERSION = 7;
+export const SIM_VERSION = 8;
 /** Version affichée du jeu, stockée dans les scores. */
-export const GAME_VERSION = '0.4.5';
+export const GAME_VERSION = '0.4.6';
 
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;

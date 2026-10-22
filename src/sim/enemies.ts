@@ -127,28 +127,13 @@ function boostAround(s: GameState, e: Enemy, self: number, R: number): void {
   }
 }
 
-function relocate(s: GameState, e: Enemy, p: Player, dx: number, dy: number): void {
-  // Replace l'ennemi de l'autre côté du joueur, à distance d'apparition.
-  const base = datan2(dy, dx); // direction ennemi -> joueur
-  for (let k = 0; k < 7; k++) {
-    const a = base + (k & 1 ? 1 : -1) * ((k + 1) >> 1) * 0.4;
-    const x = p.x + dcos(a) * WAVES.spawnRadius;
-    const y = p.y + dsin(a) * WAVES.spawnRadius;
-    if (circleHitsObstacle(s.map, x, y, e.r)) continue;
-    e.x = e.px = x;
-    e.y = e.py = y;
-    e.kbx = e.kby = 0;
-    return;
-  }
-}
-
 export function updateEnemies(s: GameState): void {
   const tick = s.tick;
   const grid = s.grid;
   const cols = grid.cols;
   const rows = grid.rows;
   const enemies = s.enemies;
-  const relocate2 = WAVES.relocateDistance * WAVES.relocateDistance;
+  const lost2 = WAVES.lostDistance * WAVES.lostDistance;
   const despawn2 = WAVES.props.despawn * WAVES.props.despawn;
   // Horloge : tout le reste du monde avance au ralenti (déplacements et minuteurs).
   const tf = s.clockUntil > tick ? LOOT.clockFactor : 1;
@@ -209,9 +194,15 @@ export function updateEnemies(s: GameState): void {
       updateBoss(s, e, p, dx, dy, dist, tf);
       continue;
     }
-    if (d2 > relocate2) {
-      relocate(s, e, p, dx, dy);
-      continue;
+    if (d2 > lost2) {
+      // Semé : loin de tous les joueurs, il disparaît (sans gemme ni score). Sinon il change de cible.
+      const ni = nearestPlayer(s, e.x, e.y);
+      const q = s.players[ni];
+      if (ni === ti || (q.x - e.x) * (q.x - e.x) + (q.y - e.y) * (q.y - e.y) > lost2) {
+        e.alive = false;
+        continue;
+      }
+      e.target = ni;
     }
 
     const d = ENEMIES[e.type];

@@ -141,3 +141,27 @@ describe('vagues lisibles', () => {
     expect(alive(s, 'golem').length).toBeGreaterThan(0);
   });
 });
+
+describe('ennemis semés et plafond', () => {
+  it('un ennemi semé loin du joueur disparaît, sans gemme ni kill', () => {
+    const s = arena();
+    put(s, 'triangle', WAVES.lostDistance + 200, 0);
+    put(s, 'triangle', 300, 0);
+    step(s, [0]);
+    expect(alive(s, 'triangle').length).toBe(1);
+    expect(s.gemCount).toBe(0);
+    expect(s.players[0].kills).toBe(0);
+  });
+
+  it('les vagues ne dépassent jamais le plafond, même avec beaucoup d’ennemis demandés', () => {
+    const s = createGame({ seed: 'PLAFOND', sandbox: { ...defaultSandbox().rules, startMinute: 8, enemyMul: 10, bosses: false, weapons: [] } });
+    let max = 0;
+    for (let i = 0; i < 90 * TICK_RATE; i++) {
+      step(s, [0]);
+      max = Math.max(max, s.enemyCount);
+    }
+    expect(max).toBeGreaterThan(WAVES.fluxCap - 20);
+    // + quelques caisses bonus, qui ne comptent pas
+    expect(max).toBeLessThanOrEqual(WAVES.enemyCap + WAVES.props.max);
+  });
+});
