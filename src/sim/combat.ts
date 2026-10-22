@@ -29,7 +29,8 @@ import {
 } from './state';
 
 /** Inflige des dégâts à l'ennemi d'index `idx`. Renvoie true s'il meurt. `owner` = joueur crédité (-1 = personne). */
-export function damageEnemy(s: GameState, idx: number, amount: number, owner: number, kx: number, ky: number): boolean {
+/** `quiet` : brûlure continue (feu au sol) — l'impact est marqué (x2 = 1) pour ne pas faire de bruit à chaque tic. */
+export function damageEnemy(s: GameState, idx: number, amount: number, owner: number, kx: number, ky: number, quiet = false): boolean {
   const e = s.enemies[idx];
   if (!e.alive) return false;
   owner = credited(s, owner);
@@ -44,7 +45,7 @@ export function damageEnemy(s: GameState, idx: number, amount: number, owner: nu
     e.kby += ky * k;
   }
   if (owner >= 0) s.players[owner].damageDealt += amount;
-  emit(s, EV_HIT, e.x, e.y - e.r, amount, e.type);
+  emit(s, EV_HIT, e.x, e.y - e.r, amount, e.type, quiet ? 1 : 0);
   if (e.hp <= 0) {
     killEnemy(s, idx, owner);
     return true;

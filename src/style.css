@@ -1,6 +1,8 @@
 /*
- * Système visuel unique : une police (Chakra Petch), une échelle de tailles, un style de panneau,
- * de bouton, d'onglet et de carte. Les lueurs sont réservées au titre et aux scores.
+ * Système visuel unique, celui de la fin de partie : une police (Chakra Petch), une échelle de tailles,
+ * un titre néon souligné en tête de chaque écran, du contenu à nu séparé par des filets (pas de cadres),
+ * des chiffres « libellé / valeur », des onglets soulignés, et une arrivée en cascade.
+ * Les lueurs sont réservées aux titres et aux scores.
  */
 :root {
   --bg: #07060f;
@@ -73,6 +75,9 @@ body.demo-swap #game {
 body.dead #game {
   filter: saturate(0.4) brightness(0.35) blur(2px);
 }
+body.paused #game {
+  filter: saturate(0.55) brightness(0.45) blur(1.5px);
+}
 
 /* ---------- Conteneur des écrans ---------- */
 #ui {
@@ -102,7 +107,7 @@ body.dead #game {
   pointer-events: none;
 }
 #ui.menu::before {
-  background: radial-gradient(ellipse at center, rgba(7, 6, 15, 0.9) 0%, rgba(7, 6, 15, 0.75) 55%, rgba(7, 6, 15, 0.45) 100%);
+  background: radial-gradient(ellipse at center, rgba(7, 6, 15, 0.94) 0%, rgba(7, 6, 15, 0.84) 60%, rgba(7, 6, 15, 0.6) 100%);
 }
 /* Menu principal : voile seulement derrière le logo et les boutons, l'essaim reste visible autour. */
 #ui.on-menu::before {
@@ -117,7 +122,7 @@ body.attract #ui {
   pointer-events: none;
 }
 #ui.overlay::before {
-  background: rgba(7, 6, 15, 0.72);
+  background: rgba(7, 6, 15, 0.6);
 }
 #ui.visible::before {
   animation: fade-in var(--push-time) var(--ease-io) both;
@@ -456,6 +461,9 @@ body.crt-on #ui {
 }
 
 /* Level-up : la carte choisie s'illumine pendant que l'écran file. */
+.screen-levelup {
+  gap: 18px;
+}
 .screen-levelup.leaving .card.picked {
   border-color: var(--c);
   box-shadow: 0 0 34px color-mix(in srgb, var(--c) 60%, transparent);
@@ -499,15 +507,82 @@ h3 {
   color: var(--muted);
   margin-bottom: 10px;
 }
+/* Titre de section suivi d'un filet qui s'efface : remplace les cadres. */
+h3.rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+h3.rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
+h3.rule small {
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  opacity: 0.6;
+}
+.gold {
+  color: var(--yellow);
+}
 .sub {
   margin-top: 6px;
   font-size: var(--fs-l);
   color: var(--muted);
 }
-.head,
 .brand,
 .foot {
   text-align: center;
+}
+/* En-tête d'écran : titre néon à la couleur de l'écran (--c), filet qui s'étire depuis le centre. */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.head h2 {
+  font-size: var(--fs-2xl);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow:
+    0 0 2px var(--c),
+    0 0 16px color-mix(in srgb, var(--c) 70%, transparent);
+  animation: neon-on 0.9s 0.05s ease-out both;
+}
+/* le filet prend la largeur du titre, un peu plus de chaque côté (ses bouts s'effacent) */
+.head .ttl {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.head .line {
+  margin: 0 -32px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--c), transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 55%, transparent);
+  animation: line-in 0.55s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.head .sub {
+  margin-top: 2px;
+  font-size: var(--fs-m);
+}
+.head .sub b {
+  font-variant-numeric: tabular-nums;
+}
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
 }
 .version {
   margin: -6px 0 0;
@@ -519,6 +594,17 @@ h3 {
 .foot {
   font-size: var(--fs-s);
   color: var(--muted);
+}
+/* Rappel des touches : des touches de clavier, puis l'action. */
+.foot.keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 22px;
+  margin-top: -4px;
+}
+.foot.keys kbd {
+  margin-right: 3px;
 }
 .note,
 .empty {
@@ -709,25 +795,9 @@ button:focus {
   background: color-mix(in srgb, var(--c) 10%, transparent);
 }
 
-/* ---------- Panneaux ---------- */
+/* ---------- Colonnes de contenu (sans cadre) ---------- */
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 18px 20px;
   width: min(560px, 100%);
-}
-.panel.wide {
-  width: 100%;
-}
-.split {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 14px;
-  width: 100%;
-}
-.split .panel {
-  width: 100%;
 }
 
 /* ---------- Cartes (difficulté, level-up) ---------- */
@@ -1047,6 +1117,26 @@ button:focus {
   font-size: var(--fs-s);
   color: var(--muted);
 }
+.diff-record .stats.mini {
+  margin: 6px 0 0;
+}
+.diff-record .stats.mini > * {
+  padding: 0 12px;
+}
+.diff-record .stats.mini > :first-child {
+  padding-left: 0;
+}
+.diff-record .stats.mini small {
+  font-size: 10px;
+}
+.diff-record .stats.mini b {
+  height: auto;
+  line-height: 1.2;
+  font-size: var(--fs-m);
+  color: var(--text);
+  text-shadow: none;
+  letter-spacing: 0;
+}
 @media (max-width: 860px) {
   .diffs {
     grid-template-columns: 1fr;
@@ -1273,6 +1363,9 @@ table.scores tbody tr:last-child td {
 .screen-settings .panel.form {
   width: min(640px, 100%);
 }
+.screen-settings {
+  gap: 16px;
+}
 .form {
   display: flex;
   flex-direction: column;
@@ -1444,19 +1537,24 @@ table.scores tbody tr:last-child td {
 .screen-sandbox {
   width: min(1180px, 100%);
 }
-.screen-sandbox .head h2 {
-  color: var(--violet);
-}
 .sandbox-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 14px;
+  gap: 22px;
   width: 100%;
   height: min(64vh, 600px);
+}
+.screen-sandbox {
+  gap: 16px;
 }
 .screen-sandbox .panel {
   width: 100%;
   overflow-y: auto;
+  padding-right: 10px;
+}
+.screen-sandbox .loadout {
+  padding: 0 4px 0 22px;
+  border-left: 1px solid var(--line);
 }
 .screen-sandbox .set {
   min-height: 42px;
@@ -1500,9 +1598,6 @@ table.scores tbody tr:last-child td {
   color: var(--c);
 }
 .loadout h3 {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   margin: 16px 0 8px;
 }
 .loadout h3:first-child {
@@ -1512,6 +1607,7 @@ table.scores tbody tr:last-child td {
   font-size: var(--fs-s);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  display: inline-block;
 }
 .slots.full {
   animation: slots-full 0.5s ease-out;
@@ -1528,8 +1624,6 @@ table.scores tbody tr:last-child td {
 }
 .foes.off {
   opacity: 0.35;
-}
-.foes .tile:disabled {
 }
 @media (max-width: 860px) {
   .sandbox-grid {
@@ -1562,73 +1656,57 @@ table.scores tbody tr:last-child td {
   background: transparent;
 }
 
-/* ---------- Codex : catégories | grille | fiche ---------- */
+/* ---------- Codex : onglets, grille | fiche ---------- */
 .screen-codex {
   width: min(1180px, 100%);
+  gap: 16px;
+}
+.cats .dtab {
+  min-width: 0;
+  padding: 6px 16px 10px;
+}
+.cats .dtab.on small {
+  color: var(--c);
 }
 .codex {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr) minmax(0, 400px);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 430px);
+  gap: 0;
   width: 100%;
-  height: min(66vh, 620px);
+  height: min(58vh, 560px);
 }
 .codex.solo {
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 820px);
+  justify-content: center;
 }
 .codex .panel {
   width: 100%;
   overflow-y: auto;
 }
-.cats {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.list {
+  padding-right: 18px;
 }
-.cat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(12, 10, 26, 0.7);
-  font-size: var(--fs-m);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  text-align: left;
-  color: var(--muted);
-  transition:
-    border-color 0.12s,
-    background 0.12s,
-    color 0.12s;
+/* La fiche : séparée de la grille par un simple filet. */
+.detail {
+  padding: 2px 6px 0 26px;
+  border-left: 1px solid var(--line);
 }
-.cat small {
-  font-size: var(--fs-s);
-  color: var(--muted);
-}
-.cat:focus,
-:where(body:not(.kbd)) .cat:hover {
-  border-color: var(--line-strong);
-  color: var(--text);
-}
-.cat.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(56, 246, 255, 0.08);
+.codex.solo .detail {
+  padding: 0 6px 0 0;
+  border-left: none;
 }
 .list h3 {
-  margin: 4px 0 10px;
+  margin: 4px 0 8px;
 }
-.list h3 ~ h3 {
+.list .tiles + h3 {
   margin-top: 18px;
 }
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 6px;
 }
+/* Tuile : icône et nom à nu ; un cadre teinté seulement sur l'élément choisi. */
 .tile {
   --c: #fff;
   display: flex;
@@ -1636,12 +1714,13 @@ table.scores tbody tr:last-child td {
   align-items: center;
   gap: 6px;
   padding: 10px 6px;
-  border: 1px solid rgba(150, 130, 255, 0.12);
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.25);
+  background: transparent;
   transition:
     border-color 0.12s,
     background 0.12s,
+    box-shadow 0.12s,
     color 0.12s;
 }
 .tile .nm {
@@ -1653,13 +1732,16 @@ table.scores tbody tr:last-child td {
 }
 .tile:focus,
 :where(body:not(.kbd)) .tile:hover {
-  border-color: var(--line-strong);
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.03);
 }
 .tile.on {
-  border-color: var(--c);
-  background: color-mix(in srgb, var(--c) 8%, rgba(0, 0, 0, 0.25));
+  border-color: color-mix(in srgb, var(--c) 65%, transparent);
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 18%, transparent);
 }
-.tile.on .nm {
+.tile.on .nm,
+.tile:focus .nm {
   color: var(--text);
 }
 .ico {
@@ -1670,31 +1752,45 @@ table.scores tbody tr:last-child td {
 .detail h3 {
   margin: 18px 0 8px;
 }
+/* En-tête de fiche : l'icône dans un halo, le nom, et un filet à la couleur de l'élément. */
 .dhead {
+  position: relative;
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: center;
+  padding-bottom: 14px;
+}
+.dhead::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--c), transparent 85%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent);
 }
 .dhead .ico.big {
   flex: none;
   width: 84px;
   height: 84px;
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-  border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 20%, transparent), transparent 70%);
 }
 .dhead .tag {
   font-size: var(--fs-s);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--c);
 }
 .dhead h2 {
-  font-size: var(--fs-xl);
+  font-size: var(--fs-2xl);
+  line-height: 1.1;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--c) 40%, transparent);
 }
 .detail .desc {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: var(--fs-l);
   line-height: 1.4;
 }
@@ -1718,7 +1814,7 @@ table.scores tbody tr:last-child td {
 .rows dd {
   margin: 0;
   padding: 6px 0;
-  border-top: 1px solid rgba(150, 130, 255, 0.1);
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
 }
 .rows dt {
   padding-right: 14px;
@@ -1726,52 +1822,50 @@ table.scores tbody tr:last-child td {
   font-weight: 600;
   white-space: nowrap;
 }
+/* Recette d'évolution : arme + passif → évolution, en grand. */
 .recipe {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+/* le résultat sur sa propre ligne : « A + B », puis « → C » */
+.recipe .res {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 8px;
+}
+.recipe .op {
+  font-size: var(--fs-xl);
+  font-weight: 700;
   color: var(--muted);
 }
 .chip {
   --c: #fff;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 9px 3px 4px;
+  gap: 8px;
+  padding: 4px 12px 4px 5px;
   border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.3);
-  font-size: var(--fs-s);
+  background: color-mix(in srgb, var(--c) 6%, transparent);
+  font-size: var(--fs-m);
   font-weight: 600;
   color: var(--text);
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.chip small {
+  font-size: var(--fs-s);
+  color: var(--c);
 }
 :where(body:not(.kbd)) .chip:hover,
 .chip:focus {
   border-color: var(--c);
-}
-.arrivals {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.arrivals span {
-  --c: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border: 1px solid rgba(150, 130, 255, 0.12);
-  border-radius: var(--radius);
-  font-size: var(--fs-l);
-  font-weight: 600;
-}
-.arrivals b {
-  font-size: var(--fs-s);
-  color: var(--c);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
 }
 .rules {
   display: grid;
@@ -1785,50 +1879,38 @@ table.scores tbody tr:last-child td {
 }
 @media (max-width: 1100px) {
   .codex {
-    grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr);
-  }
-  .codex.solo {
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .tiles {
     grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   }
 }
 @media (max-width: 700px) {
-  .codex,
-  .codex.solo {
+  .codex {
     grid-template-columns: 1fr;
     height: auto;
   }
-  .cats {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
+  .detail {
+    padding: 14px 0 0;
+    border-left: none;
+    border-top: 1px solid var(--line);
   }
   .codex .panel {
     max-height: 46vh;
   }
 }
 
-/* ---------- Équipement (pause + fin) ---------- */
+/* ---------- Équipement (fin de partie) ---------- */
 .build .items {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.screen-pause .build .items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 .build .item {
   --c: #fff;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 12px 4px 4px;
-  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
-  border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.3);
 }
 .build .item .icon {
   display: flex;
@@ -1840,11 +1922,6 @@ table.scores tbody tr:last-child td {
   column-gap: 8px;
   font-size: var(--fs-m);
 }
-.build .item .txt small {
-  flex-basis: 100%;
-  color: var(--muted);
-  font-size: var(--fs-s);
-}
 .build .lv {
   font-size: var(--fs-s);
   color: var(--c);
@@ -1852,37 +1929,123 @@ table.scores tbody tr:last-child td {
 .build .lv.max {
   color: var(--gold);
 }
-.statlist div {
+
+/* ---------- Pause : résumé de la partie ---------- */
+.screen-pause {
+  width: min(1100px, 100%);
+  gap: 16px;
+}
+.stats.run b {
+  font-size: var(--fs-xl);
+}
+.stats.run .gold {
+  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
+}
+.pause-gear {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px 40px;
+  width: 100%;
+}
+.pause-gear h3,
+.pause-stats h3 {
+  margin-bottom: 6px;
+}
+/* Une ligne d'équipement : icône, nom + niveau en pastilles, chiffres, évolution. */
+.gear {
+  --c: #fff;
   display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+}
+.gear:last-child {
+  border-bottom: none;
+}
+.gear .icon {
+  display: flex;
+  flex: none;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 40%, transparent));
+}
+.gear-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.gear-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-m);
+}
+.gear-top .pips i {
+  width: 14px;
+  height: 4px;
+}
+.gear-top .tag {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.gear small {
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.gear .evo {
+  font-style: normal;
+  opacity: 0.85;
+}
+.gear .evo.ready {
+  color: var(--gold);
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(255, 210, 58, 0.45);
+}
+/* Stats : trois colonnes « libellé valeur » ; celles qui ont un bonus en couleur, avec leurs sources. */
+.pause-stats {
+  width: 100%;
+}
+.statgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 40px;
+}
+.statgrid div {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  align-items: baseline;
   padding: 5px 0;
   border-bottom: 1px solid rgba(150, 130, 255, 0.1);
   font-size: var(--fs-m);
   color: var(--muted);
 }
-.statlist div b {
-  color: rgba(242, 234, 255, 0.5);
+.statgrid b {
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(242, 234, 255, 0.55);
 }
-.statlist div.on b {
+.statgrid div.on {
+  color: var(--text);
+}
+.statgrid div.on b {
   color: var(--green);
 }
-.statlist div small {
+.statgrid small {
   flex-basis: 100%;
   font-size: var(--fs-s);
-  color: rgba(154, 143, 192, 0.75);
+  color: rgba(154, 143, 192, 0.8);
 }
-.statlist div {
-  flex-wrap: wrap;
-}
-
-/* ---------- Pause ---------- */
-.screen-pause {
-  width: min(1100px, 100%);
-}
-.build .item .txt small.num {
-  color: var(--text);
-  opacity: 0.8;
+@media (max-width: 860px) {
+  .pause-gear {
+    grid-template-columns: 1fr;
+  }
+  .statgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ---------- Fin de partie : bandeau en pente ---------- */
@@ -1935,7 +2098,7 @@ table.scores tbody tr:last-child td {
   background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.16) 50%, transparent 58%);
   background-size: 250% 100%;
   background-position: 150% 0;
-  animation: sheen 1.1s 0.65s ease-in-out both;
+  animation: sheen 1.1s 1.05s ease-in-out both;
 }
 .banner-content {
   position: relative;
@@ -1943,7 +2106,8 @@ table.scores tbody tr:last-child td {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  animation: content-in 0.8s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* le texte part du côté opposé, une fois le bandeau presque posé */
+  animation: content-in 0.7s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes band-in {
   from {
@@ -1953,7 +2117,7 @@ table.scores tbody tr:last-child td {
 @keyframes content-in {
   from {
     opacity: 0;
-    transform: translateX(-45vw);
+    transform: translateX(45vw);
   }
 }
 @keyframes sheen {
@@ -1991,9 +2155,14 @@ h2.go {
     transform: translateY(-50%) rotate(9deg) scale(2.4);
   }
 }
+/* Arrivée en cascade : chaque bloc monte à son tour (--i), une fois le bandeau passé. */
 .reveal {
-  animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(0.8s + var(--i, 0) * 90ms);
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(0.22s + var(--i, 0) * 70ms);
+}
+.screen-death .reveal {
+  animation-duration: 0.55s;
+  animation-delay: calc(1.15s + var(--i, 0) * 90ms);
 }
 @keyframes rise {
   from {
@@ -2010,14 +2179,33 @@ h2.go {
   /* son délai d'entrée est posé en ligne par ui.ts */
   animation-delay: 0s !important;
 }
-.screen-death.leaving .reveal {
+.screen.leaving .reveal,
+.screen.leaving .head h2,
+.screen.leaving .head .line {
   /* déjà arrivés : on fige leur état final pendant que l'écran file */
+  animation: none;
+}
+/* Retour d'un sous-écran, ou autre onglet du même écran : tout est déjà en place. */
+.screen.enter-back .reveal,
+.screen.enter-back .head h2,
+.screen.enter-back .head .line,
+.screen.same .reveal:not(.records),
+.screen.same .head h2,
+.screen.same .head .line {
   animation: none;
 }
 @keyframes band-out {
   to {
     transform: translateX(105%);
   }
+}
+/* Écran posé d'emblée (pause automatique) : aucune animation, ni d'entrée ni de fond. */
+.screen.instant,
+.screen.instant *,
+.screen.instant *::before,
+.screen.instant *::after,
+#ui.instant::before {
+  animation: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
   .banner-band,
@@ -2074,14 +2262,14 @@ h2.go {
   color: var(--yellow);
   font-variant-numeric: tabular-nums;
 }
-/* Stats de fin : des chiffres séparés par un filet, sans cadre. */
+/* Chiffres « libellé / valeur » séparés par un filet, sans cadre (fin de partie, pause, codex…). */
 .stats {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   margin: 4px 0;
 }
-.stats div {
+.stats > * {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2089,8 +2277,43 @@ h2.go {
   min-width: 132px;
   padding: 2px 26px;
 }
-.stats div + div {
+.stats > * + * {
   border-left: 1px solid var(--line);
+}
+/* Version compacte, alignée à gauche (fiches du codex, record d'une difficulté). */
+.stats.mini {
+  justify-content: flex-start;
+  margin: 14px 0 4px;
+}
+.stats.mini > * {
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0 16px;
+  gap: 2px;
+}
+.stats.mini > :first-child {
+  padding-left: 0;
+}
+.stats.mini b {
+  font-size: var(--fs-xl);
+  white-space: nowrap;
+}
+.stats.mini .to {
+  font-style: normal;
+  font-size: var(--fs-m);
+  color: var(--muted);
+}
+/* valeurs en texte (passifs) : plus petites, sur plusieurs lignes */
+.stats.mini.wide > * {
+  flex: 1;
+}
+.stats.mini.wide b {
+  font-size: var(--fs-m);
+  white-space: normal;
+  line-height: 1.3;
+}
+.stats.arrivals > * small {
+  color: var(--c);
 }
 .stats small {
   font-size: var(--fs-s);

@@ -953,17 +953,17 @@ export class Renderer {
         const mid = this.softPuff(col);
         const deep = this.softPuff('#ff3d1a');
         // Lueur au sol, puis des flammèches qui montent (blanches au départ, rouges en s'éteignant).
-        let R = b.r * 1.5;
-        ctx.globalAlpha = 0.5 * fade;
+        let R = b.r * 1.1;
+        ctx.globalAlpha = 0.14 * fade;
         ctx.drawImage(fade > 0.6 ? mid : deep, b.x - R, b.y - R, R * 2, R * 2);
-        for (let k = 0; k < 4; k++) {
+        for (let k = 0; k < 2; k++) {
           const h = hash01(i * 5 + k);
           const t = ((b.age * 0.035 + h) % 1 + 1) % 1;
           const ex = b.x + (h - 0.5) * b.r * 1.2;
           const ey = b.y + (hash01(k * 11 + i) - 0.5) * b.r - t * 20;
-          R = b.r * (1.1 - 0.6 * t) * (0.5 + 0.5 * fade);
-          ctx.globalAlpha = 0.9 * fade * (1 - t);
-          ctx.drawImage(t < 0.25 ? flameCore : t < 0.6 ? mid : deep, ex - R, ey - R, R * 2, R * 2);
+          R = b.r * (0.6 - 0.3 * t) * (0.5 + 0.5 * fade);
+          ctx.globalAlpha = 0.32 * fade * (1 - t);
+          ctx.drawImage(t < 0.5 ? mid : deep, ex - R, ey - R, R * 2, R * 2);
         }
         ctx.globalAlpha = 1;
         continue;
@@ -1397,17 +1397,17 @@ export class Renderer {
     const nx = -uy;
     const ny = ux;
     const flap = Math.sin(time * 0.45);
-    r *= 1.35;
+    r *= 0.9;
     const P = (f: number, s: number): [number, number] => [x + ux * f * r + nx * s * r, y + uy * f * r + ny * s * r];
     // Traînée de feu derrière lui.
     const core = this.softPuff('#fff3c4');
     const mid = this.softPuff(color);
     const end = this.softPuff('#ff3d1a');
-    for (let k = 0; k < 14; k++) {
-      const t = (((time / 14 + k / 14) % 1) + 1) % 1;
-      const [px, py] = P(-0.5 - t * 2.6, Math.sin(time * 0.4 + k * 1.7) * 0.35 * t);
-      const R = r * (0.55 - 0.3 * t);
-      ctx.globalAlpha = (1 - t) * 0.7;
+    for (let k = 0; k < 6; k++) {
+      const t = (((time / 12 + k / 6) % 1) + 1) % 1;
+      const [px, py] = P(-0.5 - t * 1.6, Math.sin(time * 0.4 + k * 1.7) * 0.25 * t);
+      const R = r * (0.42 - 0.22 * t);
+      ctx.globalAlpha = (1 - t) * 0.4;
       ctx.drawImage(t < 0.2 ? core : t < 0.55 ? mid : end, px - R, py - R, R * 2, R * 2);
     }
     ctx.globalAlpha = 1;
@@ -1423,10 +1423,10 @@ export class Renderer {
       ctx.quadraticCurveTo(bx + (tx - bx) * 0.2, by + (ty - by) * 0.2, bx, by);
       ctx.closePath();
     }
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.3;
     ctx.fill();
     ctx.globalAlpha = 1;
-    this.glow(color, 2.6);
+    this.glow(color, 1.6);
     // Corps et tête
     ctx.beginPath();
     const [hx, hy] = P(0.55, 0);
@@ -1435,10 +1435,10 @@ export class Renderer {
     ctx.quadraticCurveTo(...P(0, 0.32), tx, ty);
     ctx.quadraticCurveTo(...P(0, -0.32), hx, hy);
     ctx.fillStyle = '#fff1b8';
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = 0.45;
     ctx.fill();
     ctx.globalAlpha = 1;
-    this.glow(color, 2);
+    this.glow(color, 1.4);
   }
 
   private drawWeaponFx(s: GameState, alpha: number, under: boolean): void {

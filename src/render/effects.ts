@@ -245,7 +245,8 @@ export class Effects {
       const e = s.events[i];
       switch (e.type) {
         case EV_HIT:
-          if (this.hitBudget-- > 0) {
+          // Brûlure du feu au sol (x2 = 1) : ni étincelles ni son à chaque tic, juste les chiffres.
+          if (e.x2 !== 1 && this.hitBudget-- > 0) {
             this.burst(e.x, e.y + 6, 2, 0, 140, 0.18, 2);
             h.sfx('hit');
           }

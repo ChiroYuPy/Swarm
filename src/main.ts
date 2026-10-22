@@ -39,7 +39,7 @@ import { Renderer } from './render/renderer';
 import { Effects } from './render/effects';
 import { AudioEngine, START_RISE } from './audio/audio';
 import { InputManager, type UiAction } from './input/input';
-import { UI, type AppApi, type BuildInfo, type DeathInfo } from './ui/ui';
+import { UI, type AppApi, type BuildInfo, type DeathInfo, type RunInfo } from './ui/ui';
 import { randomSeed } from './ui/seeds';
 import { statDetails } from './render/hud';
 import { bestScore, loadSave, recordScore, writeSave, type SandboxSetup, type SaveData, type Settings } from './storage/storage';
@@ -374,7 +374,7 @@ class App implements AppApi {
         if (a === 'pause' || a === 'back') {
           if (this.ui.screen === 'settings' || this.ui.screen === 'codex') {
             this.uiSound('uiBack');
-            this.ui.showPause(this.buildInfo());
+            this.ui.showPause(this.buildInfo(), this.runInfo());
           } else this.resume();
         } else if (dir) this.ui.navigate(dir);
         else if (a === 'confirm') this.ui.activate();
@@ -409,17 +409,18 @@ class App implements AppApi {
     }
   }
 
-  private pause(): void {
+  /** `instant` : pause automatique, l'écran est posé sans animation (voir UI.mount). */
+  private pause(instant = false): void {
     if (this.mode !== 'playing' && this.mode !== 'levelup') return;
     this.pauseFrom = this.mode;
     this.mode = 'paused';
-    this.ui.showPause(this.buildInfo());
+    this.ui.showPause(this.buildInfo(), this.runInfo(), instant);
     this.audio.setDuck(0.35);
   }
 
   private autoPause(): void {
     if (params.get('nopause') === '1' || !this.save.settings.autoPause) return; // outil de test / réglage
-    if (this.mode === 'playing' || this.mode === 'levelup') this.pause();
+    if (this.mode === 'playing' || this.mode === 'levelup') this.pause(true);
   }
 
   private showLevelUp(): void {
@@ -453,6 +454,16 @@ class App implements AppApi {
     step(this.state, [code]);
     this.fx.consume(this.state);
     this.showLevelUp();
+  }
+
+  private runInfo(): RunInfo {
+    const s = this.state;
+    return {
+      record: makeScoreRecord(s, ''),
+      bossKills: computeScore(s).bossKills,
+      best: bestScore(this.save, s.difficulty),
+      sandbox: !!this.config.sandbox,
+    };
   }
 
   private buildInfo(): BuildInfo {
@@ -703,7 +714,8 @@ class App implements AppApi {
     this.renderer.render(this.state, alpha, this.fx, {
       quality: this.save.settings.quality,
       time: this.time,
-      hud: !this.demo && drop < 0,
+      // En pause, le résumé reprend tout ce qu'affiche le HUD : on le masque.
+      hud: !this.demo && drop < 0 && this.mode !== 'paused',
       zoom,
       drop: drop >= 0 ? drop : undefined,
       showFps: this.save.settings.showFps && !this.demo,
@@ -717,6 +729,7 @@ class App implements AppApi {
     });
     document.body.classList.toggle('demo', this.demo);
     document.body.classList.toggle('dead', this.mode === 'dead');
+    document.body.classList.toggle('paused', this.mode === 'paused');
     requestAnimationFrame((t) => this.frame(t));
   }
 }

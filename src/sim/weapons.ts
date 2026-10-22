@@ -610,7 +610,10 @@ function whip(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
 
 export const SCYTHE_FX_TICKS = 18;
 
-/** Faux : un coup instantané tout autour de toi, qui achève les ennemis presque morts. */
+/**
+ * Faux : un coup instantané tout autour de toi, qui enlève une part des PV max de chaque cible (moins sur
+ * les boss) : autant de coups pour un petit que pour un gros. Elle achève les ennemis presque morts.
+ */
 function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;
   w.timer -= 1;
@@ -624,6 +627,8 @@ function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   const n = Math.min(4, L.count ?? 1);
   const base = facing(p);
   const dmg = L.damage * p.stats.might;
+  const pct = (L.pctHp ?? 0) * p.stats.might;
+  const bossPct = (L.bossPct ?? 0) * p.stats.might;
   const knock = L.knockback ?? 100;
   const exec = L.execute ?? 0;
   const g = s.grid;
@@ -639,7 +644,8 @@ function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
       const dy = e.y - p.y;
       if (!inCone(dx, dy, e.r, a, arc, len)) continue;
       const d = Math.sqrt(dx * dx + dy * dy) || 1;
-      damageEnemy(s, idx, dmg, p.index, (dx / d) * knock, (dy / d) * knock);
+      const hit = dmg + e.maxHp * (e.flags & EF_BOSS ? bossPct : pct);
+      damageEnemy(s, idx, hit, p.index, (dx / d) * knock, (dy / d) * knock);
       if (exec > 0 && e.alive && !(e.flags & EF_BOSS) && e.hp < e.maxHp * exec) damageEnemy(s, idx, e.hp + 1, p.index, 0, 0);
     }
   }
@@ -994,8 +1000,43 @@ export function spawnShell(
   b.pierce = -1;
 }
 
+/** portée prise en compte pour choisir la ligne du Phénix, et nombre de caps essayés autour du joueur */
+const PHOENIX_REACH = 650;
+const PHOENIX_DIRS = 48;
+
 /**
- * Phénix : des oiseaux de feu qui partent à travers la horde sans revenir (voir projectiles.ts).
+ * Cap du Phénix (dans AIM) : parmi PHOENIX_DIRS directions autour du joueur, celle dont la bande de
+ * largeur 2 × `band` traverse le plus de PV ennemis sur `reach` : le plus gros groupe, ou le plus gros
+ * sac à PV (boss compris). Faux si personne n'est à portée.
+ */
+function phoenixLine(s: GameState, p: Player, band: number, reach: number): boolean {
+  const g = s.grid;
+  const m = g.query(s.enemies, p.x, p.y, reach);
+  let best = 0;
+  for (let k = 0; k < PHOENIX_DIRS; k++) {
+    const a = (k * TWO_PI) / PHOENIX_DIRS;
+    const ux = dcos(a);
+    const uy = dsin(a);
+    let sum = 0;
+    for (let q = 0; q < m; q++) {
+      const e = s.enemies[g.out[q]];
+      if (!e.alive) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      if (dx * ux + dy * uy <= 0) continue;
+      if (Math.abs(dx * uy - dy * ux) > band + e.r) continue;
+      sum += e.hp;
+    }
+    if (sum > best) {
+      best = sum;
+      AIM = a;
+    }
+  }
+  return best > 0;
+}
+
+/**
+ * Phénix : des oiseaux de feu qui filent tout droit à travers la horde sans revenir (voir projectiles.ts).
  * Comme les drones, l'arme complète l'effectif : un oiseau éteint renaît près de toi après `respawn` s.
  */
 function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
@@ -1011,14 +1052,18 @@ function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L: Weapon
   }
   w.timer -= 1;
   if (w.timer > 0) return;
-  if (!aim(s, p, 520)) {
+  const band = (L.size ?? 26) * p.stats.area;
+  const reach = Math.min(PHOENIX_REACH, (L.speed ?? 470) * (L.life ?? 2));
+  // Visée manuelle : il part là où tu vises ; sinon, sur la ligne qui traverse le plus de PV ennemis.
+  if (p.aim >= 0) aim(s, p, reach);
+  else if (!phoenixLine(s, p, band, reach)) {
     w.timer = RETRY_TICKS;
     return;
   }
   const b = spawnProjectile(s);
   if (!b) return;
-  // Le deuxième oiseau part un peu de biais, pour ne pas suivre le premier.
-  const a = AIM + (alive & 1 ? 0.6 : -0.3);
+  // Le deuxième oiseau (s'il y en a un) part un peu de biais, pour ne pas suivre le premier.
+  const a = AIM + (alive & 1 ? 0.35 : 0);
   b.kind = PJ_PHOENIX;
   b.owner = p.index;
   b.slot = slot;

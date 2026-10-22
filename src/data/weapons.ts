@@ -65,6 +65,9 @@ export interface WeaponLevel {
   arc?: number;
   /** achève les ennemis (hors boss) tombés sous cette part de leurs PV */
   execute?: number;
+  /** dégâts en part des PV max de la cible (× Puissance) au lieu de `damage`, et cette part sur les boss */
+  pctHp?: number;
+  bossPct?: number;
   /** cadence de tir d'une tourelle (s) */
   fireEvery?: number;
   /** tourelle : onde de recul toutes les `ringEvery` s (rayon `radius`) */
@@ -347,11 +350,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
       '5 disques, 3 rebonds, plus gros, dégâts +15 %',
     ],
     levels: prog(
-      { damage: 14, cooldown: 1.5, speed: 440, bounces: 1, count: 1, size: 10, life: 2.5, range: 480 },
+      { damage: 11, cooldown: 1.5, speed: 440, bounces: 1, count: 1, size: 10, life: 2.5, range: 480 },
       { count: 2 },
-      { count: 3, bounces: 2, damage: 16 },
+      { count: 3, bounces: 2, damage: 13 },
       { count: 4 },
-      { count: 5, bounces: 3, size: 12, damage: 18 },
+      { count: 5, bounces: 3, size: 12, damage: 15 },
     ),
   },
   {
@@ -452,8 +455,8 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'scythe',
     color: '#ffb39c',
     fusion: true,
-    levelText: ['Fauche tout autour de toi, très fort, et achève les ennemis presque morts. Ne repousse pas.'],
-    levels: [{ damage: 85, cooldown: 1.1, length: 200, arc: Math.PI, count: 1, knockback: 0, execute: 0.12 }],
+    levelText: ['Fauche tout autour de toi toutes les 2 s : chaque coup enlève 15 % des PV max (1,5 % sur les boss), et achève sous 12 %. Redoutable contre les gros. Ne repousse pas.'],
+    levels: [{ damage: 0, pctHp: 0.15, bossPct: 0.015, cooldown: 2, length: 200, arc: Math.PI, count: 1, knockback: 0, execute: 0.12 }],
   },
   {
     id: 'tornade',
@@ -472,11 +475,11 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'phoenix',
     color: '#ffb03a',
     fusion: true,
-    levelText: ['Deux oiseaux de feu s’envolent à travers la horde et mettent le feu partout où ils passent. Quand l’un s’éteint, un autre renaît près de toi.'],
+    levelText: ['Un grand oiseau de feu file tout droit vers le plus gros groupe ou le plus gros ennemi (boss compris) : il balaie les petits sur une large bande et la laisse en flammes. Quand il s’éteint, il renaît près de toi.'],
     levels: [
       {
-        damage: 30, count: 2, speed: 470, life: 4, respawn: 0.8, size: 26, hitCd: 0.35, knockback: 40,
-        turn: 3.0, blazeDamage: 18, blazeRadius: 28, blazeLife: 1.8,
+        damage: 55, count: 1, speed: 470, life: 2.2, respawn: 0.6, size: 46, hitCd: 0.4, knockback: 40,
+        blazeDamage: 22, blazeRadius: 46, blazeLife: 1.8,
       },
     ],
   },

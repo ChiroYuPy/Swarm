@@ -1,6 +1,7 @@
 /**
- * Écrans DOM. Tous suivent le même gabarit (en-tête, contenu, actions) et les mêmes composants
- * (.btn, .tabs, .card, .panel), avec une seule police et une échelle de tailles commune (style.css).
+ * Écrans DOM. Tous suivent le gabarit de la fin de partie : un titre néon souligné (heading), du
+ * contenu à nu séparé par des filets, des chiffres « libellé / valeur » (statTiles), des onglets
+ * soulignés, le rappel des touches (keys) et une arrivée en cascade (cascade). Voir style.css.
  */
 import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
@@ -67,6 +68,16 @@ export interface BuildInfo {
   /** multiplicateurs actuels, pour afficher les vrais chiffres des armes */
   might: number;
   cooldownMul: number;
+}
+
+/** Partie en cours, pour le résumé de la pause. */
+export interface RunInfo {
+  /** score, temps, niveau, éliminés et difficulté, comme ils seraient enregistrés maintenant */
+  record: ScoreRecord;
+  bossKills: number;
+  /** meilleur score de la difficulté avant cette partie (0 : aucun) */
+  best: number;
+  sandbox: boolean;
 }
 
 export interface DeathInfo {
@@ -208,7 +219,7 @@ export function passiveTotal(def: PassiveDef, level: number): string {
 /** Vrais chiffres d'une arme au niveau donné, bonus du héros compris. */
 function weaponNumbers(id: string, level: number, might: number, cooldownMul: number): string {
   const L = weaponLevel(ALL_WEAPONS.findIndex((w) => w.id === id), level);
-  const out = [L.damage > 0 ? `Dégâts ${dec(L.damage * might, 1)}` : 'Sans dégâts'];
+  const out = [L.pctHp ? `${dec(L.pctHp * might * 100, 1)} % des PV max` : L.damage > 0 ? `Dégâts ${dec(L.damage * might, 1)}` : 'Sans dégâts'];
   if (L.cooldown) out.push(`recharge ${dec(L.cooldown * cooldownMul)} s`);
   else if (L.tick) out.push(`toutes les ${dec(L.tick)} s`);
   else if (L.hitCd) out.push(`touche toutes les ${dec(L.hitCd)} s`);
@@ -306,30 +317,93 @@ function codexItems(tab: CodexTab): CodexItem[] {
 function chip(tab: CodexTab, id: string, suffix = ''): string {
   const it = codexItems(tab).find((x) => x.id === id);
   if (!it) return '';
-  return `<button class="chip" data-goto="${tab}:${id}" style="--c:${it.color}"><span data-icon="${it.icon}" data-size="22"></span>${esc(it.name)}${suffix}</button>`;
+  return `<button class="chip" data-goto="${tab}:${id}" style="--c:${it.color}"><span data-icon="${it.icon}" data-size="26"></span>${esc(it.name)}${suffix ? `<small>${suffix}</small>` : ''}</button>`;
 }
 
 function recipe(i: number): string {
   const f = FUSIONS[i];
-  return `<div class="recipe">${chip('armes', f.weapon, ' niv. 5')}<span>+</span>${chip('bonus', f.with, ' niv. 5')}<span>→</span>${chip('fusions', f.result)}</div>`;
+  return `<div class="recipe">${chip('armes', f.weapon, 'niv. 5')}<span class="op">+</span>${chip('bonus', f.with, 'niv. 5')}<span class="res"><span class="op">→</span>${chip('fusions', f.result)}</span></div>`;
 }
 
 function rows(list: [string, string][]): string {
   return `<dl class="rows">${list.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
+// ---------- Gabarit commun des écrans ----------
+/** Couleur de chaque écran : son titre et le filet dessous, rien d'autre. */
+const SCREEN_COLOR = {
+  pause: '#38f6ff',
+  codex: '#ff3df5',
+  scores: '#ffd23a',
+  settings: '#6fa8ff',
+  sandbox: '#b48cff',
+  difficulty: '#38f6ff',
+  levelup: '#39ff7a',
+  swap: '#ffd23a',
+};
+
+/**
+ * En-tête d'écran : un titre néon à la couleur de l'écran, souligné d'un filet qui s'étire depuis le
+ * centre ; `sub` (HTML) dessous. Le reste de l'écran suit en cascade (.reveal).
+ */
+function heading(title: string, color: string, sub = ''): string {
+  return `<header class="head" style="--c:${color}"><div class="ttl"><h2>${esc(title)}</h2><span class="line"></span></div>${sub ? `<p class="sub">${sub}</p>` : ''}</header>`;
+}
+
+/** Classe + délai d'un élément de la cascade d'arrivée (à poser dans un attribut class). */
+const cascade = (i: number) => `reveal" style="--i:${i}`;
+
+/** Chiffres « libellé / valeur » séparés par des filets, comme à la fin de partie. `v` est du HTML. */
+function statTiles(list: [string, string][], cls = ''): string {
+  return `<div class="stats ${cls}">${list.map(([k, v]) => `<div><small>${esc(k)}</small><b>${v}</b></div>`).join('')}</div>`;
+}
+
+/** Rappel des touches, en touches de clavier : [[touches], action]. */
+function keys(list: [string[], string][]): string {
+  return `<p class="foot keys">${list.map(([k, a]) => `<span>${k.map((x) => `<kbd>${esc(x)}</kbd>`).join('')} ${esc(a)}</span>`).join('')}</p>`;
+}
+
+/** Jauge de niveau (pastilles) ; `fresh` : la dernière, celle qu'on va gagner, en blanc (level-up). */
+function levelPips(level: number, max: number, fresh = false): string {
+  let h = '<span class="pips">';
+  for (let k = 1; k <= max; k++) h += `<i class="${k < level || (k === level && !fresh) ? 'on' : k === level ? 'new' : ''}"></i>`;
+  return `${h}</span>`;
+}
+
+/** « 12 → 18 » si la valeur change entre le niveau 1 et le niveau max, sinon « 12 ». */
+const span = (a: string, b: string) => (a === b ? a : `${a} <i class="to">→</i> ${b}`);
+
+/** Chiffres clés d'une arme, du niveau 1 au niveau max (tuiles de la fiche du codex). */
+function weaponTiles(id: string): string {
+  const i = ALL_WEAPONS.findIndex((w) => w.id === id);
+  const a = weaponLevel(i, 1);
+  const b = weaponLevel(i, ALL_WEAPONS[i].levels.length);
+  const out: [string, string][] = [];
+  if (a.pctHp) out.push(['Dégâts', `${dec(a.pctHp * 100, 1)} % <i class="to">PV max</i>`]);
+  else if (a.damage > 0) out.push(['Dégâts', span(dec(a.damage, 1), dec(b.damage, 1))]);
+  const rate = (L: typeof a) => L.cooldown ?? L.tick ?? L.hitCd ?? L.fireEvery;
+  if (rate(a)) out.push([a.cooldown ? 'Recharge' : 'Cadence', `${span(dec(rate(a)!), dec(rate(b)!))} s`]);
+  if ((a.count ?? 1) > 1 || (b.count ?? 1) > 1) out.push(['Nombre', span(String(a.count ?? 1), String(b.count ?? 1))]);
+  const reach = (L: typeof a) => L.radius ?? L.range ?? L.length ?? L.attackRange;
+  if (reach(a)) out.push([a.radius ? 'Rayon' : 'Portée', span(String(reach(a)), String(reach(b)))]);
+  return out.length ? statTiles(out.slice(0, 4), 'mini') : '';
+}
+
 function codexDetail(it: CodexItem): string {
   let tag = '';
   let body = '';
   let desc = '';
+  let figures = '';
+  const h3 = (t: string) => `<h3 class="rule">${t}</h3>`;
   switch (it.tab) {
     case 'armes': {
       const w = ALL_WEAPONS.find((x) => x.id === it.id)!;
       tag = 'Arme';
       desc = w.desc;
-      body = `<h3>Niveaux</h3>${rows(w.levelText.map((t, k) => [`Niv. ${k + 1}`, t]))}`;
+      figures = weaponTiles(w.id);
+      body = `${h3('Niveaux')}${rows(w.levelText.map((t, k) => [`Niv. ${k + 1}`, t]))}`;
       const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.weapon === it.id);
-      if (fi.length) body += `<h3>${fi.length > 1 ? 'Évolutions' : 'Évolution'}</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
+      if (fi.length) body += `${h3(fi.length > 1 ? 'Évolutions' : 'Évolution')}${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
     case 'fusions': {
@@ -337,16 +411,21 @@ function codexDetail(it: CodexItem): string {
       const i = FUSIONS.findIndex((f) => f.result === it.id);
       tag = 'Évolution';
       desc = w.desc;
-      body = `<h3>Effet</h3><p>${esc(w.levelText[0])}</p><h3>Recette</h3>${recipe(i)}<p class="hint">Proposée au level-up quand l’arme et le passif sont au niveau 5, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement, et tu gardes le passif.</p>`;
+      figures = weaponTiles(w.id);
+      body = `${h3('Effet')}<p>${esc(w.levelText[0])}</p>${h3('Recette')}${recipe(i)}<p class="hint">Proposée au level-up quand l’arme et le passif sont au niveau 5, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement, et tu gardes le passif.</p>`;
       break;
     }
     case 'bonus': {
       const p = PASSIVES.find((x) => x.id === it.id)!;
       tag = 'Passif';
       desc = p.desc;
-      body = `<h3>Par niveau</h3><p>${esc(p.effect)}</p><h3>Total</h3>${rows([1, 2, 3, 4, 5].map((l) => [`Niv. ${l}`, passiveTotal(p, l)]))}`;
+      figures = statTiles([
+        ['Par niveau', esc(p.effect)],
+        ['Au niveau 5', esc(passiveTotal(p, 5))],
+      ], 'mini wide');
+      body = `${h3('Total par niveau')}${rows([1, 2, 3, 4, 5].map((l) => [`Niv. ${l}`, passiveTotal(p, l)]))}`;
       const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.with === it.id);
-      if (fi.length) body += `<h3>${fi.length > 1 ? 'Évolutions' : 'Évolution'}</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
+      if (fi.length) body += `${h3(fi.length > 1 ? 'Évolutions' : 'Évolution')}${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
     case 'objets': {
@@ -380,12 +459,14 @@ function codexDetail(it: CodexItem): string {
       const e = ENEMIES.find((x) => x.id === it.id)!;
       tag = BEHAVIOR_LABEL[e.behavior] ?? '';
       desc = e.desc;
-      const st: [string, string][] = [
+      const top: [string, string][] = [
         ['PV', num(e.hp)],
         ['Vitesse', num(e.speed)],
+        e.behavior === 'kamikaze' ? ['Explosion', String(e.blastDamage ?? 0)] : ['Contact', String(e.damage)],
       ];
-      if (e.behavior === 'kamikaze') st.push(['Explosion', `${e.blastDamage ?? 0} dégâts`]);
-      else st.push(['Contact', `${e.damage} dégâts`]);
+      if (e.behavior !== 'boss') top.push(['XP', String(e.xp)]);
+      figures = statTiles(top, 'mini');
+      const st: [string, string][] = [];
       if (e.behavior === 'shooter') st.push(['Tir', `${e.bulletDamage ?? 0} dégâts`]);
       if (e.behavior === 'blinker') st.push(['Atterrissage', `${e.blastDamage ?? 0} dégâts`]);
       if (e.behavior === 'leader') st.push(['Aura', `+${Math.round((e.auraSpeed ?? 0) * 100)} % de vitesse aux voisins`]);
@@ -395,36 +476,35 @@ function codexDetail(it: CodexItem): string {
         const g = f.splitInto ? ENEMIES.find((x) => x.id === f.splitInto) : undefined;
         st.push(['À sa mort', `${e.splitCount ?? 2} × ${f.name} (${f.hp} PV)${g ? `, puis ${(e.splitCount ?? 2) * (f.splitCount ?? 2)} × ${g.name} (${g.hp} PV)` : ''}`]);
       }
-      if (e.behavior !== 'boss') st.push(['XP', String(e.xp)]);
-      body = `<h3>Statistiques de base</h3>${rows(st)}<p class="hint">Les PV augmentent avec le temps et selon la difficulté.</p>`;
+      body = `${st.length ? `${h3('Capacités')}${rows(st)}` : ''}<p class="hint">Statistiques de base : les PV augmentent avec le temps et selon la difficulté.</p>`;
       const at = enemyArrival(e.id);
       body +=
         e.behavior === 'boss'
-          ? `<h3>Arrivée</h3><p>Boss n°${BOSS_ORDER.indexOf(e.id) + 1}, après la vague ${(BOSS_ORDER.indexOf(e.id) + 1) * WAVES.wavesPerBoss}, quelle que soit la difficulté. Les boss reviennent ensuite dans le même ordre, plus forts (Mk II…).</p>`
-          : `<h3>Arrivée</h3><div class="arrivals">${DIFFICULTIES.map(
-              (d, i) => `<span style="--c:${d.color}"><b>${esc(d.name)}</b>${at[i] < 0 ? '—' : at[i] === 0 ? 'dès le début' : formatTime(at[i])}</span>`,
+          ? `${h3('Arrivée')}<p>Boss n°${BOSS_ORDER.indexOf(e.id) + 1}, après la vague ${(BOSS_ORDER.indexOf(e.id) + 1) * WAVES.wavesPerBoss}, quelle que soit la difficulté. Les boss reviennent ensuite dans le même ordre, plus forts (Mk II…).</p>`
+          : `${h3('Arrivée')}<div class="stats mini arrivals">${DIFFICULTIES.map(
+              (d, i) => `<div style="--c:${d.color}"><small>${esc(d.name)}</small><b>${at[i] < 0 ? '—' : at[i] === 0 ? 'Début' : formatTime(at[i])}</b></div>`,
             ).join('')}</div>`;
       break;
     }
   }
   return `<header class="dhead" style="--c:${it.color}"><span class="ico big" data-icon="${it.icon}"></span><div><span class="tag">${esc(tag)}</span><h2>${esc(it.name)}</h2></div></header>
-    <p class="desc">${esc(desc)}</p>${body}`;
+    <p class="desc">${esc(desc)}</p>${figures}${body}`;
 }
 
 function codexRules(): string {
   return `
     <div class="rules">
-      <section><h3>Contrôles</h3>
+      <section><h3 class="rule">Contrôles</h3>
         <p><kbd>ZQSD</kbd> <kbd>WASD</kbd> <kbd>flèches</kbd> ou stick : se déplacer. Tes armes tirent toutes seules.</p>
         <p><kbd>Espace</kbd> (ou bouton A) : utiliser l’objet activable en réserve.</p>
         <p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> ou flèches + <kbd>Entrée</kbd> : choisir une amélioration. <kbd>Échap</kbd> : pause.</p>
       </section>
-      <section><h3>Objectif</h3>
+      <section><h3 class="rule">Objectif</h3>
         <p>Survivre le plus longtemps possible dans un monde sans fin. Score : ${SCORE.perSecond} points par seconde, ${SCORE.perKill} par ennemi, ${SCORE.perBoss} par boss.</p>
         <p>Ramasse l’XP (losanges) pour monter de niveau et choisir 1 amélioration parmi 3. Jusqu’à ${MAX_WEAPON_SLOTS} armes et ${MAX_PASSIVE_SLOTS} passifs, 5 niveaux chacun.</p>
         <p>Les ennemis arrivent par vagues de ${WAVES.waveLength} s (2 ou 3 types à la fois), séparées de ${WAVES.pause} s de calme. Toutes les ${WAVES.wavesPerBoss} vagues, un boss : les autres ennemis s’enfuient, il ne reste que lui et ses renforts ; les vagues reprennent à sa mort. La frise en haut de l’écran montre ce qui arrive.</p>
       </section>
-      <section><h3>Objets</h3>
+      <section><h3 class="rule">Objets</h3>
         <p><b>Bonus</b> (dans un cercle) : effet immédiat ou temporaire. <b>Activables</b> (dans un losange) : gardés en réserve, un seul à la fois. <b>Reliques</b> (dans un hexagone) : se déclenchent toutes seules.</p>
         <p>Les boules violettes des Tireurs se cassent : tes tirs, explosions, ondes, orbes, aura et laser les détruisent.</p>
         <p>Les caisses bonus <b>?</b> apparaissent régulièrement près de toi : casse-les.</p>
@@ -622,20 +702,26 @@ export class UI {
    * Monte un écran. `overlay` : par-dessus la partie (fond assombri), sinon écran de menu.
    * L'écran précédent n'est pas effacé d'un coup : il reste un instant en place, inerte, le temps
    * de jouer sa sortie pendant que le nouveau entre (glissement selon le sens de navigation).
+   * `instant` : l'écran est posé d'emblée, sans aucune animation (pause automatique : la page est en
+   * arrière-plan, le navigateur retiendrait les animations jusqu'au retour du joueur).
    */
-  private mount(name: string, html: string, overlay = false): HTMLElement {
+  private mount(name: string, html: string, overlay = false, instant = false): HTMLElement {
     cancelAnimationFrame(this.countAnim);
     clearTimeout(this.closeTimer);
     const prev = this.screenEl;
     const prevName = this.current;
     this.current = name;
     this.toasts.replaceChildren(); // les messages de jeu ne doivent pas traîner sur un écran
-    this.root.className = `visible ${overlay ? 'overlay' : 'menu'} on-${name}`;
+    this.root.className = `visible ${overlay ? 'overlay' : 'menu'} on-${name}${instant ? ' instant' : ''}`;
     document.body.classList.toggle('menu-home', name === 'menu');
     const el = document.createElement('div');
     el.className = `screen screen-${name}`;
     el.innerHTML = html;
-    if (prev && prevName === name && TAB_SCREENS.has(name)) {
+    if (instant) {
+      prev?.remove();
+      el.classList.add('instant');
+      this.root.appendChild(el);
+    } else if (prev && prevName === name && TAB_SCREENS.has(name)) {
       // Même écran, autre onglet (codex, records) : seul le contenu change.
       el.classList.add('same');
       // Si l'écran est encore en train d'arriver, le nouveau reprend le glissement là où il en était.
@@ -682,7 +768,7 @@ export class UI {
     el.style.top = `${r.top}px`;
     el.style.width = `${r.width}px`;
     el.style.margin = '0';
-    el.classList.remove('enter-fwd', 'enter-back', 'enter-none', 'same');
+    el.classList.remove('enter-fwd', 'enter-back', 'enter-none', 'same', 'instant');
     el.classList.add('leaving', `leave-${dir}`);
     setTimeout(() => el.remove(), LEAVE_MS[name] ?? LEAVE_MS.default);
   }
@@ -702,7 +788,7 @@ export class UI {
     }
     this.leave(prev, prevName, prevName === 'death' ? 'back' : 'fwd');
     // Le fond s'efface en même temps que l'écran ; #ui reste affiché (sans capter la souris) jusqu'à la fin.
-    this.root.classList.remove('visible');
+    this.root.classList.remove('visible', 'instant');
     this.root.classList.add('closing');
     this.closeTimer = window.setTimeout(() => {
       if (this.current) return;
@@ -1108,9 +1194,10 @@ export class UI {
     };
     const cards = DIFFICULTIES.map((d, i) => {
       const best = topScores(save, i)[0];
+      const tile = (k: string, v: string) => `<span><small>${k}</small><b>${v}</b></span>`;
       const record = best
-        ? `<small>Record</small><b>${pad7(best.score)}</b><em>${formatTime(best.tempsSurvecu)} · niv. ${best.level || '—'} · ${num(best.kills)} éliminés</em>`
-        : '<small>Record</small><em>Aucun record</em>';
+        ? `<small>Record</small><b>${pad7(best.score)}</b><span class="stats mini">${tile('Temps', formatTime(best.tempsSurvecu))}${tile('Niveau', String(best.level || '—'))}${tile('Éliminés', num(best.kills))}</span>`
+        : '<small>Record</small><em>Aucune partie pour l’instant</em>';
       return `<button class="diff nav ${i === save.difficulty ? 'primary' : ''}" data-d="${i}" style="--c:${d.color};--i:${i}">
         <span class="diff-top">
           <span class="threat">${DIFFICULTIES.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</span>
@@ -1124,10 +1211,10 @@ export class UI {
     const el = this.mount(
       'difficulty',
       `
-      <header class="head"><h2>Difficulté</h2><p class="sub">Change la résistance des ennemis et la vitesse à laquelle les nouveaux types arrivent.</p></header>
+      ${heading('Difficulté', SCREEN_COLOR.difficulty, 'Change la résistance des ennemis et la vitesse à laquelle les nouveaux types arrivent.')}
       <div class="diffs">${cards}</div>
-      <p class="foot">← → : choisir · Entrée : jouer · Échap : retour</p>
-      <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
+      ${keys([[['←', '→'], 'choisir'], [['Entrée'], 'jouer'], [['Échap'], 'retour']])}
+      <footer class="actions ${cascade(2)}"><button class="btn nav" id="back">Retour</button></footer>
     `,
     );
     el.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) => b.addEventListener('click', () => this.app.play(Number(b.dataset.d))));
@@ -1142,7 +1229,7 @@ export class UI {
   showSandbox(): void {
     const rowsHtml = SANDBOX_UI.map(
       (g) =>
-        `<h3>${g.title}</h3>${g.items
+        `<h3 class="rule">${g.title}</h3>${g.items
           .map(
             (it) =>
               `<button class="set nav" data-sb="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><span class="ctl"></span></button>`,
@@ -1158,20 +1245,20 @@ export class UI {
     const el = this.mount(
       'sandbox',
       `
-      <header class="head"><h2>Sandbox</h2><p class="sub">Compose ta partie et teste ce que tu veux. Rien n’est enregistré dans les records.</p></header>
-      <div class="sandbox-grid">
+      ${heading('Sandbox', SCREEN_COLOR.sandbox, 'Compose ta partie et teste ce que tu veux. Rien n’est enregistré dans les records.')}
+      <div class="sandbox-grid ${cascade(1)}">
         <div class="panel form">${rowsHtml}<div class="tiles foes">${foes}</div></div>
         <div class="panel loadout">
-          <h3>Armes <small class="slots" data-slots="w"></small></h3>
+          <h3 class="rule">Armes <small class="slots" data-slots="w"></small></h3>
           <div class="tiles">${BASE_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
-          <h3>Évolutions</h3>
+          <h3 class="rule">Évolutions</h3>
           <div class="tiles">${FUSED_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
-          <h3>Passifs <small class="slots" data-slots="p"></small></h3>
+          <h3 class="rule">Passifs <small class="slots" data-slots="p"></small></h3>
           <div class="tiles">${PASSIVES.map((x) => kit('p', x.id, x.name, x.color, `passive:${x.id}`)).join('')}</div>
         </div>
       </div>
-      <p class="foot">← → : régler · Clic : niveau suivant · Clic droit : niveau précédent · Échap : retour</p>
-      <footer class="actions">
+      ${keys([[['←', '→'], 'régler'], [['Clic'], 'niveau suivant'], [['Clic droit'], 'niveau précédent'], [['Échap'], 'retour']])}
+      <footer class="actions ${cascade(2)}">
         <button class="btn nav primary go" id="start">Lancer</button>
         <button class="btn nav" id="reset">Réinitialiser</button>
         <button class="btn nav" id="back">Retour</button>
@@ -1359,11 +1446,11 @@ export class UI {
     const el = this.mount(
       'scores',
       `
-      <header class="head"><h2>Records</h2><p class="sub">Tes ${TOP_PER_DIFFICULTY} meilleures parties, par difficulté.</p></header>
-      <div class="tabs">${tabs}</div>
-      <div class="records" style="--c:${diff.color}">${body}</div>
-      <p class="foot">← → : difficulté · Échap : retour</p>
-      <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
+      ${heading('Records', SCREEN_COLOR.scores, `Tes ${TOP_PER_DIFFICULTY} meilleures parties, par difficulté.`)}
+      <div class="tabs ${cascade(1)}">${tabs}</div>
+      <div class="records ${cascade(2)}" style="--c:${diff.color}">${body}</div>
+      ${keys([[['←', '→'], 'difficulté'], [['Échap'], 'retour']])}
+      <footer class="actions ${cascade(3)}"><button class="btn nav" id="back">Retour</button></footer>
     `,
     );
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) => b.addEventListener('click', () => this.showScores(Number(b.dataset.d))));
@@ -1379,7 +1466,7 @@ export class UI {
     const overlay = this.current === 'pause';
     const groups = SETTINGS_UI.map(
       (g) =>
-        `<h3>${g.title}</h3>${g.items
+        `<h3 class="rule">${g.title}</h3>${g.items
           .map(
             (it) =>
               `<button class="set nav" data-key="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? ` <kbd>${it.hint}</kbd>` : ''}</span><span class="ctl"></span></button>`,
@@ -1389,10 +1476,10 @@ export class UI {
     const el = this.mount(
       'settings',
       `
-      <header class="head"><h2>Options</h2></header>
-      <div class="panel form">${groups.join('')}</div>
-      <p class="foot">↑ ↓ : choisir · ← → : régler · Échap : retour</p>
-      <footer class="actions">
+      ${heading('Options', SCREEN_COLOR.settings)}
+      <div class="panel form ${cascade(1)}">${groups.join('')}</div>
+      ${keys([[['↑', '↓'], 'choisir'], [['←', '→'], 'régler'], [['Échap'], 'retour']])}
+      <footer class="actions ${cascade(2)}">
         <button class="btn nav primary" id="back">Retour</button>
         <button class="btn nav" id="reset">Réinitialiser</button>
       </footer>
@@ -1494,16 +1581,20 @@ export class UI {
       this.codexOverlay = this.current === 'pause';
     }
     this.codexTab = tab;
-    const cats: [CodexTab, string, number][] = [
-      ['regles', 'Comment jouer', 0],
-      ['armes', 'Armes', BASE_WEAPONS.length],
-      ['fusions', 'Évolutions', FUSIONS.length],
-      ['bonus', 'Passifs', PASSIVES.length],
-      ['objets', 'Objets', codexItems('objets').length],
-      ['ennemis', 'Ennemis', codexItems('ennemis').length],
+    const cats: [CodexTab, string, number, string][] = [
+      ['regles', 'Comment jouer', 0, '#f2eaff'],
+      ['armes', 'Armes', BASE_WEAPONS.length, '#38f6ff'],
+      ['fusions', 'Évolutions', FUSIONS.length, '#ffd23a'],
+      ['bonus', 'Passifs', PASSIVES.length, '#39ff7a'],
+      ['objets', 'Objets', codexItems('objets').length, '#ff9b3d'],
+      ['ennemis', 'Ennemis', codexItems('ennemis').length, '#ff3d6e'],
     ];
+    // Onglets soulignés, comme les records : la catégorie ouverte prend sa couleur.
     const side = cats
-      .map(([id, label, n]) => `<button class="cat nav ${id === tab ? 'on' : ''}" data-tab="${id}"><span>${label}</span>${n ? `<small>${n}</small>` : ''}</button>`)
+      .map(
+        ([id, label, n, c]) =>
+          `<button class="tab dtab cat nav ${id === tab ? 'on' : ''}" data-tab="${id}" style="--c:${c}"><span>${label}</span><small>${n || '—'}</small></button>`,
+      )
       .join('');
     const items = codexItems(tab);
     let center = '';
@@ -1514,7 +1605,7 @@ export class UI {
         if (it.group && it.group !== group) {
           if (group || i) center += '</div>';
           group = it.group;
-          center += `<h3>${esc(group)}</h3><div class="tiles">`;
+          center += `<h3 class="rule">${esc(group)}</h3><div class="tiles">`;
         } else if (i === 0) center += '<div class="tiles">';
         center += `<button class="tile nav" data-i="${i}" style="--c:${it.color}" title="${esc(it.name)}"><span class="ico" data-icon="${it.icon}"></span><span class="nm">${esc(it.name)}</span></button>`;
       }
@@ -1523,14 +1614,14 @@ export class UI {
     const el = this.mount(
       'codex',
       `
-      <header class="head"><h2>Codex</h2></header>
-      <div class="codex ${items.length ? '' : 'solo'}">
-        <nav class="cats">${side}</nav>
+      ${heading('Codex', SCREEN_COLOR.codex)}
+      <nav class="tabs cats ${cascade(1)}">${side}</nav>
+      <div class="codex ${items.length ? '' : 'solo'} ${cascade(2)}">
         ${items.length ? `<div class="panel list">${center}</div>` : ''}
         <article class="panel detail">${items.length ? '' : codexRules()}</article>
       </div>
-      <p class="foot">↑ ↓ : catégorie · ← → : élément · Échap : retour</p>
-      <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
+      ${keys([[['↑', '↓'], 'catégorie'], [['←', '→'], 'élément'], [['Échap'], 'retour']])}
+      <footer class="actions ${cascade(3)}"><button class="btn nav" id="back">Retour</button></footer>
     `,
       this.codexOverlay,
     );
@@ -1622,7 +1713,7 @@ export class UI {
           sub = owned ? (o.toLevel === 5 ? evolutionHint(d.id) : '') : d.desc;
           color = d.color;
           iconId = d.id;
-          pips = this.pips(o.toLevel, 5);
+          pips = levelPips(o.toLevel, 5, true);
         } else if (o.kind === OFFER_PASSIVE) {
           const d = PASSIVES[o.id];
           const owned = ownedLevels(o);
@@ -1633,7 +1724,7 @@ export class UI {
           color = d.color;
           kind = 'passive';
           iconId = d.id;
-          pips = this.pips(o.toLevel, 5);
+          pips = levelPips(o.toLevel, 5, true);
         } else if (o.kind === OFFER_SWAP) {
           const d = ALL_WEAPONS[o.id];
           tag = d.fusion ? 'Échange · évolution' : `Échange · niveau ${o.toLevel}`;
@@ -1642,7 +1733,7 @@ export class UI {
           sub = swapping ? `Remplace ${swapping.name}` : '';
           color = d.color;
           iconId = d.id;
-          if (!d.fusion) pips = this.pips(o.toLevel, 5);
+          if (!d.fusion) pips = levelPips(o.toLevel, 5, true);
         } else if (o.kind === OFFER_FUSION) {
           const f = FUSION_TABLE[o.id];
           const r = weaponDef(f.result);
@@ -1690,9 +1781,9 @@ export class UI {
       bar = `<div class="swapbar ${swap.charges > 0 ? '' : 'empty'}"><span class="swap-label">${label}</span>${btns}</div>`;
     }
     const head = swapping
-      ? `<h2>Échanger ${esc(swapping.name)}</h2><p class="sub">Choisis l’arme qui la remplace, au même niveau</p>`
-      : `<h2>Niveau ${level}</h2><p class="sub">Choisis une amélioration : <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, flèches + <kbd>Entrée</kbd> ou clic</p>`;
-    const el = this.mount('levelup', `<header class="head">${head}</header><div class="cards">${cards}</div>${bar}`, true);
+      ? heading(`Échanger ${swapping.name}`, SCREEN_COLOR.swap, 'Choisis l’arme qui la remplace, au même niveau.')
+      : heading(`Niveau ${level}`, SCREEN_COLOR.levelup, 'Choisis une amélioration : <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, flèches + <kbd>Entrée</kbd> ou clic');
+    const el = this.mount('levelup', `${head}<div class="cards">${cards}</div>${bar}`, true);
     el.querySelectorAll<HTMLElement>('.icon').forEach((s) => {
       const px = s.closest('.swap-btn') ? 34 : 60;
       if (s.dataset.id) s.appendChild(iconCanvas(s.dataset.kind as 'weapon' | 'passive' | 'pickup', s.dataset.id, px));
@@ -1708,12 +1799,6 @@ export class UI {
     this.levelOpenedAt = performance.now();
     if (this.kbd) this.focusCard(0);
     else this.syncPointer(document.elementFromPoint(this.pointer.x, this.pointer.y));
-  }
-
-  private pips(level: number, max: number): string {
-    let h = '<span class="pips">';
-    for (let k = 1; k <= max; k++) h += `<i class="${k < level ? 'on' : k === level ? 'new' : ''}"></i>`;
-    return `${h}</span>`;
   }
 
   /** Carte sélectionnée au level-up (-1 : aucune, la souris est ailleurs). */
@@ -1741,48 +1826,106 @@ export class UI {
     this.screenEl?.querySelectorAll<HTMLButtonElement>('.pick')[this.levelFocus]?.click();
   }
 
-  private buildHtml(b: BuildInfo, detailed: boolean): string {
+  /** Équipement en ligne, icônes à nu (fin de partie). */
+  private buildHtml(b: BuildInfo): string {
     const w = b.weapons
       .map((x) => {
         const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
         const lvl = x.fusion ? '<span class="lv max">Évolution</span>' : `<span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>`;
-        const info = detailed
-          ? `<small>${esc(x.fusion ? d.levelText[0] : d.levelText[x.level - 1])}</small><small class="num">${esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))}</small>`
-          : '';
-        return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="weapon" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b>${lvl}${info}</span></div>`;
+        return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="weapon" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b>${lvl}</span></div>`;
       })
       .join('');
     const p = b.passives
       .map((x) => {
         const d = PASSIVES.find((y) => y.id === x.id)!;
-        const info = detailed ? `<small>${esc(passiveTotal(d, x.level))}</small>` : '';
-        return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="passive" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b><span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>${info}</span></div>`;
+        return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="passive" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b><span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span></span></div>`;
       })
       .join('');
     return `<div class="items">${w}${p}</div>`;
   }
 
   private fillIcons(el: HTMLElement, size: number): void {
-    el.querySelectorAll<HTMLElement>('.item .icon').forEach((s) => s.appendChild(iconCanvas(s.dataset.kind as 'weapon' | 'passive', s.dataset.id!, size)));
+    el.querySelectorAll<HTMLElement>('.icon[data-id]').forEach((s) => s.appendChild(iconCanvas(s.dataset.kind as 'weapon' | 'passive', s.dataset.id!, size)));
+  }
+
+  /**
+   * Équipement détaillé (pause) : niveau en pastilles, vrais chiffres, et où en est chaque évolution
+   * (prête au prochain level-up, ou le passif qu'il lui manque).
+   */
+  private gearHtml(b: BuildInfo): { weapons: string; passives: string } {
+    const owned = new Map(b.passives.map((x) => [x.id, x.level]));
+    const armed = new Set(b.weapons.map((x) => x.id));
+    const row = (kind: 'weapon' | 'passive', id: string, color: string, name: string, lvl: string, lines: string[]) =>
+      `<div class="gear" style="--c:${color}"><span class="icon" data-kind="${kind}" data-id="${id}"></span><div class="gear-txt"><div class="gear-top"><b>${esc(name)}</b>${lvl}</div>${lines.map((l) => `<small>${l}</small>`).join('')}</div></div>`;
+    const weapons = b.weapons
+      .map((x) => {
+        const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
+        const lines = [esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))];
+        for (const f of FUSIONS.filter((f) => f.weapon === x.id)) {
+          const res = ALL_WEAPONS.find((y) => y.id === f.result)!.name;
+          const pl = owned.get(f.with) ?? 0;
+          lines.push(
+            x.level >= 5 && pl >= 5
+              ? `<em class="evo ready">✦ ${esc(res)} : évolution prête</em>`
+              : `<em class="evo">Évolue en ${esc(res)} · ${esc(PASSIVES.find((p) => p.id === f.with)!.name)} ${pl ? `${pl}/5` : 'à prendre'}</em>`,
+          );
+        }
+        return row('weapon', x.id, d.color, d.name, x.fusion ? '<span class="tag">Évolution</span>' : levelPips(x.level, 5), lines);
+      })
+      .join('');
+    const passives = b.passives
+      .map((x) => {
+        const d = PASSIVES.find((y) => y.id === x.id)!;
+        const lines = [esc(passiveTotal(d, x.level))];
+        for (const f of FUSIONS.filter((f) => f.with === x.id && armed.has(f.weapon)))
+          lines.push(`<em class="evo">Fait évoluer ${esc(ALL_WEAPONS.find((y) => y.id === f.weapon)!.name)}</em>`);
+        return row('passive', x.id, d.color, d.name, levelPips(x.level, 5), lines);
+      })
+      .join('');
+    return { weapons, passives };
   }
 
   // ---------- Pause ----------
-  showPause(build: BuildInfo): void {
+  /**
+   * Résumé de la partie en cours, au style de la fin de partie : chiffres, équipement détaillé, stats.
+   * `instant` : pause automatique (fenêtre quittée), l'écran est déjà en place au retour.
+   */
+  showPause(build: BuildInfo, run: RunInfo, instant = false): void {
+    const r = run.record;
+    const diff = DIFFICULTIES[r.difficulty];
+    const dname = `<span style="color:${diff.color}">${esc(diff.name)}</span>`;
+    const sub = run.sandbox
+      ? `Sandbox · ${dname}`
+      : `${dname} · ${
+          !run.best ? 'Premier record en jeu' : r.score > run.best ? '<b class="gold">Record battu !</b>' : `Record à battre : <b class="gold">${pad7(run.best)}</b>`
+        }`;
+    const gear = this.gearHtml(build);
     const stats = build.stats
       .map(
         (st) =>
-          `<div class="${st.on ? 'on' : ''}" title="${esc(st.hint)}"><span>${esc(st.label)}</span><b>${esc(st.value)}</b><small>${st.sources.map(esc).join(' · ')}</small></div>`,
+          `<div class="${st.on ? 'on' : ''}" title="${esc(st.hint)}"><span>${esc(st.label)}</span><b>${esc(st.value)}</b>${st.on ? `<small>${st.sources.map(esc).join(' · ')}</small>` : ''}</div>`,
       )
       .join('');
     const el = this.mount(
       'pause',
       `
-      <header class="head"><h2>Pause</h2></header>
-      <div class="split">
-        <div class="panel build"><h3>Équipement</h3>${this.buildHtml(build, true)}</div>
-        <div class="panel statlist"><h3>Stats</h3>${stats}</div>
+      ${heading('Pause', SCREEN_COLOR.pause, sub)}
+      ${statTiles(
+        [
+          ['Score', `<span class="gold">${pad7(r.score)}</span>`],
+          ['Temps', formatTime(r.tempsSurvecu)],
+          ['Éliminés', num(r.kills)],
+          ['Niveau', String(r.level)],
+          ['Boss vaincus', String(run.bossKills)],
+        ],
+        `run ${cascade(1)}`,
+      )}
+      <div class="pause-gear ${cascade(2)}">
+        <section><h3 class="rule">Armes <small>${build.weapons.length}/${MAX_WEAPON_SLOTS}</small></h3>${gear.weapons}</section>
+        <section><h3 class="rule">Passifs <small>${build.passives.length}/${MAX_PASSIVE_SLOTS}</small></h3>${gear.passives || '<p class="empty">Aucun passif pour l’instant.</p>'}</section>
       </div>
-      <footer class="actions">
+      <section class="pause-stats ${cascade(3)}"><h3 class="rule">Stats</h3><div class="statgrid">${stats}</div></section>
+      <footer class="actions ${cascade(4)}">
         <button class="btn nav primary go" id="resume">Reprendre</button>
         <button class="btn nav" id="codex">Codex</button>
         <button class="btn nav" id="settings">Options</button>
@@ -1790,18 +1933,19 @@ export class UI {
       </footer>
     `,
       true,
+      instant,
     );
-    this.fillIcons(el, 36);
+    this.fillIcons(el, 34);
     el.querySelector('#resume')!.addEventListener('click', () => this.app.resume());
-    el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showPause(build)));
-    el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showPause(build)));
+    el.querySelector('#codex')!.addEventListener('click', () => this.showCodex('armes', 0, () => this.showPause(build, run)));
+    el.querySelector('#settings')!.addEventListener('click', () => this.showSettings(() => this.showPause(build, run)));
     el.querySelector('#quit')!.addEventListener('click', () => this.app.quit());
   }
 
   // ---------- Fin de partie ----------
   /**
-   * Un bandeau en pente traverse l'écran de gauche à droite (rouge, doré si record), le score défile
-   * une fois le bandeau posé, puis le reste de l'écran apparaît en cascade.
+   * Un bandeau en pente arrive de la gauche (rouge, doré si record), puis le texte arrive de la droite ;
+   * le score défile une fois le texte posé, puis le reste de l'écran apparaît en cascade.
    */
   showDeath(d: DeathInfo): void {
     const r = d.record;
@@ -1835,7 +1979,7 @@ export class UI {
         <div><small>Niveau</small><b>${r.level}</b></div>
         <div><small>Boss vaincus</small><b>${d.bossKills}</b></div>
       </div>
-      <div class="build final-build ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
+      <div class="build final-build ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build)}</div>
       <footer class="actions ${reveal(4)}">
         <button class="btn nav primary" id="retry">Rejouer</button>
         ${d.sandbox ? '<button class="btn nav" id="edit">Modifier</button>' : ''}
@@ -1853,7 +1997,8 @@ export class UI {
     // Le score défile comme sur une borne, une fois le bandeau posé.
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const out = el.querySelector<HTMLElement>('#count')!;
-    const delay = reduced ? 0 : 620;
+    // une fois le texte arrivé (il suit le bandeau, voir content-in dans style.css)
+    const delay = reduced ? 0 : 1050;
     const dur = reduced ? 1 : Math.min(1400, 300 + r.score / 8);
     el.querySelector<HTMLElement>('.stamp')?.style.setProperty('animation-delay', `${delay + dur}ms`);
     const t0 = performance.now() + delay;

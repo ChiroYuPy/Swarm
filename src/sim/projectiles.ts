@@ -194,7 +194,7 @@ function blaze(s: GameState, b: Projectile): void {
   const dmg = (b.a * FIRE_TICK) / TICK_RATE;
   for (let k = 0; k < n; k++) {
     const idx = g.out[k];
-    if (s.enemies[idx].alive) damageEnemy(s, idx, dmg, b.owner, 0, 0);
+    if (s.enemies[idx].alive) damageEnemy(s, idx, dmg, b.owner, 0, 0, true);
   }
 }
 
@@ -496,9 +496,9 @@ function shell(s: GameState, b: Projectile): boolean {
 }
 
 /**
- * Phénix : il vole sans jamais revenir, en virant (virage limité) vers l'ennemi le plus proche qu'il n'a pas
- * brûlé récemment : il zigzague ainsi à travers la horde. Il brûle chaque ennemi touché (au plus une fois
- * par `hitCd`) et laisse une traînée de feu au sol. c = index de sa cible (ty = son id), (vx, vy) = cap.
+ * Phénix : un oiseau de feu lancé vers l'ennemi le plus proche, qui file ensuite tout droit à travers la
+ * horde sans jamais tourner. Il brûle chaque ennemi touché (au plus une fois par `hitCd`) et laisse une
+ * traînée de feu au sol. (vx, vy) = cap.
  */
 function phoenix(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
@@ -506,35 +506,7 @@ function phoenix(s: GameState, b: Projectile): boolean {
   const L = weaponLevel(b.weapon, 1);
   const key = b.owner * MAX_WEAPON_SLOTS + (b.slot % MAX_WEAPON_SLOTS);
   const g = s.grid;
-  if (b.age % 8 === 1 || !validTarget(s, b)) {
-    b.c = -1;
-    let bestD = PHOENIX_SEEK * PHOENIX_SEEK;
-    const m = g.query(s.enemies, b.x, b.y, PHOENIX_SEEK);
-    for (let q = 0; q < m; q++) {
-      const e = s.enemies[g.out[q]];
-      if (!e.alive || e.speed === 0 || e.immune[key] > s.tick) continue;
-      const dx = e.x - b.x;
-      const dy = e.y - b.y;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
-        b.c = g.out[q];
-      }
-    }
-    if (b.c >= 0) b.ty = s.enemies[b.c].id;
-  }
-  const speed = L.speed ?? 470;
-  let sp = speed;
-  if (b.c >= 0) {
-    const e = s.enemies[b.c];
-    const heading = datan2(b.vy, b.vx);
-    const max = (L.turn ?? 3) * DT;
-    const h = turnToward(heading, datan2(e.y - b.y, e.x - b.x), max);
-    // Il ralentit un peu au plus serré du virage.
-    sp = speed * (1 - 0.25 * (Math.abs(h - heading) / max));
-    b.vx = dcos(h);
-    b.vy = dsin(h);
-  }
+  const sp = L.speed ?? 470;
   b.x += b.vx * sp * DT;
   b.y += b.vy * sp * DT;
   if (b.age % PHOENIX_TRAIL === 0) {
@@ -565,9 +537,7 @@ function phoenix(s: GameState, b: Projectile): boolean {
   return false;
 }
 /** une flaque de feu tous les N ticks derrière le Phénix */
-const PHOENIX_TRAIL = 5;
-/** distance à laquelle le Phénix repère sa prochaine proie */
-const PHOENIX_SEEK = 360;
+const PHOENIX_TRAIL = 9;
 
 function mine(s: GameState, b: Projectile): boolean {
   if (b.age < b.a) return false;

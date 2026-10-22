@@ -104,15 +104,21 @@ describe('nouvelles armes', () => {
     expect(fused).toContain(weaponId('phenix'));
   });
 
-  it('la Faux achève les ennemis presque morts', () => {
+  it('la Faux enlève une part des PV max, et achève les ennemis presque morts', () => {
     const s = arena('faux', 1, 1);
     for (let i = 0; i < s.enemyCount; i++) {
       const e = s.enemies[i];
       e.maxHp = 100000;
-      e.hp = 5000;
+      // un coup (15 %) les laisse sous le seuil d'achèvement
+      e.hp = i % 2 ? 20000 : 100000;
     }
-    run(s, 2);
+    run(s, 1);
+    const L = weaponDef(weaponId('faux')).levels[0];
+    // les gros touchés (les plus lointains sont hors de portée) perdent exactement leur part de PV max
+    const hit = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.hp < e.maxHp && e.hp > 20000);
     expect(s.players[0].kills).toBeGreaterThan(0);
+    expect(hit.length).toBeGreaterThan(0);
+    for (const e of hit) expect(e.hp).toBeCloseTo(e.maxHp * (1 - L.pctHp!), 0);
   });
 
   it('la tourelle reste posée et tire sans le joueur', () => {
@@ -208,7 +214,7 @@ describe('nouvelles armes', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('les Phénix partent sans revenir, renaissent près de toi et laissent du feu', () => {
+  it('les Phénix filent tout droit sans revenir, renaissent près de toi et laissent du feu', () => {
     const s = arena('phenix', 1, 100000);
     const p = s.players[0];
     let maxTurn = 0;
@@ -237,12 +243,29 @@ describe('nouvelles armes', () => {
         heading.set(id, h);
       }
     });
-    expect(maxAlive).toBe(2);
-    // Vie de 4 s : en 10 s, chaque oiseau a renaît au moins une fois.
+    expect(maxAlive).toBe(1);
+    // Vie de 2,2 s : en 10 s, il renaît plusieurs fois.
     expect(births.size).toBeGreaterThan(2);
     expect(fires).toBeGreaterThan(3);
-    expect(maxTurn).toBeLessThan(0.2);
+    expect(maxTurn).toBeLessThan(1e-9);
     expect(p.hp).toBe(p.stats.maxHp);
+  });
+
+  it('le Phénix part vers le plus gros sac à PV, pas vers l’ennemi le plus proche', () => {
+    const s = arena('phenix', 1, 5, 'triangle');
+    const p = s.players[0];
+    // Un « boss » loin à gauche, la petite foule tout autour : il doit partir vers la gauche.
+    const big = s.enemies[0];
+    big.x = p.x - 500;
+    big.y = p.y;
+    big.hp = big.maxHp = 5000;
+    let heading: number | null = null;
+    run(s, 3, (st) => {
+      const b = projs(st, PJ_PHOENIX)[0];
+      if (b && heading === null) heading = Math.atan2(b.vy, b.vx);
+    });
+    expect(heading).not.toBeNull();
+    expect(Math.abs(Math.abs(heading!) - Math.PI)).toBeLessThan(0.2);
   });
 
   it('le Fouet claque en éventail devant toi et le Lance-flammes en demi-cercle au max', () => {
