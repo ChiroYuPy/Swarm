@@ -208,7 +208,7 @@ export function passiveTotal(def: PassiveDef, level: number): string {
 /** Vrais chiffres d'une arme au niveau donné, bonus du héros compris. */
 function weaponNumbers(id: string, level: number, might: number, cooldownMul: number): string {
   const L = weaponLevel(ALL_WEAPONS.findIndex((w) => w.id === id), level);
-  const out = [`Dégâts ${dec(L.damage * might, 1)}`];
+  const out = [L.damage > 0 ? `Dégâts ${dec(L.damage * might, 1)}` : 'Sans dégâts'];
   if (L.cooldown) out.push(`recharge ${dec(L.cooldown * cooldownMul)} s`);
   else if (L.tick) out.push(`toutes les ${dec(L.tick)} s`);
   else if (L.hitCd) out.push(`touche toutes les ${dec(L.hitCd)} s`);

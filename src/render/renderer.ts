@@ -23,6 +23,12 @@ import {
   PJ_BOOMERANG,
   PJ_RING,
   PJ_FIRE,
+  PJ_BLAZE,
+  PJ_DRONE,
+  PJ_PHOENIX,
+  PJ_RICOCHET,
+  PJ_SHELL,
+  PJ_TURRET,
   PK_CHEST,
   PK_VACUUM,
   BOSS_PATTERNS,
@@ -41,6 +47,7 @@ import { COLORS, FX_COLORS, OBSTACLE_TINTS } from './palette';
 import type { Effects } from './effects';
 import { drawHud, formatTime, glowText, FONT, type HudOptions } from './hud';
 import { neon } from './icons';
+import { SCYTHE_FX_TICKS, WHIP_FX_TICKS } from '../sim/weapons';
 import { SpriteBank, eyePath, queenPath, type Sprite } from './sprites';
 
 export interface RenderOptions extends HudOptions {
@@ -73,6 +80,12 @@ const RES_STEP = 0.15;
 const RES_SLOW_MS = 20;
 const RES_FAST_MS = 17.5;
 
+/** Pseudo-aléa décoratif stable (0..1) pour les flammes et braises. */
+function hash01(n: number): number {
+  const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -96,6 +109,7 @@ export class Renderer {
   private viewY0 = 0;
   private viewY1 = 0;
   private readonly sprites = new SpriteBank();
+  private readonly puffs = new Map<string, CanvasImageSource>();
   private resScale = 1;
   private frameAvg = 1000 / 60;
   private slowMs = 0;
@@ -926,6 +940,206 @@ export class Renderer {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    // Feu au sol du joueur : cratères des Météores (anneau en pointillés, qui le distingue du feu ennemi plein)
+    // et traînée du Phénix (de simples flammèches), avec des braises qui montent.
+    const flameCore = this.softPuff('#ffe9a8');
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_BLAZE || !this.visible(b.x, b.y, b.r)) continue;
+      const def = ALL_WEAPONS[b.weapon];
+      const col = def.color;
+      if (def.behavior === 'phoenix') {
+        const fade = Math.min(1, b.life / 40);
+        const mid = this.softPuff(col);
+        const deep = this.softPuff('#ff3d1a');
+        // Lueur au sol, puis des flammèches qui montent (blanches au départ, rouges en s'éteignant).
+        let R = b.r * 1.5;
+        ctx.globalAlpha = 0.5 * fade;
+        ctx.drawImage(fade > 0.6 ? mid : deep, b.x - R, b.y - R, R * 2, R * 2);
+        for (let k = 0; k < 4; k++) {
+          const h = hash01(i * 5 + k);
+          const t = ((b.age * 0.035 + h) % 1 + 1) % 1;
+          const ex = b.x + (h - 0.5) * b.r * 1.2;
+          const ey = b.y + (hash01(k * 11 + i) - 0.5) * b.r - t * 20;
+          R = b.r * (1.1 - 0.6 * t) * (0.5 + 0.5 * fade);
+          ctx.globalAlpha = 0.9 * fade * (1 - t);
+          ctx.drawImage(t < 0.25 ? flameCore : t < 0.6 ? mid : deep, ex - R, ey - R, R * 2, R * 2);
+        }
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      const fade = Math.min(1, b.life / 30);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 0.08 * fade;
+      ctx.fill();
+      ctx.setLineDash([4, 6]);
+      ctx.globalAlpha = 0.5 * fade;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const ember = this.softPuff(col);
+      for (let k = 0; k < 9; k++) {
+        const h = hash01(i * 7 + k);
+        const t = ((b.age * 0.025 + h) % 1 + 1) % 1;
+        const a = h * Math.PI * 2;
+        const d = b.r * 0.8 * hash01(k * 13 + i);
+        const ex = b.x + Math.cos(a) * d;
+        const ey = b.y + Math.sin(a) * d - t * 22;
+        const R = 7 + 11 * (1 - t);
+        ctx.globalAlpha = 0.75 * fade * (1 - t);
+        ctx.drawImage(t < 0.25 ? flameCore : ember, ex - R, ey - R, R * 2, R * 2);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // Obus du Mortier (en cloche, avec leur ombre) et Météores (qui tombent en biais) : la zone d'impact s'affiche au sol.
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_SHELL) continue;
+      const col = ALL_WEAPONS[b.weapon].color;
+      const t = Math.min(1, (b.age + alpha) / b.a);
+      if (this.visible(b.tx, b.ty, b.b)) {
+        ctx.beginPath();
+        ctx.arc(b.tx, b.ty, b.b * (0.35 + 0.65 * t), 0, Math.PI * 2);
+        ctx.setLineDash([6, 6]);
+        ctx.globalAlpha = 0.25 + 0.35 * t;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+      const gx = b.vx + (b.tx - b.vx) * t;
+      const gy = b.vy + (b.ty - b.vy) * t;
+      if (!this.visible(gx, gy, 400)) continue;
+      if (b.c === 1) {
+        // Météore : arrive d'en haut à gauche, avec une traînée.
+        const k = 1 - t;
+        const mx = gx - 170 * k;
+        const my = gy - 440 * k;
+        // Queue de feu
+        const tail = this.softPuff(col);
+        for (let q = 0; q < 8; q++) {
+          const f = q / 8;
+          const R = 14 * (1 - f) + 4;
+          ctx.globalAlpha = 0.7 * (1 - f);
+          ctx.drawImage(q < 2 ? this.softPuff('#ffe9a8') : tail, mx - 50 * f * 1.3 - R, my - 130 * f * 1.3 - R, R * 2, R * 2);
+        }
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx - 50, my - 130);
+        ctx.globalAlpha = 0.8;
+        this.glow(col, 5);
+        ctx.beginPath();
+        ctx.arc(mx, my, 9, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        this.glow(col, 3);
+      } else {
+        const dist = Math.hypot(b.tx - b.vx, b.ty - b.vy);
+        const h = 4 * Math.min(160, dist * 0.45) * t * (1 - t);
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, 6, 3, 0, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.globalAlpha = 0.25;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(gx, gy - h, 6, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.globalAlpha = 0.5;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        this.glow(col, 2);
+      }
+    }
+    // Drones autonomes : petites flèches orientées, qui apparaissent en fondu.
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_DRONE) continue;
+      const x = lerp(b.px, b.x, alpha);
+      const y = lerp(b.py, b.y, alpha);
+      if (!this.visible(x, y, 16)) continue;
+      const def = ALL_WEAPONS[b.weapon];
+      const sp = Math.hypot(b.vx, b.vy);
+      const ux = sp > 5 ? b.vx / sp : 1;
+      const uy = sp > 5 ? b.vy / sp : 0;
+      const L = def.id === 'escadrille' ? 10 : 8;
+      ctx.beginPath();
+      ctx.moveTo(x + ux * L, y + uy * L);
+      ctx.lineTo(x - ux * L * 0.7 - uy * L * 0.7, y - uy * L * 0.7 + ux * L * 0.7);
+      ctx.lineTo(x - ux * L * 0.35, y - uy * L * 0.35);
+      ctx.lineTo(x - ux * L * 0.7 + uy * L * 0.7, y - uy * L * 0.7 - ux * L * 0.7);
+      ctx.closePath();
+      ctx.globalAlpha = Math.min(1, b.age / 20);
+      ctx.fillStyle = def.color;
+      const dive = def.id === 'kamikazes';
+      ctx.globalAlpha *= dive && (b.age >> 2) & 1 ? 0.9 : 0.35;
+      ctx.fill();
+      ctx.globalAlpha = Math.min(1, b.age / 20);
+      this.glow(def.color, 1.8);
+      ctx.globalAlpha = 1;
+    }
+    // Phénix : un oiseau de feu aux ailes battantes, suivi de flammèches.
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_PHOENIX) continue;
+      const x = lerp(b.px, b.x, alpha);
+      const y = lerp(b.py, b.y, alpha);
+      if (!this.visible(x, y, b.r * 3)) continue;
+      this.drawPhoenix(x, y, b.vx, b.vy, b.r, ALL_WEAPONS[b.weapon].color, b.age + alpha);
+    }
+    // Tourelles : socle hexagonal et canon tourné vers la cible ; elles clignotent avant de disparaître.
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_TURRET || !this.visible(b.x, b.y, 30)) continue;
+      if (b.life < 60 && (b.life >> 3) & 1) continue;
+      const def = ALL_WEAPONS[b.weapon];
+      const big = def.fusion ? 1.3 : 1;
+      ctx.beginPath();
+      this.polygon(b.x, b.y, 6, 12 * big, Math.PI / 6);
+      ctx.fillStyle = def.color;
+      ctx.globalAlpha = 0.15;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      this.glow(def.color, 2);
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x + b.vx * 17 * big, b.y + b.vy * 17 * big);
+      if (def.fusion) {
+        const nx = -b.vy * 5;
+        const ny = b.vx * 5;
+        ctx.moveTo(b.x + nx, b.y + ny);
+        ctx.lineTo(b.x + nx + b.vx * 15 * big, b.y + ny + b.vy * 15 * big);
+        ctx.moveTo(b.x - nx, b.y - ny);
+        ctx.lineTo(b.x - nx + b.vx * 15 * big, b.y - ny + b.vy * 15 * big);
+      }
+      this.glow(def.color, 3);
+    }
+    // Disques ricochets : un anneau à trois encoches qui tourne.
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_RICOCHET) continue;
+      const x = lerp(b.px, b.x, alpha);
+      const y = lerp(b.py, b.y, alpha);
+      if (!this.visible(x, y, b.r + 6)) continue;
+      const rot = (b.age + alpha) * 0.5;
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) {
+        const a0 = rot + (k * Math.PI * 2) / 3;
+        ctx.moveTo(x + Math.cos(a0 + 0.35) * b.r, y + Math.sin(a0 + 0.35) * b.r);
+        ctx.arc(x, y, b.r, a0 + 0.35, a0 + (Math.PI * 2) / 3 - 0.35);
+      }
+      this.glow(ALL_WEAPONS[b.weapon].color, 2.5);
+      ctx.beginPath();
+      ctx.arc(x, y, b.r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
     // Balles ennemies : pleines, rouges à cœur blanc (distinctes de tout le reste). Celles des Tireurs,
     // cassables, sont violettes cerclées de pointillés.
     for (let i = 0; i < s.projCount; i++) {
@@ -948,6 +1162,213 @@ export class Renderer {
       this.glow(ALL_WEAPONS[b.weapon].color, 4);
       ctx.globalAlpha = 1;
     }
+  }
+
+  /**
+   * Fouet : la lanière se déroule en ondulant (t de 0 à 0,45), claque au bout (étincelle), puis s'efface.
+   * Tracée comme une courbe qui s'affine vers la pointe.
+   */
+  private drawWhip(x: number, y: number, angles: Float64Array, n: number, len: number, width: number, t: number, color: string): void {
+    const ctx = this.ctx;
+    const ext = Math.min(1, t / 0.45);
+    const e = 1 - (1 - ext) * (1 - ext);
+    const fade = t < 0.45 ? 1 : Math.max(0, 1 - (t - 0.45) / 0.55);
+    const SEG = 18;
+    for (let b = 0; b < n; b++) {
+      const ux = Math.cos(angles[b]);
+      const uy = Math.sin(angles[b]);
+      const side = b % 2 === 0 ? 1 : -1;
+      // Trois traits de plus en plus fins vers la pointe.
+      for (let part = 0; part < 3; part++) {
+        ctx.beginPath();
+        for (let k = (part * SEG) / 3; k <= ((part + 1) * SEG) / 3; k++) {
+          const u = k / SEG;
+          const along = len * e * u;
+          const wave = Math.sin(u * Math.PI * 2.2 - t * 14) * width * 0.9 * (1 - e * 0.85) * u * side;
+          const px = x + ux * along - uy * wave;
+          const py = y + uy * along + ux * wave;
+          if (k === (part * SEG) / 3) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.globalAlpha = fade;
+        this.glow(color, 3.2 - part * 0.9);
+      }
+      // Claquement : une étincelle au bout, au moment où la lanière se tend.
+      if (t > 0.35 && t < 0.7) {
+        const k = 1 - Math.abs(t - 0.5) / 0.2;
+        const tx = x + ux * len;
+        const ty = y + uy * len;
+        ctx.beginPath();
+        for (let r = 0; r < 6; r++) {
+          const a = angles[b] + (r * Math.PI) / 3 + 0.3;
+          ctx.moveTo(tx + Math.cos(a) * 6, ty + Math.sin(a) * 6);
+          ctx.lineTo(tx + Math.cos(a) * (10 + 12 * k), ty + Math.sin(a) * (10 + 12 * k));
+        }
+        ctx.globalAlpha = Math.max(0, k);
+        this.glow('#ffffff', 1.6);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Jet de flammes : des bouffées qui partent du joueur, grossissent, passent du blanc-jaune
+   * à la couleur de l'arme puis s'éteignent. Purement décoratif (aucun aléa de la simulation).
+   */
+  private drawFlameJet(x: number, y: number, a: number, len: number, arc: number, color: string, time: number, seed: number): void {
+    const ctx = this.ctx;
+    const N = 34;
+    const scale = len / 135;
+    const core = this.softPuff('#fff3c4');
+    const mid = this.softPuff(color);
+    const end = this.softPuff('#ff3d1a');
+    for (let k = 0; k < N; k++) {
+      const h = hash01(k * 31 + seed * 97);
+      const t = (((time / 26 + h) % 1) + 1) % 1;
+      const off = (hash01(k * 17 + seed * 5) * 2 - 1) * arc * 0.8 * Math.min(1, t * 3);
+      const wob = Math.sin(time * 0.3 + k) * 0.05;
+      const d = len * t;
+      const fx = x + Math.cos(a + off + wob) * d;
+      const fy = y + Math.sin(a + off + wob) * d;
+      // Les bouffées grossissent en s'éloignant, passent du blanc-jaune à la couleur puis au rouge, et s'éteignent.
+      const R = (5 + 15 * t) * scale;
+      ctx.globalAlpha = Math.min(1, (1 - t) * 1.4) * 0.75;
+      ctx.drawImage(t < 0.25 ? core : t < 0.65 ? mid : end, fx - R, fy - R, R * 2, R * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Disque flou d'une couleur (dégradé radial), mis en cache : brique des flammes. */
+  private softPuff(color: string): CanvasImageSource {
+    let img = this.puffs.get(color);
+    if (!img) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 32;
+      const g = cv.getContext('2d')!;
+      const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.45, color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 32, 32);
+      img = cv;
+      this.puffs.set(color, img);
+      // Comme les sprites : une texture ImageBitmap se dessine bien plus vite qu'un canvas.
+      if (typeof createImageBitmap === 'function') createImageBitmap(cv).then((bmp) => this.puffs.set(color, bmp), () => {});
+    }
+    return img;
+  }
+
+  /**
+   * Faux : la lame fait un tour complet autour de toi (rapide puis freinée), suivie d'une traînée
+   * en éventail qui s'efface. `t` = avancement de l'animation (0..1).
+   */
+  private drawScythe(x: number, y: number, angles: Float64Array, n: number, R: number, t: number, color: string): void {
+    const ctx = this.ctx;
+    const ease = 1 - (1 - t) * (1 - t) * (1 - t);
+    const fade = t < 0.7 ? 1 : (1 - t) / 0.3;
+    for (let b = 0; b < n; b++) {
+      const a = angles[b] + ease * Math.PI * 2;
+      // Traînée : des tranches d'anneau de plus en plus pâles derrière la lame.
+      const trail = Math.min(ease * Math.PI * 2, 2.4);
+      const SEG = 12;
+      ctx.fillStyle = color;
+      for (let k = 0; k < SEG; k++) {
+        const a1 = a - (trail * k) / SEG;
+        const a0 = a - (trail * (k + 1)) / SEG;
+        ctx.beginPath();
+        ctx.arc(x, y, R, a0, a1);
+        ctx.arc(x, y, R * 0.45, a1, a0, true);
+        ctx.closePath();
+        ctx.globalAlpha = 0.28 * (1 - k / SEG) * (1 - k / SEG) * fade;
+        ctx.fill();
+      }
+      // Bord tranchant de la traînée
+      ctx.beginPath();
+      ctx.arc(x, y, R, a - trail * 0.8, a);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6 * fade;
+      ctx.stroke();
+      // Manche, puis la lame en croissant qui se recourbe vers l'avant.
+      const P = (r: number, ang: number): [number, number] => [x + Math.cos(ang) * r, y + Math.sin(ang) * r];
+      ctx.beginPath();
+      ctx.moveTo(...P(R * 0.15, a));
+      ctx.lineTo(...P(R * 0.98, a));
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#fff4ec';
+      ctx.globalAlpha = 0.8 * fade;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(...P(R * 1.02, a - 0.04));
+      ctx.quadraticCurveTo(...P(R * 1.08, a + 0.4), ...P(R * 0.72, a + 0.78));
+      ctx.quadraticCurveTo(...P(R * 0.9, a + 0.36), ...P(R * 0.84, a - 0.02));
+      ctx.closePath();
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.85 * fade;
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 6;
+      ctx.globalAlpha = 0.35 * fade;
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = fade;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Phénix : corps, ailes qui battent, queue de flammes. (vx, vy) = sens du vol. */
+  private drawPhoenix(x: number, y: number, vx: number, vy: number, r: number, color: string, time: number): void {
+    const ctx = this.ctx;
+    const n = Math.hypot(vx, vy) || 1;
+    const ux = vx / n;
+    const uy = vy / n;
+    const nx = -uy;
+    const ny = ux;
+    const flap = Math.sin(time * 0.45);
+    r *= 1.35;
+    const P = (f: number, s: number): [number, number] => [x + ux * f * r + nx * s * r, y + uy * f * r + ny * s * r];
+    // Traînée de feu derrière lui.
+    const core = this.softPuff('#fff3c4');
+    const mid = this.softPuff(color);
+    const end = this.softPuff('#ff3d1a');
+    for (let k = 0; k < 14; k++) {
+      const t = (((time / 14 + k / 14) % 1) + 1) % 1;
+      const [px, py] = P(-0.5 - t * 2.6, Math.sin(time * 0.4 + k * 1.7) * 0.35 * t);
+      const R = r * (0.55 - 0.3 * t);
+      ctx.globalAlpha = (1 - t) * 0.7;
+      ctx.drawImage(t < 0.2 ? core : t < 0.55 ? mid : end, px - R, py - R, R * 2, R * 2);
+    }
+    ctx.globalAlpha = 1;
+    // Ailes
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      const [ax, ay] = P(0.1, 0);
+      const [cx, cy] = P(-0.2, side * (0.9 + 0.35 * flap));
+      const [tx, ty] = P(-0.75, side * (1.25 + 0.5 * flap));
+      const [bx, by] = P(-0.45, side * 0.35);
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo(cx, cy, tx, ty);
+      ctx.quadraticCurveTo(bx + (tx - bx) * 0.2, by + (ty - by) * 0.2, bx, by);
+      ctx.closePath();
+    }
+    ctx.globalAlpha = 0.45;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    this.glow(color, 2.6);
+    // Corps et tête
+    ctx.beginPath();
+    const [hx, hy] = P(0.55, 0);
+    const [tx, ty] = P(-0.55, 0);
+    ctx.moveTo(hx, hy);
+    ctx.quadraticCurveTo(...P(0, 0.32), tx, ty);
+    ctx.quadraticCurveTo(...P(0, -0.32), hx, hy);
+    ctx.fillStyle = '#fff1b8';
+    ctx.globalAlpha = 0.6;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    this.glow(color, 2);
   }
 
   private drawWeaponFx(s: GameState, alpha: number, under: boolean): void {
@@ -1016,6 +1437,12 @@ export class Renderer {
           this.glow(def.color, 1.5);
           ctx.globalAlpha = 1;
         }
+      } else if (def.behavior === 'whip' && w.activeTicks > 0) {
+        this.drawWhip(x, y, w.angles, w.vN, w.vLen, w.vW, 1 - (w.activeTicks - alpha) / WHIP_FX_TICKS, def.color);
+      } else if (def.behavior === 'scythe' && w.activeTicks > 0) {
+        this.drawScythe(x, y, w.angles, w.vN, w.vLen, Math.min(1, 1 - (w.activeTicks - alpha) / SCYTHE_FX_TICKS), def.color);
+      } else if (def.behavior === 'flame' && w.activeTicks > 0) {
+        for (let b = 0; b < w.vN; b++) this.drawFlameJet(x, y, w.angles[b], w.vLen, w.vW, def.color, s.tick + alpha, b);
       } else if (def.behavior === 'beam' && w.activeTicks > 0) {
         ctx.beginPath();
         for (let b = 0; b < w.vN; b++) {

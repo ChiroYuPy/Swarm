@@ -19,4 +19,11 @@ export const FUSIONS: FusionDef[] = [
   { result: 'multiprise', weapon: 'rallonge', with: 'laser', withKind: 'weapon' },
   { result: 'creperang', weapon: 'boomerang', with: 'crepes', withKind: 'weapon' },
   { result: 'periph', weapon: 'klaxon', with: 'chaussettes', withKind: 'passive' },
+  { result: 'faux', weapon: 'fouet', with: 'biceps', withKind: 'passive' },
+  { result: 'tornade', weapon: 'flammes', with: 'lunettes', withKind: 'passive' },
+  { result: 'phenix', weapon: 'flammes', with: 'soupe', withKind: 'passive' },
+  { result: 'bastion', weapon: 'tourelle', with: 'blindage', withKind: 'passive' },
+  { result: 'escadrille', weapon: 'ricochet', with: 'drone', withKind: 'weapon' },
+  { result: 'kamikazes', weapon: 'drone', with: 'mortier', withKind: 'weapon' },
+  { result: 'meteores', weapon: 'mortier', with: 'chance', withKind: 'passive' },
 ];

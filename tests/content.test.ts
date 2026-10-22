@@ -24,7 +24,7 @@ import { botInput } from '../src/ai/bot';
 
 describe('contenu', () => {
   it('un niveau = une instance de plus pour les armes à instances', () => {
-    for (const id of ['confetti', 'petitspois', 'crepes', 'boomerang', 'rallonge', 'klaxon']) {
+    for (const id of ['confetti', 'petitspois', 'crepes', 'boomerang', 'rallonge', 'klaxon', 'fouet', 'flammes', 'tourelle', 'drone', 'ricochet', 'mortier']) {
       const w = weaponId(id);
       for (let l = 1; l <= 5; l++) expect(weaponLevel(w, l).count, `${id} niv. ${l}`).toBe(l);
     }

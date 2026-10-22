@@ -6,7 +6,24 @@
  * par-dessus le précédent. Les durées sont en secondes, les distances en unités monde.
  */
 
-export type Behavior = 'projectile' | 'spiral' | 'orbit' | 'aura' | 'beam' | 'mine' | 'boomerang' | 'chain' | 'pulse';
+export type Behavior =
+  | 'projectile'
+  | 'spiral'
+  | 'orbit'
+  | 'aura'
+  | 'beam'
+  | 'mine'
+  | 'boomerang'
+  | 'chain'
+  | 'pulse'
+  | 'whip'
+  | 'scythe'
+  | 'flame'
+  | 'turret'
+  | 'drone'
+  | 'ricochet'
+  | 'mortar'
+  | 'phoenix';
 
 export interface WeaponLevel {
   damage: number;
@@ -42,6 +59,33 @@ export interface WeaponLevel {
   burstEvery?: number;
   burstCount?: number;
   rotStep?: number;
+  /** demi-angle d'un cône ou d'un coup de fouet (radians) */
+  arc?: number;
+  /** achève les ennemis (hors boss) tombés sous cette part de leurs PV */
+  execute?: number;
+  /** cadence de tir d'une tourelle (s) */
+  fireEvery?: number;
+  /** tourelle : onde de recul toutes les `ringEvery` s (rayon `radius`) */
+  ringEvery?: number;
+  /** rebonds d'un disque ricochet */
+  bounces?: number;
+  /** cratère en feu (Météores) : dégâts par seconde, rayon, durée (s) */
+  blazeDamage?: number;
+  blazeRadius?: number;
+  blazeLife?: number;
+  /** jets de flammes qui tournent en continu (rad/s) au lieu de viser */
+  spin?: number;
+  /** drones : PV, délai de réapparition (s), portée d'attaque, vitesse des tirs */
+  hp?: number;
+  respawn?: number;
+  attackRange?: number;
+  shotSpeed?: number;
+  /** drones kamikazes : foncent et explosent (1) */
+  dive?: number;
+  /** obus qui tombent du ciel (Météores) : 1 */
+  meteor?: number;
+  /** virage max (radians par seconde) des drones et du Phénix : ils tournent en avançant */
+  turn?: number;
 }
 
 export interface WeaponDef {
@@ -201,6 +245,132 @@ export const BASE_WEAPONS: WeaponDef[] = [
       { count: 5, radius: 180, damage: 12 },
     ),
   },
+  {
+    id: 'fouet',
+    name: 'Fouet',
+    desc: 'Une lanière qui claque devant toi, blesse et envoie valser les ennemis.',
+    behavior: 'whip',
+    color: '#ff8c69',
+    levelText: [
+      '1 fouet devant toi : blesse et repousse loin.',
+      '2 fouets : devant et derrière',
+      '3 fouets, plus longs, dégâts +25 %, repoussent plus loin',
+      '4 fouets, plus larges, étourdissent 0,3 s',
+      '5 fouets, encore plus longs, dégâts +20 %, étourdissent 0,5 s',
+    ],
+    levels: prog(
+      { damage: 12, cooldown: 1.4, length: 160, width: 26, count: 1, knockback: 420 },
+      { count: 2 },
+      { count: 3, damage: 15, length: 185, knockback: 480 },
+      { count: 4, width: 34, stun: 0.3 },
+      { count: 5, damage: 18, length: 215, knockback: 560, stun: 0.5 },
+    ),
+  },
+  {
+    id: 'flammes',
+    name: 'Lance-flammes',
+    desc: 'Un jet de flammes court vers l’ennemi le plus proche.',
+    behavior: 'flame',
+    color: '#ff6a1a',
+    levelText: [
+      '1 jet de flammes vers l’ennemi le plus proche.',
+      '2 jets (devant et derrière)',
+      '3 jets, dégâts +25 %',
+      '4 jets, brûlent plus longtemps',
+      '5 jets, portée +15 %, dégâts +20 %',
+    ],
+    levels: prog(
+      { damage: 4, cooldown: 2.6, duration: 1.4, tick: 0.12, length: 135, arc: 0.32, count: 1 },
+      { count: 2 },
+      { count: 3, damage: 5 },
+      { count: 4, duration: 2.0 },
+      { count: 5, length: 155, damage: 6 },
+    ),
+  },
+  {
+    id: 'tourelle',
+    name: 'Tourelle',
+    desc: 'Pose une tourelle qui tire seule sur ce qui passe à portée. Bats-toi autour d’elle.',
+    behavior: 'turret',
+    color: '#c8ff5a',
+    levelText: [
+      'Pose 1 tourelle qui tire seule pendant 12 s.',
+      '2 tourelles',
+      '3 tourelles, tirent plus vite',
+      '4 tourelles, dégâts +20 %, tirs perçants',
+      '5 tourelles, durent 16 s',
+    ],
+    levels: prog(
+      { damage: 9, cooldown: 12, life: 12, fireEvery: 0.6, range: 330, count: 1, speed: 520, pierce: 0, size: 5 },
+      { count: 2 },
+      { count: 3, fireEvery: 0.5 },
+      { count: 4, damage: 11, pierce: 1 },
+      { count: 5, life: 16, cooldown: 16 },
+    ),
+  },
+  {
+    id: 'drone',
+    name: 'Drone',
+    desc: 'Des drones autonomes partent chasser les ennemis gênants (Tireurs, Meneurs, Téléporteurs, Bombes). Abattus, ils réapparaissent près de toi.',
+    behavior: 'drone',
+    color: '#d6dcff',
+    levelText: [
+      '1 drone chasseur.',
+      '2 drones',
+      '3 drones, dégâts +30 %, plus résistants',
+      '4 drones',
+      '5 drones, tirent plus vite, reviennent plus vite',
+    ],
+    levels: prog(
+      { damage: 7, cooldown: 0.7, count: 1, speed: 260, range: 520, hp: 50, respawn: 3, attackRange: 180, shotSpeed: 600, size: 4, turn: 3.2 },
+      { count: 2 },
+      { count: 3, damage: 9, hp: 70 },
+      { count: 4 },
+      { count: 5, cooldown: 0.55, respawn: 2 },
+    ),
+  },
+  {
+    id: 'ricochet',
+    name: 'Ricochet',
+    desc: 'Un disque à tête chercheuse qui rebondit d’ennemi en ennemi, et sur les obstacles.',
+    behavior: 'ricochet',
+    color: '#ff4f9a',
+    levelText: [
+      '1 disque chercheur, 4 rebonds.',
+      '2 disques',
+      '3 disques, 6 rebonds, dégâts +15 %',
+      '4 disques',
+      '5 disques, 8 rebonds, plus gros, dégâts +15 %',
+    ],
+    levels: prog(
+      { damage: 18, cooldown: 1.5, speed: 440, bounces: 4, count: 1, size: 10, life: 3, range: 520 },
+      { count: 2 },
+      { count: 3, bounces: 6, damage: 21 },
+      { count: 4 },
+      { count: 5, bounces: 8, size: 12, damage: 24 },
+    ),
+  },
+  {
+    id: 'mortier',
+    name: 'Mortier',
+    desc: 'Lance des obus au loin, sur les groupes d’ennemis. Le point d’impact s’affiche au sol.',
+    behavior: 'mortar',
+    color: '#ffe08a',
+    levelText: [
+      'Lance 1 obus au loin, sur un groupe.',
+      '2 obus',
+      '3 obus, dégâts +20 %, explosion plus large',
+      '4 obus',
+      '5 obus, explosion encore plus large, dégâts +20 %',
+    ],
+    levels: prog(
+      { damage: 28, cooldown: 2.2, count: 1, radius: 70, range: 480, duration: 0.7, knockback: 160 },
+      { count: 2 },
+      { count: 3, damage: 34, radius: 80 },
+      { count: 4 },
+      { count: 5, radius: 95, damage: 40 },
+    ),
+  },
 ];
 
 export const FUSED_WEAPONS: WeaponDef[] = [
@@ -270,6 +440,96 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     fusion: true,
     levelText: ['Triple onde géante qui étourdit les ennemis.'],
     levels: [{ damage: 28, cooldown: 1.5, radius: 265, duration: 0.4, knockback: 400, count: 3, delay: 0.18, stun: 0.5 }],
+  },
+  {
+    id: 'faux',
+    name: 'Faux',
+    desc: 'Fusion de Fouet et Puissance.',
+    behavior: 'scythe',
+    color: '#ffb39c',
+    fusion: true,
+    levelText: ['Fauche tout autour de toi et achève les ennemis presque morts.'],
+    levels: [{ damage: 40, cooldown: 1.1, length: 200, arc: Math.PI, count: 1, knockback: 140, execute: 0.12 }],
+  },
+  {
+    id: 'tornade',
+    name: 'Tornade de feu',
+    desc: 'Fusion de Lance-flammes et Amplificateur.',
+    behavior: 'flame',
+    color: '#ff7a2e',
+    fusion: true,
+    levelText: ['Quatre jets de flammes tournent sans arrêt autour de toi.'],
+    levels: [{ damage: 10, tick: 0.12, length: 200, arc: 0.3, count: 4, spin: 2.4 }],
+  },
+  {
+    id: 'phenix',
+    name: 'Phénix',
+    desc: 'Fusion de Lance-flammes et Vitalité.',
+    behavior: 'phoenix',
+    color: '#ffb03a',
+    fusion: true,
+    levelText: ['Un oiseau de feu traverse la horde, fait demi-tour en planant et revient, en laissant une traînée de feu. Chaque brûlure te soigne un peu.'],
+    levels: [
+      {
+        damage: 32, cooldown: 2.0, speed: 520, range: 440, size: 28, count: 1, hitCd: 0.35, lifesteal: 0.02, knockback: 60,
+        turn: 4.2, blazeDamage: 14, blazeRadius: 26, blazeLife: 1.4,
+      },
+    ],
+  },
+  {
+    id: 'bastion',
+    name: 'Bastion',
+    desc: 'Fusion de Tourelle et Blindage.',
+    behavior: 'turret',
+    color: '#e4ff9a',
+    fusion: true,
+    levelText: ['Deux tourelles lourdes : tirs triples perçants et onde de recul.'],
+    levels: [
+      {
+        damage: 14, cooldown: 14, life: 14, fireEvery: 0.4, range: 380, count: 2, speed: 560, pierce: 2, size: 6,
+        spread: 0.18, burstCount: 3, ringEvery: 2.0, radius: 130, knockback: 260,
+      },
+    ],
+  },
+  {
+    id: 'escadrille',
+    name: 'Escadrille',
+    desc: 'Fusion de Ricochet et Drone.',
+    behavior: 'drone',
+    color: '#ff9ccd',
+    fusion: true,
+    levelText: ['Quatre drones chasseurs, plus solides, qui lancent des disques ricochets.'],
+    levels: [
+      {
+        damage: 22, cooldown: 0.9, count: 4, speed: 300, range: 600, hp: 140, respawn: 2.5, attackRange: 260,
+        shotSpeed: 460, size: 10, bounces: 6, life: 3, turn: 3.4,
+      },
+    ],
+  },
+  {
+    id: 'kamikazes',
+    name: 'Kamikazes',
+    desc: 'Fusion de Drone et Mortier.',
+    behavior: 'drone',
+    color: '#ff9a5c',
+    fusion: true,
+    levelText: ['Quatre drones foncent dans les groupes et explosent comme des bombes, puis réapparaissent près de toi.'],
+    levels: [{ damage: 75, count: 4, speed: 430, range: 520, radius: 150, knockback: 260, respawn: 1.6, dive: 1, hp: 1, turn: 4 }],
+  },
+  {
+    id: 'meteores',
+    name: 'Météores',
+    desc: 'Fusion de Mortier et Chance.',
+    behavior: 'mortar',
+    color: '#ff5a24',
+    fusion: true,
+    levelText: ['Une pluie de météores s’abat sur les groupes et laisse des cratères en feu.'],
+    levels: [
+      {
+        damage: 90, cooldown: 0.6, count: 1, radius: 125, range: 540, duration: 0.6, knockback: 220, meteor: 1,
+        blazeDamage: 22, blazeRadius: 80, blazeLife: 2.5,
+      },
+    ],
   },
 ];
 

@@ -60,3 +60,11 @@ for (let i = 0; i < DIR_COUNT; i++) {
   DIR_X[i] = dcos(a);
   DIR_Y[i] = dsin(a);
 }
+
+/** Tourne l'angle `a` vers `to` d'au plus `step` radians. */
+export function turnToward(a: number, to: number, step: number): number {
+  let diff = to - a;
+  while (diff > PI) diff -= TWO_PI;
+  while (diff < -PI) diff += TWO_PI;
+  return a + (diff > step ? step : diff < -step ? -step : diff);
+}

@@ -283,7 +283,17 @@ export class Effects {
           break;
         case EV_SHOOT: {
           const b = weaponDef(e.k).behavior;
-          h.sfx(b === 'beam' ? 'laser' : b === 'mine' ? 'mine' : b === 'boomerang' ? 'boomerang' : b === 'chain' ? 'zap' : 'shoot');
+          h.sfx(
+            b === 'beam' || b === 'flame'
+              ? 'laser'
+              : b === 'mine' || b === 'turret' || b === 'mortar'
+                ? 'mine'
+                : b === 'boomerang' || b === 'whip' || b === 'scythe' || b === 'ricochet' || b === 'phoenix'
+                  ? 'boomerang'
+                  : b === 'chain'
+                    ? 'zap'
+                    : 'shoot',
+          );
           break;
         }
         case EV_EXPLOSION:

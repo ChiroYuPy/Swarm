@@ -111,7 +111,8 @@ export function rollOffers(s: GameState, p: Player): void {
   p.offerLevel = level;
   const offers: Offer[] = [];
   const fusions = availableFusions(p);
-  if (fusions.length > 0) offers.push({ kind: OFFER_FUSION, id: fusions[0], toLevel: 1 });
+  // Toutes les fusions possibles sont proposées (une arme peut en avoir deux : à toi de choisir).
+  for (const f of fusions) if (offers.length < 3) offers.push({ kind: OFFER_FUSION, id: f, toLevel: 1 });
   const order = offerOrder(s.seed, level);
   for (const idx of order) {
     if (offers.length >= 3) break;

@@ -3,7 +3,7 @@ import { BOSS, ENEMIES, ETOILE, HEXAGONE, OEIL, REINE, type BossPhaseKind } from
 import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DT, TICK_RATE } from './constants';
-import { PI, TWO_PI, dcos, datan2, dsin } from './dmath';
+import { PI, TWO_PI, dcos, datan2, dsin, turnToward } from './dmath';
 import { AVOID, avoidance, circleHitsObstacle, moveCircle, segmentClear } from './map';
 import { spawnEnemy, spawnProjectile } from './entities';
 import { explode, hurtPlayer, nearestPlayer } from './combat';
@@ -232,15 +232,25 @@ export function updateEnemies(s: GameState): void {
       }
       case BEHAVIOR.SHOOTER: {
         keepAway(s, e, dx, dy, dist, d.keepMin ?? 240, d.keepMax ?? 340);
+        // Il pivote vers toi peu à peu (aux = son cap) et ne tire que droit devant lui.
+        if (e.ai === 0) {
+          e.aux = datan2(dy, dx);
+          e.ai = 1;
+        }
+        const want = datan2(dy, dx);
+        if (!stunned) e.aux = turnToward(e.aux, want, SHOOTER_TURN * DT * tf);
         e.timer -= tf;
         if (e.timer <= 0) {
-          if (dist < 560 && !stunned) {
-            const a = datan2(dy, dx);
+          let off = want - e.aux;
+          while (off > PI) off -= TWO_PI;
+          while (off < -PI) off += TWO_PI;
+          if (dist < 560 && !stunned && Math.abs(off) < SHOOTER_CONE) {
+            const a = e.aux;
             fireEnemyBullet(s, e.x, e.y, a, d.bulletSpeed ?? 190, (d.bulletDamage ?? 8) * dmgMul(s), true);
             emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
             e.timer = Math.round((d.shootEvery ?? 2.6) * TICK_RATE);
           } else {
-            e.timer = 20;
+            e.timer = dist < 560 && !stunned ? 1 : 20;
           }
         }
         break;
@@ -377,12 +387,20 @@ export function updateEnemies(s: GameState): void {
     moveCircle(s.map, e, vx * DT + hx, vy * DT + hy, e.r);
     e.kbx *= KB_DECAY;
     e.kby *= KB_DECAY;
-    if (DX !== 0 || DY !== 0) {
+    if (beh === BEHAVIOR.SHOOTER) {
+      // Le Tireur regarde là où il vise, pas là où il marche.
+      e.vx = dcos(e.aux);
+      e.vy = dsin(e.aux);
+    } else if (DX !== 0 || DY !== 0) {
       e.vx = DX;
       e.vy = DY;
     }
   }
 }
+
+/** vitesse de pivot du Tireur (radians par seconde) et demi-angle dans lequel il tire */
+const SHOOTER_TURN = 2.2;
+const SHOOTER_CONE = 0.12;
 
 /** Vitesse voulue du boss ce tick (sortie des phases). */
 let VX = 0;

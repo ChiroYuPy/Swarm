@@ -52,6 +52,17 @@ export function damageEnemy(s: GameState, idx: number, amount: number, owner: nu
   return false;
 }
 
+/** Repousse un ennemi sans le blesser (il clignote quand même, pour qu'on voie le coup). */
+export function pushEnemy(s: GameState, idx: number, kx: number, ky: number): void {
+  const e = s.enemies[idx];
+  if (!e.alive || e.frozenUntil > s.tick) return;
+  e.hitTick = s.tick;
+  const k = 1 - e.kbResist;
+  if (k <= 0) return;
+  e.kbx += kx * k;
+  e.kby += ky * k;
+}
+
 /** Un clone fait gagner ses éliminations et ses dégâts à son modèle. */
 function credited(s: GameState, owner: number): number {
   const p = owner >= 0 ? s.players[owner] : undefined;

@@ -68,6 +68,18 @@ export const PJ_BOOMERANG = 3;
 export const PJ_RING = 4;
 /** flamme au sol laissée par l'Étoile ricochet : a = dégâts par seconde */
 export const PJ_FIRE = 5;
+/** tourelle posée (immobile) : a = ticks avant le prochain tir, d = ticks avant l'onde, (vx, vy) = canon, lv = niveau */
+export const PJ_TURRET = 6;
+/** disque ricochet : a = rebonds restants, c = index de la cible suivie (ty = son id) */
+export const PJ_RICOCHET = 7;
+/** flamme au sol du joueur (brûle les ennemis) : a = dégâts par seconde */
+export const PJ_BLAZE = 8;
+/** drone autonome : a = ticks avant son tir, b = PV, c = index de sa cible (-1 = aucune, ty = son id), d = rang dans l'escadron, tx = dégagement restant */
+export const PJ_DRONE = 9;
+/** obus en vol de (vx, vy) vers (tx, ty) : a = durée du vol, b = rayon, c = météore (1) */
+export const PJ_SHELL = 10;
+/** Phénix : a = 0 aller / 1 retour, b = portée, c = distance parcourue, d = secondes depuis le demi-tour, (vx, vy) = cap */
+export const PJ_PHOENIX = 11;
 
 export class Projectile {
   kind = 0;
@@ -91,6 +103,11 @@ export class Projectile {
   knock = 0;
   hitIds = new Int32Array(8);
   hitCount = 0;
+  /** niveau de l'arme qui l'a créé (tourelles) */
+  lv = 1;
+  /** cible : point d'arrivée d'un obus, ou id de l'ennemi visé (drones, disques) */
+  tx = 0;
+  ty = 0;
   /** données propres au type de projectile */
   a = 0;
   b = 0;
@@ -154,7 +171,7 @@ export class WeaponInst {
   vN = 0;
   vLen = 0;
   vW = 0;
-  angles = new Float64Array(4);
+  angles = new Float64Array(8);
 }
 
 export class PassiveInst {

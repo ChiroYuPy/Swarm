@@ -232,6 +232,230 @@ export function drawWeaponIcon(ctx: Ctx, id: string, cx: number, cy: number, siz
       }
       break;
     }
+    case 'fouet':
+    case 'faux': {
+      if (id === 'faux') {
+        // Lame courbe sur un manche
+        ctx.moveTo(-r * 0.55, r * 0.85);
+        ctx.lineTo(r * 0.15, -r * 0.55);
+        neon(ctx, '#ffffff', lw * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.15, -r * 0.55);
+        ctx.quadraticCurveTo(-r * 0.2, -r * 1.0, -r * 0.9, -r * 0.55);
+        ctx.quadraticCurveTo(-r * 0.3, -r * 0.62, r * 0.05, -r * 0.35);
+        neon(ctx, c, lw, 0.35);
+      } else {
+        // Manche + lanière en S qui claque
+        ctx.moveTo(-r * 0.85, r * 0.85);
+        ctx.lineTo(-r * 0.45, r * 0.45);
+        neon(ctx, '#ffffff', lw * 1.2);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.45, r * 0.45);
+        ctx.bezierCurveTo(r * 0.4, r * 0.3, -r * 0.4, -r * 0.5, r * 0.8, -r * 0.7);
+        neon(ctx, c, lw);
+        ctx.beginPath();
+        ctx.moveTo(r * 0.62, -r * 0.95);
+        ctx.lineTo(r * 0.9, -r * 0.88);
+        ctx.moveTo(r * 0.95, -r * 0.6);
+        ctx.lineTo(r * 1.0, -r * 0.4);
+        neon(ctx, c, lw * 0.6);
+      }
+      break;
+    }
+    case 'flammes': {
+      // Flamme
+      ctx.moveTo(0, r * 0.85);
+      ctx.bezierCurveTo(-r * 0.75, r * 0.5, -r * 0.3, -r * 0.2, 0, -r * 0.9);
+      ctx.bezierCurveTo(r * 0.25, -r * 0.35, r * 0.75, r * 0.2, 0, r * 0.85);
+      neon(ctx, c, lw, 0.35);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.7);
+      ctx.bezierCurveTo(-r * 0.3, r * 0.5, -r * 0.1, r * 0.1, 0, -r * 0.2);
+      ctx.bezierCurveTo(r * 0.1, r * 0.1, r * 0.3, r * 0.5, 0, r * 0.7);
+      solid(ctx, '#fff1b8', lw * 0.4);
+      break;
+    }
+    case 'tornade': {
+      // Trois jets en tourbillon autour d'un point
+      for (let k = 0; k < 3; k++) {
+        const a0 = (k * TAU) / 3;
+        ctx.moveTo(Math.cos(a0) * r * 0.2, Math.sin(a0) * r * 0.2);
+        ctx.quadraticCurveTo(
+          Math.cos(a0 + 0.9) * r * 0.75,
+          Math.sin(a0 + 0.9) * r * 0.75,
+          Math.cos(a0 + 1.6) * r * 0.95,
+          Math.sin(a0 + 1.6) * r * 0.95,
+        );
+      }
+      neon(ctx, c, lw * 1.1);
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.18, 0, TAU);
+      solid(ctx, '#fff1b8', lw * 0.5);
+      break;
+    }
+    case 'phenix': {
+      // Oiseau de feu, ailes déployées
+      ctx.moveTo(0, -r * 0.55);
+      ctx.quadraticCurveTo(-r * 0.5, -r * 0.75, -r * 0.95, -r * 0.2);
+      ctx.quadraticCurveTo(-r * 0.45, -r * 0.2, -r * 0.15, r * 0.05);
+      ctx.moveTo(0, -r * 0.55);
+      ctx.quadraticCurveTo(r * 0.5, -r * 0.75, r * 0.95, -r * 0.2);
+      ctx.quadraticCurveTo(r * 0.45, -r * 0.2, r * 0.15, r * 0.05);
+      neon(ctx, c, lw * 0.9, 0.25);
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.75);
+      ctx.quadraticCurveTo(r * 0.22, -r * 0.1, 0, r * 0.35);
+      ctx.quadraticCurveTo(-r * 0.22, -r * 0.1, 0, -r * 0.75);
+      neon(ctx, '#fff1b8', lw * 0.7, 0.5);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.25, r * 0.4);
+      ctx.lineTo(-r * 0.35, r * 0.95);
+      ctx.moveTo(0, r * 0.4);
+      ctx.lineTo(0, r * 1.0);
+      ctx.moveTo(r * 0.25, r * 0.4);
+      ctx.lineTo(r * 0.35, r * 0.95);
+      neon(ctx, c, lw * 0.6);
+      break;
+    }
+    case 'tourelle':
+    case 'bastion': {
+      const big = id === 'bastion';
+      // Trépied
+      ctx.moveTo(0, r * 0.25);
+      ctx.lineTo(-r * 0.6, r * 0.9);
+      ctx.moveTo(0, r * 0.25);
+      ctx.lineTo(r * 0.6, r * 0.9);
+      ctx.moveTo(0, r * 0.25);
+      ctx.lineTo(0, r * 0.9);
+      neon(ctx, c, lw * 0.8);
+      // Dôme
+      ctx.beginPath();
+      ctx.arc(-r * 0.05, r * 0.2, r * (big ? 0.48 : 0.4), Math.PI, 0);
+      ctx.closePath();
+      neon(ctx, c, lw, 0.3);
+      // Canon(s), pointés vers le haut à droite
+      ctx.beginPath();
+      const offs = big ? [-0.14, 0.14] : [0];
+      for (const o of offs) {
+        ctx.moveTo(r * (0.1 + o), r * (0.0 + o));
+        ctx.lineTo(r * (0.85 + o), r * (-0.65 + o));
+      }
+      neon(ctx, c, lw * 1.2);
+      ctx.beginPath();
+      ctx.arc(-r * 0.05, r * 0.02, r * 0.1, 0, TAU);
+      solid(ctx, '#ffffff', lw * 0.4);
+      break;
+    }
+    case 'drone':
+    case 'escadrille': {
+      // Losange(s) en vol, avec leurs rotors
+      const pts = id === 'escadrille' ? [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]] : [[0, 0]];
+      const k = id === 'escadrille' ? 0.45 : 0.8;
+      for (const [px, py] of pts) {
+        const x = px * r;
+        const y = py * r;
+        ctx.moveTo(x + r * k, y);
+        ctx.lineTo(x, y + r * k * 0.6);
+        ctx.lineTo(x - r * k, y);
+        ctx.lineTo(x, y - r * k * 0.6);
+        ctx.closePath();
+      }
+      neon(ctx, c, lw * (id === 'escadrille' ? 0.7 : 1), 0.3);
+      if (id === 'drone') {
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.9, -r * 0.62);
+        ctx.lineTo(-r * 0.4, -r * 0.62);
+        ctx.moveTo(r * 0.4, -r * 0.62);
+        ctx.lineTo(r * 0.9, -r * 0.62);
+        neon(ctx, c, lw * 0.6);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.14, 0, TAU);
+        solid(ctx, '#ff4f9a', lw * 0.5);
+      }
+      ctx.beginPath();
+      ctx.arc(id === 'drone' ? 0 : -r * 0.45, id === 'drone' ? 0 : -r * 0.45, r * 0.1, 0, TAU);
+      solid(ctx, '#ffffff', lw * 0.4);
+      break;
+    }
+    case 'kamikazes': {
+      // Flèche qui pique sur une explosion
+      ctx.moveTo(-r * 0.8, -r * 0.8);
+      ctx.lineTo(-r * 0.05, -r * 0.35);
+      ctx.lineTo(-r * 0.35, -r * 0.05);
+      ctx.closePath();
+      neon(ctx, c, lw * 0.9, 0.4);
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const a = (k * TAU) / 8;
+        const rr = k & 1 ? r * 0.28 : r * 0.55;
+        const px = r * 0.3 + Math.cos(a) * rr;
+        const py = r * 0.3 + Math.sin(a) * rr;
+        if (k === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      neon(ctx, '#ffd23a', lw * 0.8, 0.35);
+      break;
+    }
+    case 'mortier': {
+      // Tube incliné + obus en cloche
+      ctx.moveTo(-r * 0.75, r * 0.85);
+      ctx.lineTo(-r * 0.25, r * 0.15);
+      ctx.moveTo(-r * 0.45, r * 0.95);
+      ctx.lineTo(-r * 0.05, r * 0.3);
+      neon(ctx, c, lw * 1.1);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.15, r * 0.1);
+      ctx.quadraticCurveTo(r * 0.25, -r * 0.9, r * 0.75, r * 0.2);
+      ctx.setLineDash([lw, lw * 1.5]);
+      neon(ctx, c, lw * 0.5);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(r * 0.3, -r * 0.42, r * 0.17, 0, TAU);
+      solid(ctx, '#ffffff', lw * 0.5);
+      ctx.beginPath();
+      ctx.ellipse(r * 0.75, r * 0.45, r * 0.25, r * 0.1, 0, 0, TAU);
+      neon(ctx, c, lw * 0.6);
+      break;
+    }
+    case 'meteores': {
+      // Deux météores en biais avec leurs traînées
+      for (const [mx, my, k] of [
+        [r * 0.35, r * 0.35, 1],
+        [-r * 0.35, -r * 0.05, 0.65],
+      ] as const) {
+        ctx.moveTo(mx - r * 0.55 * k, my - r * 0.8 * k);
+        ctx.lineTo(mx, my);
+      }
+      neon(ctx, c, lw * 0.8);
+      ctx.beginPath();
+      ctx.arc(r * 0.35, r * 0.35, r * 0.24, 0, TAU);
+      ctx.moveTo(-r * 0.35 + r * 0.16, -r * 0.05);
+      ctx.arc(-r * 0.35, -r * 0.05, r * 0.16, 0, TAU);
+      solid(ctx, c, lw * 0.6);
+      break;
+    }
+    case 'ricochet': {
+      // Disque à encoches + trajet en zigzag
+      ctx.moveTo(-r * 0.95, r * 0.7);
+      ctx.lineTo(-r * 0.4, -r * 0.1);
+      ctx.lineTo(0, r * 0.45);
+      ctx.setLineDash([lw, lw * 1.6]);
+      neon(ctx, c, lw * 0.6);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) {
+        const a0 = -0.4 + (k * TAU) / 3;
+        ctx.moveTo(r * 0.4 + Math.cos(a0 + 0.35) * r * 0.48, -r * 0.35 + Math.sin(a0 + 0.35) * r * 0.48);
+        ctx.arc(r * 0.4, -r * 0.35, r * 0.48, a0 + 0.35, a0 + TAU / 3 - 0.35);
+      }
+      neon(ctx, c, lw);
+      ctx.beginPath();
+      ctx.arc(r * 0.4, -r * 0.35, r * 0.15, 0, TAU);
+      solid(ctx, '#ffffff', lw * 0.5);
+      break;
+    }
     default:
       ctx.arc(0, 0, r * 0.6, 0, TAU);
       neon(ctx, c, lw);
