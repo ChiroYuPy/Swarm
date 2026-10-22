@@ -12,6 +12,7 @@ import {
   BOSS_PATTERNS,
   BOSS_SUMMONS,
   BOSS_TYPE,
+  HEXAGONE_TYPE,
   EGG_TYPE,
   ENEMY_BEHAVIOR,
   LEADER_SPEED,
@@ -433,7 +434,7 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       }
       break;
     case 'spiral': {
-      const c = e.type === BOSS_TYPE ? BOSS : HEXAGONE;
+      const c = e.type === BOSS_TYPE ? BOSS : e.type === HEXAGONE_TYPE ? HEXAGONE : REINE;
       const every = Math.max(1, Math.round(c.spiralEvery * TICK_RATE));
       if (elapsed % every === 0) {
         const arms = c.spiralArms + (e.type === BOSS_TYPE ? e.aux2 : 0);
@@ -601,13 +602,21 @@ function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
   }
 }
 
-/** Hexagone bâtisseur : une cage hexagonale de murs autour du joueur (ils montent, puis deviennent solides). */
+/**
+ * Hexagone bâtisseur : une cage hexagonale de murs autour du joueur (ils montent, puis deviennent solides),
+ * un cycle sur `cageEvery`, avec une sortie au milieu de deux côtés opposés. `ax` = cages déjà tentées.
+ */
 function buildCage(s: GameState, e: Enemy, p: Player): void {
+  e.ax++;
+  if ((e.ax - 1) % HEXAGONE.cageEvery !== 0) return;
   const R = HEXAGONE.cageRadius;
   const n = Math.max(1, Math.round(R / HEXAGONE.wallSpacing));
   const life = Math.round(HEXAGONE.wallLife * TICK_RATE);
   const solid = Math.round((HEXAGONE.wallLife - HEXAGONE.wallRise) * TICK_RATE);
   const hm = hpMul(s);
+  // Les sorties changent de côtés d'une cage à l'autre.
+  const gapSide = ((e.ax - 1) / HEXAGONE.cageEvery) % 3;
+  const g0 = Math.floor((n - HEXAGONE.gapWalls) / 2) + 1;
   for (let side = 0; side < 6; side++) {
     const a0 = (side * PI) / 3 + PI / 6;
     const a1 = a0 + PI / 3;
@@ -616,6 +625,7 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
     const x1 = p.x + dcos(a1) * R;
     const y1 = p.y + dsin(a1) * R;
     for (let j = 0; j < n; j++) {
+      if (side % 3 === gapSide && j >= g0 && j < g0 + HEXAGONE.gapWalls) continue;
       const x = x0 + ((x1 - x0) * j) / n;
       const y = y0 + ((y1 - y0) * j) / n;
       if (circleHitsObstacle(s.map, x, y, 4)) continue;
@@ -632,11 +642,12 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
 function layEggs(s: GameState, e: Enemy): void {
   let eggs = 0;
   for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === EGG_TYPE) eggs++;
-  e.aux++;
-  const n = Math.min(REINE.maxEggs - eggs, e.aux % REINE.bigEvery === 0 ? 3 : 1);
+  // ay = pontes déjà faites (aux sert à la spirale de dards)
+  e.ay++;
+  const n = Math.min(REINE.maxEggs - eggs, e.ay % REINE.bigEvery === 0 ? 3 : 1);
   const hm = hpMul(s);
   for (let k = 0; k < n; k++) {
-    const a = (k * TWO_PI) / 3 + e.aux;
+    const a = (k * TWO_PI) / 3 + e.ay;
     const egg = spawnEnemy(s, EGG_TYPE, e.x + (n > 1 ? dcos(a) * 34 : 0), e.y + (n > 1 ? dsin(a) * 34 : 0), hm, 1, 1, e.target);
     if (!egg) return;
     egg.timer = Math.round(REINE.hatchAfter * TICK_RATE) + k * 12;
@@ -650,7 +661,7 @@ function hatch(s: GameState, egg: Enemy): void {
   const n = REINE.hatchCount;
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / n;
-    spawnEnemy(s, SWARM_TYPE, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s), dmgMul(s), spdMul(s), egg.target);
+    spawnEnemy(s, SWARM_TYPE, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s) * REINE.broodHp, dmgMul(s), spdMul(s), egg.target);
   }
   emit(s, EV_HATCH, egg.x, egg.y, n);
 }
@@ -676,7 +687,7 @@ function summon(s: GameState, boss: Enemy, p: Player): void {
     const x = cx + dcos(a) * R;
     const y = cy + dsin(a) * R;
     if (circleHitsObstacle(s.map, x, y, r)) continue;
-    spawnEnemy(s, sm.typeId, x, y, hpMul(s), dmgMul(s), spdMul(s), boss.target);
+    spawnEnemy(s, sm.typeId, x, y, hpMul(s) * (sm.hp ?? 1), dmgMul(s), spdMul(s), boss.target);
   }
   if (!self) emit(s, EV_RING_WAVE, p.x, p.y, n);
 }

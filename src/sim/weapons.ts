@@ -525,6 +525,8 @@ export function spawnRing(s: GameState, p: Player, slot: number, def: number, x:
   b.a = (L.radius ?? 140) * p.stats.area;
   b.b = dur;
   b.c = Math.round((L.stun ?? 0) * TICK_RATE);
+  b.d = L.slow ?? 0;
+  b.tx = Math.round((L.slowTime ?? 0) * TICK_RATE);
   b.r = 0;
   b.damage = L.damage * p.stats.might;
   b.knock = L.knockback ?? 250;
@@ -557,8 +559,10 @@ function facing(p: Player): number {
 }
 
 export const WHIP_FX_TICKS = 16;
+/** écart entre deux lanières du Fouet (1/20 de tour) */
+const WHIP_STEP = TWO_PI / 20;
 
-/** Fouet : des lanières qui claquent autour de toi, blessent et repoussent loin dans leur axe. */
+/** Fouet : des lanières en éventail devant toi (1/5 de tour au plus), qui blessent et repoussent loin dans leur axe. */
 function whip(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;
   w.timer -= 1;
@@ -576,8 +580,8 @@ function whip(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   const dmg = L.damage * p.stats.might;
   const g = s.grid;
   for (let k = 0; k < n; k++) {
-    // Fouets répartis tout autour, le premier devant toi.
-    const a = base + (k * TWO_PI) / n;
+    // Éventail centré devant toi : 18° entre deux lanières, 72° pour 5.
+    const a = base + (k - (n - 1) / 2) * WHIP_STEP;
     w.angles[k] = a;
     const ux = dcos(a);
     const uy = dsin(a);
@@ -647,7 +651,10 @@ function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }
 
-/** Lance-flammes (jets figés dans leur direction de départ, comme le laser) / Tornade de feu (jets qui tournent sans arrêt). */
+/**
+ * Lance-flammes : des jets côte à côte, centrés là où tu vises, figés dans leur direction de départ (comme le laser).
+ * Tornade de feu : des jets répartis tout autour, qui tournent sans arrêt.
+ */
 function flame(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   const len = (L.length ?? 135) * p.stats.area;
   const arc = L.arc ?? 0.32;
@@ -674,7 +681,7 @@ function flame(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
     w.timer = RETRY_TICKS;
     return;
   }
-  for (let b = 0; b < n; b++) w.angles[b] = AIM + (b * TWO_PI) / n;
+  for (let b = 0; b < n; b++) w.angles[b] = AIM + (b - (n - 1) / 2) * 2 * arc;
   w.activeTicks = ticks(L.duration, 1.4);
   w.tickTimer = 0;
   w.timer += cdTicks(L, p);
@@ -873,6 +880,9 @@ export function spawnDisc(s: GameState, p: Player, slot: number, def: number, x:
   b.life = ticks(L.life, 3);
 }
 
+/** le Mortier ne vise pas les ennemis plus près que ça de toi */
+const MORTAR_MIN = 200;
+
 /** Candidats du Mortier (copiés : la recherche de voisins réutilise la grille). */
 const CAND = new Int32Array(24);
 
@@ -915,7 +925,7 @@ function mortar(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponL
   hitN = 0;
   let fired = 0;
   for (let k = 0; k < n; k++) {
-    const t = mortarTarget(s, p, range, L.meteor ? 0 : 150);
+    const t = mortarTarget(s, p, range, L.meteor ? 0 : MORTAR_MIN);
     if (t < 0) break;
     const e = s.enemies[t];
     HITS[hitN++] = e.id;
@@ -984,35 +994,45 @@ export function spawnShell(
   b.pierce = -1;
 }
 
-/** Phénix : un oiseau de feu qui file droit, fait demi-tour en planant et revient (voir projectiles.ts). */
+/**
+ * Phénix : des oiseaux de feu qui partent à travers la horde sans revenir (voir projectiles.ts).
+ * Comme les drones, l'arme complète l'effectif : un oiseau éteint renaît près de toi après `respawn` s.
+ */
 function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
+  const n = L.count ?? 1;
+  let alive = 0;
+  for (let i = 0; i < s.projCount; i++) {
+    const b = s.projectiles[i];
+    if (b.kind === PJ_PHOENIX && b.owner === p.index && b.weapon === w.def && b.life > 0) alive++;
+  }
+  if (alive >= n) {
+    w.timer = ticks(L.respawn, 0.8);
+    return;
+  }
   w.timer -= 1;
   if (w.timer > 0) return;
-  const range = L.range ?? 460;
-  if (!aim(s, p, range)) {
+  if (!aim(s, p, 520)) {
     w.timer = RETRY_TICKS;
     return;
   }
   const b = spawnProjectile(s);
-  if (b) {
-    b.kind = PJ_PHOENIX;
-    b.owner = p.index;
-    b.slot = slot;
-    b.weapon = w.def;
-    b.x = b.px = p.x;
-    b.y = b.py = p.y;
-    b.vx = dcos(AIM);
-    b.vy = dsin(AIM);
-    b.a = 0;
-    b.b = range;
-    b.c = 0;
-    b.d = 0;
-    b.r = (L.size ?? 28) * p.stats.area;
-    b.damage = L.damage * p.stats.might;
-    b.knock = L.knockback ?? 60;
-    b.pierce = -1;
-    b.life = 6 * TICK_RATE;
-  }
-  w.timer += cdTicks(L, p);
+  if (!b) return;
+  // Le deuxième oiseau part un peu de biais, pour ne pas suivre le premier.
+  const a = AIM + (alive & 1 ? 0.6 : -0.3);
+  b.kind = PJ_PHOENIX;
+  b.owner = p.index;
+  b.slot = slot;
+  b.weapon = w.def;
+  b.x = b.px = p.x;
+  b.y = b.py = p.y;
+  b.vx = dcos(a);
+  b.vy = dsin(a);
+  b.c = -1;
+  b.r = (L.size ?? 26) * p.stats.area;
+  b.damage = L.damage * p.stats.might;
+  b.knock = L.knockback ?? 40;
+  b.pierce = -1;
+  b.life = ticks(L.life, 4);
+  w.timer = 15; // le suivant ne part pas dans la même image
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }

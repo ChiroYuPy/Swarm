@@ -546,7 +546,7 @@ export class Effects {
 export function offerLabel(kind: number, id: number, toLevel: number): string {
   if (kind === OFFER_WEAPON) return `${ALL_WEAPONS[id].name} niv. ${toLevel}`;
   if (kind === OFFER_PASSIVE) return `${PASSIVES[id].name} niv. ${toLevel}`;
-  if (kind === OFFER_FUSION) return `Fusion : ${ALL_WEAPONS[FUSION_TABLE[id].result].name}`;
+  if (kind === OFFER_FUSION) return `Évolution : ${ALL_WEAPONS[FUSION_TABLE[id].result].name}`;
   return PICKUPS[0].name;
 }
 

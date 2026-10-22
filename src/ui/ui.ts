@@ -216,10 +216,13 @@ function weaponNumbers(id: string, level: number, might: number, cooldownMul: nu
   return out.join(' · ');
 }
 
-const fusionPartner = (i: number) => {
-  const f = FUSIONS[i];
-  return f.withKind === 'weapon' ? ALL_WEAPONS.find((x) => x.id === f.with)! : PASSIVES.find((x) => x.id === f.with)!;
-};
+const fusionPartner = (i: number) => PASSIVES.find((x) => x.id === FUSIONS[i].with)!;
+
+/** « Niveau max : évolue avec X (ou Y) au niveau 5. », ou rien si l'arme n'a pas d'évolution. */
+function evolutionHint(weaponId: string): string {
+  const names = FUSIONS.filter((f) => f.weapon === weaponId).map((f) => PASSIVES.find((x) => x.id === f.with)!.name);
+  return names.length ? `Niveau max : évolue avec ${names.join(' ou ')} au niveau 5.` : '';
+}
 
 // ---------- Codex : données ----------
 interface CodexItem {
@@ -308,8 +311,7 @@ function chip(tab: CodexTab, id: string, suffix = ''): string {
 
 function recipe(i: number): string {
   const f = FUSIONS[i];
-  const partnerTab: CodexTab = f.withKind === 'weapon' ? 'armes' : 'bonus';
-  return `<div class="recipe">${chip('armes', f.weapon, ' niv. 5')}<span>+</span>${chip(partnerTab, f.with, ' niv. 5')}<span>→</span>${chip('fusions', f.result)}</div>`;
+  return `<div class="recipe">${chip('armes', f.weapon, ' niv. 5')}<span>+</span>${chip('bonus', f.with, ' niv. 5')}<span>→</span>${chip('fusions', f.result)}</div>`;
 }
 
 function rows(list: [string, string][]): string {
@@ -326,16 +328,16 @@ function codexDetail(it: CodexItem): string {
       tag = 'Arme';
       desc = w.desc;
       body = `<h3>Niveaux</h3>${rows(w.levelText.map((t, k) => [`Niv. ${k + 1}`, t]))}`;
-      const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.weapon === it.id || (f.withKind === 'weapon' && f.with === it.id));
-      if (fi.length) body += `<h3>Fusion</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
+      const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.weapon === it.id);
+      if (fi.length) body += `<h3>${fi.length > 1 ? 'Évolutions' : 'Évolution'}</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
     case 'fusions': {
       const w = ALL_WEAPONS.find((x) => x.id === it.id)!;
       const i = FUSIONS.findIndex((f) => f.result === it.id);
-      tag = 'Fusion';
+      tag = 'Évolution';
       desc = w.desc;
-      body = `<h3>Effet</h3><p>${esc(w.levelText[0])}</p><h3>Recette</h3>${recipe(i)}<p class="hint">Proposée au level-up quand les deux sont au niveau 5, ou offerte par le coffre du boss. Elle remplace l’arme d’origine.</p>`;
+      body = `<h3>Effet</h3><p>${esc(w.levelText[0])}</p><h3>Recette</h3>${recipe(i)}<p class="hint">Proposée au level-up quand l’arme et le passif sont au niveau 5, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement, et tu gardes le passif.</p>`;
       break;
     }
     case 'bonus': {
@@ -343,8 +345,8 @@ function codexDetail(it: CodexItem): string {
       tag = 'Passif';
       desc = p.desc;
       body = `<h3>Par niveau</h3><p>${esc(p.effect)}</p><h3>Total</h3>${rows([1, 2, 3, 4, 5].map((l) => [`Niv. ${l}`, passiveTotal(p, l)]))}`;
-      const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.withKind === 'passive' && f.with === it.id);
-      if (fi.length) body += `<h3>Fusion</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
+      const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.with === it.id);
+      if (fi.length) body += `<h3>${fi.length > 1 ? 'Évolutions' : 'Évolution'}</h3>${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
     case 'objets': {
@@ -1162,7 +1164,7 @@ export class UI {
         <div class="panel loadout">
           <h3>Armes <small class="slots" data-slots="w"></small></h3>
           <div class="tiles">${BASE_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
-          <h3>Fusions</h3>
+          <h3>Évolutions</h3>
           <div class="tiles">${FUSED_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
           <h3>Passifs <small class="slots" data-slots="p"></small></h3>
           <div class="tiles">${PASSIVES.map((x) => kit('p', x.id, x.name, x.color, `passive:${x.id}`)).join('')}</div>
@@ -1495,7 +1497,7 @@ export class UI {
     const cats: [CodexTab, string, number][] = [
       ['regles', 'Comment jouer', 0],
       ['armes', 'Armes', BASE_WEAPONS.length],
-      ['fusions', 'Fusions', FUSIONS.length],
+      ['fusions', 'Évolutions', FUSIONS.length],
       ['bonus', 'Passifs', PASSIVES.length],
       ['objets', 'Objets', codexItems('objets').length],
       ['ennemis', 'Ennemis', codexItems('ennemis').length],
@@ -1617,7 +1619,7 @@ export class UI {
           tag = owned ? `Arme · niveau ${owned} → ${o.toLevel}` : `Nouvelle arme · ${slots.weapons + 1}/${MAX_WEAPON_SLOTS}`;
           name = d.name;
           line = d.levelText[Math.max(0, o.toLevel - 1)];
-          sub = owned ? (o.toLevel === 5 ? 'Niveau max : fusion possible avec son partenaire.' : '') : d.desc;
+          sub = owned ? (o.toLevel === 5 ? evolutionHint(d.id) : '') : d.desc;
           color = d.color;
           iconId = d.id;
           pips = this.pips(o.toLevel, 5);
@@ -1634,7 +1636,7 @@ export class UI {
           pips = this.pips(o.toLevel, 5);
         } else if (o.kind === OFFER_SWAP) {
           const d = ALL_WEAPONS[o.id];
-          tag = d.fusion ? 'Échange · fusion' : `Échange · niveau ${o.toLevel}`;
+          tag = d.fusion ? 'Échange · évolution' : `Échange · niveau ${o.toLevel}`;
           name = d.name;
           line = d.fusion ? d.levelText[0] : d.levelText[Math.max(0, o.toLevel - 1)];
           sub = swapping ? `Remplace ${swapping.name}` : '';
@@ -1644,7 +1646,7 @@ export class UI {
         } else if (o.kind === OFFER_FUSION) {
           const f = FUSION_TABLE[o.id];
           const r = weaponDef(f.result);
-          tag = 'Fusion';
+          tag = 'Évolution';
           name = r.name;
           line = r.levelText[0];
           sub = `${weaponDef(f.weapon).name} + ${fusionPartner(o.id).name}`;
@@ -1743,7 +1745,7 @@ export class UI {
     const w = b.weapons
       .map((x) => {
         const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
-        const lvl = x.fusion ? '<span class="lv max">Fusion</span>' : `<span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>`;
+        const lvl = x.fusion ? '<span class="lv max">Évolution</span>' : `<span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>`;
         const info = detailed
           ? `<small>${esc(x.fusion ? d.levelText[0] : d.levelText[x.level - 1])}</small><small class="num">${esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))}</small>`
           : '';

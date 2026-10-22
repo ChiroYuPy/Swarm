@@ -140,7 +140,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 2000, speed: 68, damage: 20, radius: 46, xp: 0, kbResist: 1,
   },
   {
-    id: 'hexagone', name: 'Hexagone bâtisseur', desc: 'Boss : t’enferme dans une cage de murs puis tire à travers. Casse un mur pour sortir (ils tombent seuls au bout de 6 s).',
+    id: 'hexagone', name: 'Hexagone bâtisseur', desc: 'Boss : un cycle sur deux, il dresse une cage de murs autour de toi puis tire à travers. Elle a deux sorties, et les murs tombent seuls au bout de 6 s.',
     behavior: 'boss', shape: 'hexagon', color: '#3dffe0',
     hp: 2100, speed: 54, damage: 22, radius: 44, xp: 0, kbResist: 1,
   },
@@ -155,9 +155,9 @@ export const ENEMIES: EnemyDef[] = [
     hp: 2100, speed: 66, damage: 20, radius: 42, xp: 0, kbResist: 1,
   },
   {
-    id: 'reine', name: 'Reine de l’essaim', desc: 'Boss : te fuit en pondant des œufs qui éclosent en Essaim. Casse les œufs et rattrape-la.',
+    id: 'reine', name: 'Reine de l’essaim', desc: 'Boss : te fuit en pondant des œufs qui éclosent en Essaim coriace, lâche des gerbes de dards et appelle sa nuée. Casse les œufs et rattrape-la.',
     behavior: 'boss', shape: 'queen', color: '#ff9ecf',
-    hp: 1700, speed: 100, damage: 18, radius: 40, xp: 0, kbResist: 1,
+    hp: 3400, speed: 100, damage: 18, radius: 40, xp: 0, kbResist: 1,
   },
   {
     id: 'mur', name: 'Mur', desc: 'Posé par l’Hexagone bâtisseur.',
@@ -204,6 +204,8 @@ export interface BossSummon {
   around: 'self' | 'player';
   radius: number;
   maxAlive: number;
+  /** PV des renforts × hp (1 par défaut) */
+  hp?: number;
 }
 
 /** Les boss arrivent toujours dans cet ordre, puis on reboucle en « Mk II », « Mk III »… */
@@ -258,6 +260,10 @@ export const HEXAGONE = {
   /** rayon de la cage (hexagone) et écart entre deux murs */
   cageRadius: 210,
   wallSpacing: 27,
+  /** une cage seulement tous les N cycles */
+  cageEvery: 2,
+  /** murs manquants au milieu de deux côtés opposés (les sorties) */
+  gapWalls: 3,
   /** durée de vie d'un mur, dont la montée (pas encore solide) */
   wallLife: 6.5,
   wallRise: 0.6,
@@ -327,19 +333,31 @@ export const OEIL = {
 /** Reine de l'essaim : fuit (plus lente que toi) et pond des œufs qui éclosent en Essaim. */
 export const REINE = {
   pattern: [
-    { kind: 'flee', duration: 1.2 },
+    { kind: 'flee', duration: 0.9 },
     { kind: 'lay', duration: 0.3 },
+    { kind: 'flee', duration: 0.9 },
+    { kind: 'lay', duration: 0.3 },
+    { kind: 'spiral', duration: 2.2 },
+    { kind: 'flee', duration: 0.9 },
+    { kind: 'summon', duration: 0.6 },
   ] as BossPhase[],
   keepMin: 260,
   keepMax: 400,
   /** une ponte sur `bigEvery` est triple */
-  bigEvery: 3,
-  hatchAfter: 3.6,
-  hatchCount: 5,
-  maxEggs: 8,
+  bigEvery: 2,
+  hatchAfter: 2.6,
+  hatchCount: 7,
+  maxEggs: 14,
+  /** PV de l'Essaim qui éclot (× les PV normaux) : une zone ne suffit plus à tout raser */
+  broodHp: 4,
+  /** gerbe de dards en spirale */
+  spiralEvery: 0.12,
+  spiralArms: 3,
+  spiralTurn: 0.38,
   /** à chaque ponte, une salve vers le joueur */
   volleyCount: 3,
   volleySpread: 0.22,
   bulletSpeed: 190,
   bulletDamage: 10,
+  summon: { type: 'points', count: 18, perBoss: 4, around: 'self', radius: 70, maxAlive: 70, hp: 4 } as BossSummon,
 };

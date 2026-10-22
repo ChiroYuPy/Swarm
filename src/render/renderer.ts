@@ -735,7 +735,7 @@ export class Renderer {
       const e = s.enemies[i];
       if (!e.alive || e.type !== WALL_TYPE || e.ai !== 0 || !this.visible(e.x, e.y, e.r)) continue;
       const prog = Math.max(0, Math.min(1, 1 - (e.timer - e.aux) / rise));
-      this.polygon(e.x, e.y, 6, e.r * (0.4 + 0.6 * prog), Math.PI / 6);
+      this.polygon(e.x, e.y, 6, e.r * (0.4 + 0.6 * prog), 0);
       any = true;
     }
     if (!any) return;
@@ -1151,16 +1151,11 @@ export class Renderer {
       this.spriteAt(b.a === 1 ? sp.breakableBullet : sp.enemyBullet, x, y);
     }
 
-    // Ondes (klaxon) : peu nombreuses, vectorielles
+    // Ondes de choc (Onde de choc, Séisme, Bastion) : peu nombreuses, vectorielles.
     for (let i = 0; i < s.projCount; i++) {
       const b = s.projectiles[i];
-      if (b.kind !== PJ_RING) continue;
-      const f = Math.min(1, (b.age + alpha) / b.b);
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, Math.max(1, b.a * f), 0, Math.PI * 2);
-      ctx.globalAlpha = 1 - f * 0.7;
-      this.glow(ALL_WEAPONS[b.weapon].color, 4);
-      ctx.globalAlpha = 1;
+      if (b.kind !== PJ_RING || !this.visible(b.x, b.y, b.a)) continue;
+      this.drawShockwave(b.x, b.y, b.a, Math.min(1, (b.age + alpha) / b.b), ALL_WEAPONS[b.weapon].color, b.d >= 0.5, i);
     }
   }
 
@@ -1257,6 +1252,81 @@ export class Renderer {
       if (typeof createImageBitmap === 'function') createImageBitmap(cv).then((bmp) => this.puffs.set(color, bmp), () => {});
     }
     return img;
+  }
+
+  /**
+   * Onde de choc : un front épais qui file (rapide puis freiné), une bande d'air comprimé derrière lui,
+   * deux échos plus fins et des stries de poussière soufflées vers l'extérieur. `quake` (Séisme, qui ralentit
+   * fort) : le sol se fissure en étoile sous l'onde. `f` = avancement (0..1).
+   */
+  private drawShockwave(x: number, y: number, maxR: number, f: number, color: string, quake: boolean, seed: number): void {
+    const ctx = this.ctx;
+    const e = 1 - (1 - f) * (1 - f);
+    const R = Math.max(2, maxR * e);
+    const fade = 1 - f;
+    // Bande d'air comprimé, plus dense contre le front.
+    for (let k = 0; k < 3; k++) {
+      const r0 = R * (1 - 0.1 * (k + 1));
+      const r1 = R * (1 - 0.1 * k);
+      ctx.beginPath();
+      ctx.arc(x, y, r1, 0, Math.PI * 2);
+      ctx.arc(x, y, r0, Math.PI * 2, 0, true);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = (0.2 - k * 0.06) * fade;
+      ctx.fill();
+    }
+    // Échos
+    for (const [k, w] of [
+      [0.84, 1.5],
+      [0.7, 1],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x, y, R * k, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.globalAlpha = 0.45 * fade;
+      ctx.stroke();
+    }
+    // Front
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.globalAlpha = 0.4 + 0.6 * fade;
+    this.glow(color, 2 + 4 * fade);
+    // Stries de poussière juste devant le front.
+    ctx.beginPath();
+    const N = 18;
+    for (let k = 0; k < N; k++) {
+      const a = ((k + hash01(seed * 31 + k) * 0.6) / N) * Math.PI * 2;
+      const r0 = R * (1.02 + 0.04 * hash01(k * 7 + seed));
+      const r1 = r0 + 6 + 14 * fade;
+      ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
+      ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.6 * fade;
+    ctx.stroke();
+    if (quake) {
+      // Fissures en zigzag, du centre jusqu'au front.
+      ctx.beginPath();
+      for (let c = 0; c < 7; c++) {
+        let a = ((c + hash01(seed * 13 + c)) / 7) * Math.PI * 2;
+        let px = x;
+        let py = y;
+        ctx.moveTo(px, py);
+        const steps = 5;
+        for (let k = 1; k <= steps; k++) {
+          a += (hash01(seed * 17 + c * 5 + k) - 0.5) * 0.7;
+          const r = (R * k) / steps;
+          px = x + Math.cos(a) * r;
+          py = y + Math.sin(a) * r;
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.globalAlpha = 0.85 * fade;
+      this.glow(color, 2);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**

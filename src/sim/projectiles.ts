@@ -5,7 +5,7 @@ import { clearShotsIn } from './shots';
 import { pointInObstacle } from './map';
 import { TWO_PI, datan2, dcos, dsin, turnToward } from './dmath';
 import { removeProjectile } from './entities';
-import { damageEnemy, explode, healPlayer, hurtPlayer } from './combat';
+import { damageEnemy, explode, hurtPlayer } from './combat';
 import { weaponLevel } from './registry';
 import { DRONE_LIFE, huntTarget, spawnBlaze, spawnBullet, spawnDisc, spawnMine, spawnRing, ticks } from './weapons';
 import {
@@ -318,8 +318,9 @@ function ownerWeapon(o: Player, def: number): WeaponInst | null {
 
 /**
  * Drone autonome : il part chasser une cible (les gênants d'abord, sauf les kamikazes qui foncent dans le tas),
- * en évitant celles que tes autres drones visent déjà. Il vole comme un avion : il ne tourne qu'en avançant,
- * fait des passes de tir (il ne tire que devant lui), puis dégage et revient. Abattu au contact des ennemis,
+ * en évitant celles que tes autres drones visent déjà. Il vole comme un avion : il ne tourne qu'en avançant
+ * et ne tire que devant lui. Drone : passes de tir, puis il dégage et revient. Escadrille (`orbit`) : il tourne
+ * autour de sa cible à distance et lance ses disques chercheurs droit devant. Abattu au contact des ennemis,
  * il réapparaît près de toi. `tx` = ticks de dégagement restants après une passe.
  */
 function droneAgent(s: GameState, b: Projectile): boolean {
@@ -351,6 +352,11 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     // Dégagement : il s'écarte en biais de sa cible avant de revenir pour une nouvelle passe.
     b.tx--;
     desired = heading + (b.d & 1 ? 1 : -1);
+  } else if (e && L.orbit) {
+    // Vise un point du cercle autour de la cible, un peu en avant de lui : il tourne autour.
+    const keep = (L.attackRange ?? 280) * 0.7;
+    const a = datan2(b.y - e.y, b.x - e.x) + (b.d & 1 ? 0.6 : -0.6);
+    desired = datan2(e.y + dsin(a) * keep - b.y, e.x + dcos(a) * keep - b.x);
   } else if (e) {
     const ex = e.x - b.x;
     const ey = e.y - b.y;
@@ -404,7 +410,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     return true;
   }
 
-  // Tir : seulement si la cible est devant lui, à portée.
+  // Tir : seulement si la cible est devant lui, à portée (en orbite, ses disques chercheurs la rattrapent).
   b.a -= 1;
   if (b.a <= 0 && e) {
     const ex = e.x - b.x;
@@ -414,8 +420,8 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     let diff = ang - h;
     while (diff > Math.PI) diff -= TWO_PI;
     while (diff < -Math.PI) diff += TWO_PI;
-    if (ex * ex + ey * ey <= reach * reach && Math.abs(diff) < DRONE_CONE) {
-      if (L.bounces) spawnDisc(s, o, b.slot, b.weapon, b.x, b.y, ang, L);
+    if (ex * ex + ey * ey <= reach * reach && (L.orbit || Math.abs(diff) < DRONE_CONE)) {
+      if (L.bounces) spawnDisc(s, o, b.slot, b.weapon, b.x, b.y, L.orbit ? h : ang, L);
       else {
         const t = spawnBullet(s, o, b.slot, b.weapon, ang, L, b.x, b.y);
         if (t) t.life = Math.max(1, Math.round(((reach + 60) / (L.shotSpeed ?? 600)) * TICK_RATE));
@@ -492,34 +498,47 @@ function shell(s: GameState, b: Projectile): boolean {
 }
 
 /**
- * Phénix : il file droit sur `b` pixels, puis fait demi-tour en planant (virage limité, qui se resserre
- * pour toujours finir par te rejoindre) et revient vers toi. Il brûle chaque ennemi touché (au plus une fois
- * par `hitCd`), soigne un peu, et laisse une traînée de feu au sol.
- * a = 0 aller / 1 retour, c = distance parcourue, d = secondes depuis le demi-tour, (vx, vy) = cap.
+ * Phénix : il vole sans jamais revenir, en virant (virage limité) vers l'ennemi le plus proche qu'il n'a pas
+ * brûlé récemment : il zigzague ainsi à travers la horde. Il brûle chaque ennemi touché (au plus une fois
+ * par `hitCd`) et laisse une traînée de feu au sol. c = index de sa cible (ty = son id), (vx, vy) = cap.
  */
 function phoenix(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
   if (!o || !o.alive) return true;
   const L = weaponLevel(b.weapon, 1);
-  const speed = L.speed ?? 520;
+  const key = b.owner * MAX_WEAPON_SLOTS + (b.slot % MAX_WEAPON_SLOTS);
+  const g = s.grid;
+  if (b.age % 8 === 1 || !validTarget(s, b)) {
+    b.c = -1;
+    let bestD = PHOENIX_SEEK * PHOENIX_SEEK;
+    const m = g.query(s.enemies, b.x, b.y, PHOENIX_SEEK);
+    for (let q = 0; q < m; q++) {
+      const e = s.enemies[g.out[q]];
+      if (!e.alive || e.speed === 0 || e.immune[key] > s.tick) continue;
+      const dx = e.x - b.x;
+      const dy = e.y - b.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) {
+        bestD = d;
+        b.c = g.out[q];
+      }
+    }
+    if (b.c >= 0) b.ty = s.enemies[b.c].id;
+  }
+  const speed = L.speed ?? 470;
   let sp = speed;
-  if (b.a === 0 && b.c >= b.b) b.a = 1;
-  if (b.a === 1) {
-    const dx = o.x - b.x;
-    const dy = o.y - b.y;
-    if (dx * dx + dy * dy < 28 * 28) return true;
-    b.d += DT;
+  if (b.c >= 0) {
+    const e = s.enemies[b.c];
     const heading = datan2(b.vy, b.vx);
-    const max = (L.turn ?? 4.2) * DT * (1 + b.d * 1.5);
-    const h = turnToward(heading, datan2(dy, dx), max);
+    const max = (L.turn ?? 3) * DT;
+    const h = turnToward(heading, datan2(e.y - b.y, e.x - b.x), max);
     // Il ralentit un peu au plus serré du virage.
-    sp = speed * (1 - 0.3 * (Math.abs(h - heading) / max));
+    sp = speed * (1 - 0.25 * (Math.abs(h - heading) / max));
     b.vx = dcos(h);
     b.vy = dsin(h);
   }
   b.x += b.vx * sp * DT;
   b.y += b.vy * sp * DT;
-  b.c += sp * DT;
   if (b.age % PHOENIX_TRAIL === 0) {
     spawnBlaze(
       s,
@@ -527,16 +546,13 @@ function phoenix(s: GameState, b: Projectile): boolean {
       b.weapon,
       b.x,
       b.y,
-      (L.blazeRadius ?? 26) * o.stats.area,
-      (L.blazeDamage ?? 14) * o.stats.might,
-      ticks(L.blazeLife, 1.4),
+      (L.blazeRadius ?? 28) * o.stats.area,
+      (L.blazeDamage ?? 18) * o.stats.might,
+      ticks(L.blazeLife, 1.8),
     );
   }
-  const key = b.owner * MAX_WEAPON_SLOTS + (b.slot % MAX_WEAPON_SLOTS);
   const hitCd = Math.round((L.hitCd ?? 0.35) * TICK_RATE);
-  const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, b.r);
-  let heal = 0;
   for (let k = 0; k < n; k++) {
     const idx = g.out[k];
     const e = s.enemies[idx];
@@ -547,13 +563,13 @@ function phoenix(s: GameState, b: Projectile): boolean {
     if (ex * ex + ey * ey >= rr * rr) continue;
     e.immune[key] = s.tick + hitCd;
     damageEnemy(s, idx, b.damage, b.owner, b.vx * b.knock, b.vy * b.knock);
-    heal += b.damage * (L.lifesteal ?? 0);
   }
-  if (heal > 0) healPlayer(s, o, Math.min(heal, 6), false);
   return false;
 }
 /** une flaque de feu tous les N ticks derrière le Phénix */
 const PHOENIX_TRAIL = 5;
+/** distance à laquelle le Phénix repère sa prochaine proie */
+const PHOENIX_SEEK = 360;
 
 function mine(s: GameState, b: Projectile): boolean {
   if (b.age < b.a) return false;
@@ -661,6 +677,10 @@ function ring(s: GameState, b: Projectile): boolean {
     const nx = d > 0.001 ? dx / d : 0;
     const ny = d > 0.001 ? dy / d : 0;
     if (b.c > 0 && !(e.flags & EF_BOSS)) e.stunUntil = Math.max(e.stunUntil, s.tick + b.c);
+    if (b.d > 0) {
+      e.slowFactor = e.slowUntil > s.tick ? Math.max(e.slowFactor, b.d) : b.d;
+      e.slowUntil = Math.max(e.slowUntil, s.tick + b.tx);
+    }
     damageEnemy(s, idx, b.damage, b.owner, nx * b.knock, ny * b.knock);
   }
   return false;

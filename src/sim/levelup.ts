@@ -86,20 +86,15 @@ function makeOffer(p: Player, u: UniverseItem): Offer | null {
   return p.passives.length < MAX_PASSIVE_SLOTS ? { kind: u.kind, id: u.id, toLevel: 1 } : null;
 }
 
-/** Index des fusions disponibles pour ce joueur (ordre de priorité des données). */
+/** Index des évolutions disponibles pour ce joueur (ordre de priorité des données). */
 export function availableFusions(p: Player): number[] {
   const out: number[] = [];
   for (let i = 0; i < FUSION_TABLE.length; i++) {
     const f = FUSION_TABLE[i];
     const w = findWeapon(p, f.weapon);
     if (!w || w.level < weaponMaxLevel(f.weapon)) continue;
-    if (f.withPassive) {
-      const ps = findPassive(p, f.with);
-      if (!ps || ps.level < MAX_ITEM_LEVEL) continue;
-    } else {
-      const w2 = findWeapon(p, f.with);
-      if (!w2 || w2.level < weaponMaxLevel(f.with)) continue;
-    }
+    const ps = findPassive(p, f.with);
+    if (!ps || ps.level < MAX_ITEM_LEVEL) continue;
     out.push(i);
   }
   return out;
@@ -111,7 +106,7 @@ export function rollOffers(s: GameState, p: Player): void {
   p.offerLevel = level;
   const offers: Offer[] = [];
   const fusions = availableFusions(p);
-  // Toutes les fusions possibles sont proposées (une arme peut en avoir deux : à toi de choisir).
+  // Toutes les évolutions possibles sont proposées (une arme peut en avoir deux : à toi de choisir).
   for (const f of fusions) if (offers.length < 3) offers.push({ kind: OFFER_FUSION, id: f, toLevel: 1 });
   const order = offerOrder(s.seed, level);
   for (const idx of order) {
@@ -144,11 +139,6 @@ export function applyFusion(s: GameState, p: Player, fusionIndex: number): boole
   w.activeTicks = 0;
   w.tickTimer = 0;
   p.banned.push(f.weapon);
-  if (!f.withPassive) {
-    const bi = p.weapons.findIndex((x) => x.def === f.with);
-    if (bi >= 0) p.weapons.splice(bi, 1);
-    p.banned.push(f.with);
-  }
   emit(s, EV_FUSION, p.x, p.y, f.result, 0, 0, 0, p.index);
   return true;
 }
@@ -184,7 +174,7 @@ function applyOfferEffect(s: GameState, p: Player, o: Offer): void {
 
 // ---------- Échange d'arme ----------
 
-/** Armes contre lesquelles l'arme de l'emplacement `slot` peut s'échanger (base ↔ base, fusion ↔ fusion). */
+/** Armes contre lesquelles l'arme de l'emplacement `slot` peut s'échanger (base ↔ base, évolution ↔ évolution). */
 function swapCandidates(p: Player, slot: number): number[] {
   const w = p.weapons[slot];
   if (!w) return [];
@@ -193,8 +183,8 @@ function swapCandidates(p: Player, slot: number): number[] {
     for (let id = 0; id < BASE_WEAPONS.length; id++) if (!findWeapon(p, id) && !p.banned.includes(id)) out.push(id);
   } else {
     for (const f of FUSION_TABLE) {
-      // Une fusion dont on tient encore une arme d'origine ferait doublon : exclue.
-      if (findWeapon(p, f.result) || findWeapon(p, f.weapon) || (!f.withPassive && findWeapon(p, f.with))) continue;
+      // Une évolution dont on tient encore l'arme d'origine ferait doublon : exclue.
+      if (findWeapon(p, f.result) || findWeapon(p, f.weapon)) continue;
       if (!out.includes(f.result)) out.push(f.result);
     }
   }
@@ -226,13 +216,9 @@ function applySwap(s: GameState, p: Player, o: Offer): void {
   const w = p.weapons[p.swapSlot];
   p.swapSlot = -1;
   if (!w) return;
-  // L'arme rendue ne revient plus ; les armes d'origine d'une fusion reçue non plus.
+  // L'arme rendue ne revient plus ; l'arme d'origine d'une évolution reçue non plus.
   p.banned.push(w.def);
-  for (const f of FUSION_TABLE) {
-    if (f.result !== o.id) continue;
-    p.banned.push(f.weapon);
-    if (!f.withPassive) p.banned.push(f.with);
-  }
+  for (const f of FUSION_TABLE) if (f.result === o.id) p.banned.push(f.weapon);
   w.def = o.id;
   w.level = o.toLevel;
   w.timer = 30;

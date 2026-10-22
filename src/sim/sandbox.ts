@@ -65,11 +65,10 @@ function applyLoadout(p: Player, c: SandboxConfig): void {
     if (def === undefined || p.weapons.length >= MAX_WEAPON_SLOTS || p.weapons.some((x) => x.def === def)) continue;
     addWeapon(p, def).level = clamp(Math.round(w.level), 1, weaponMaxLevel(def));
   }
-  // Une fusion déjà en main : ses armes d'origine ne sont plus proposées (comme après une vraie fusion).
+  // Une évolution déjà en main : son arme d'origine n'est plus proposée (comme après une vraie évolution).
   for (const f of FUSION_TABLE) {
     if (!p.weapons.some((x) => x.def === f.result)) continue;
-    for (const b of f.withPassive ? [f.weapon] : [f.weapon, f.with])
-      if (!p.weapons.some((x) => x.def === b) && !p.banned.includes(b)) p.banned.push(b);
+    if (!p.weapons.some((x) => x.def === f.weapon) && !p.banned.includes(f.weapon)) p.banned.push(f.weapon);
   }
   p.passives = [];
   for (const x of c.passives) {

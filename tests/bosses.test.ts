@@ -120,6 +120,26 @@ describe('vagues et boss', () => {
     expect(alive(s, 'mur').length).toBe(0);
   });
 
+  it('Hexagone : la cage a deux sorties opposées, et ne revient qu’un cycle sur deux', () => {
+    const s = arena();
+    const p = s.players[0];
+    const hex = boss(s, 'hexagone', 500, 0, 'build');
+    step(s, [0]);
+    const angles = alive(s, 'mur')
+      .map((w) => Math.atan2(w.y - p.y, w.x - p.x))
+      .sort((x, y) => x - y);
+    // Les trous : de grands écarts d'angle entre deux murs voisins (le tour complet compris).
+    const gaps = angles.map((a, i) => (i + 1 < angles.length ? angles[i + 1] - a : angles[0] + 2 * Math.PI - a));
+    const big = gaps.filter((g) => g * HEXAGONE.cageRadius > 60);
+    expect(big.length).toBe(2);
+    for (const w of alive(s, 'mur')) w.alive = false;
+    // Cycle suivant : pas de cage.
+    hex.ai = (BOSS_PATTERNS[hex.type].findIndex((ph) => ph.kind === 'build') - 1 + BOSS_PATTERNS[hex.type].length) % BOSS_PATTERNS[hex.type].length;
+    hex.timer = 0;
+    step(s, [0]);
+    expect(alive(s, 'mur').length).toBe(0);
+  });
+
   it('Étoile : sa ruée laisse des flammes qui brûlent', () => {
     const s = arena();
     const p = s.players[0];

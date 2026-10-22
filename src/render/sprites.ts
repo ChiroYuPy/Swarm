@@ -174,8 +174,8 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       break;
     case 'hexagon':
     case 'block':
-      // Hexagone (le boss : un second, plus petit, au centre ; le mur : plein).
-      polygon(ctx, 6, r, Math.PI / 6);
+      // Hexagone (le boss : un second, plus petit, au centre ; le mur : à plat, pour s'emboîter en nid d'abeille).
+      polygon(ctx, 6, r, d.shape === 'block' ? 0 : Math.PI / 6);
       if (d.shape === 'hexagon') polygon(ctx, 6, r * 0.5, 0);
       break;
     case 'star':

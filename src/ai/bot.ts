@@ -41,7 +41,7 @@ const NEAR_Y = new Float64Array(2048);
 const NEAR_W = new Float64Array(2048);
 
 function offerScore(p: Player, o: Offer): number {
-  // Stratégie « joueur raisonnable » : 3-4 armes montées à fond, des passifs utiles, les fusions dès que possible.
+  // Stratégie « joueur raisonnable » : 3-4 armes montées à fond, des passifs utiles, les évolutions dès que possible.
   if (o.kind === OFFER_FUSION) return 100;
   if (o.kind === OFFER_WEAPON) {
     const owned = p.weapons.some((w) => w.def === o.id);
@@ -50,9 +50,9 @@ function offerScore(p: Player, o: Offer): number {
   }
   if (o.kind === OFFER_PASSIVE) {
     const id = PASSIVES[o.id].id;
-    // Bonus si ce passif ouvre une fusion avec une arme possédée.
+    // Bonus si ce passif ouvre une évolution d'une arme possédée.
     const ownedIds = p.weapons.map((w) => BASE_WEAPONS[w.def]?.id);
-    const helps = FUSIONS.some((f) => f.withKind === 'passive' && f.with === id && ownedIds.includes(f.weapon));
+    const helps = FUSIONS.some((f) => f.with === id && ownedIds.includes(f.weapon));
     const base = o.toLevel > 1 ? 40 : 38;
     return base + (helps ? 12 : 0) + (id === 'soupe' || id === 'biceps' || id === 'blindage' ? 6 : 0);
   }

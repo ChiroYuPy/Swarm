@@ -69,7 +69,7 @@ describe('nouvelles armes', () => {
     expect(pushed).toBe(true);
   });
 
-  it('chaque nouvelle fusion est proposée quand ses deux moitiés sont au max', () => {
+  it('chaque nouvelle évolution est proposée quand l’arme et son passif sont au max', () => {
     for (const result of ['faux', 'tornade', 'phenix', 'bastion', 'escadrille', 'kamikazes', 'meteores']) {
       const fi = FUSION_TABLE.findIndex((f) => f.result === weaponId(result));
       expect(fi, result).toBeGreaterThanOrEqual(0);
@@ -78,12 +78,10 @@ describe('nouvelles armes', () => {
       const p = s.players[0];
       p.weapons.length = 0;
       addWeapon(p, f.weapon).level = weaponDef(f.weapon).levels.length;
-      if (f.withPassive) {
-        const x = new PassiveInst();
-        x.def = f.with;
-        x.level = 5;
-        p.passives.push(x);
-      } else addWeapon(p, f.with).level = weaponDef(f.with).levels.length;
+      const x = new PassiveInst();
+      x.def = f.with;
+      x.level = 5;
+      p.passives.push(x);
       expect(availableFusions(p), result).toContain(fi);
     }
   });
@@ -210,18 +208,25 @@ describe('nouvelles armes', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('le Phénix fait demi-tour en virant, revient et laisse du feu', () => {
+  it('les Phénix partent sans revenir, renaissent près de toi et laissent du feu', () => {
     const s = arena('phenix', 1, 100000);
     const p = s.players[0];
     let maxTurn = 0;
     let fires = 0;
-    let back = false;
+    let maxAlive = 0;
+    const births = new Set<number>();
     const heading = new Map<number, number>();
-    run(s, 4, (st) => {
+    run(s, 10, (st) => {
       fires = Math.max(fires, projs(st, PJ_BLAZE).length);
-      for (const ph of projs(st, PJ_PHOENIX)) {
-        // Un oiseau par lancer : on le reconnaît à son tick de départ.
+      const birds = projs(st, PJ_PHOENIX);
+      maxAlive = Math.max(maxAlive, birds.length);
+      for (const ph of birds) {
+        // Un oiseau par envol : on le reconnaît à son tick de départ.
         const id = st.tick - ph.age;
+        if (ph.age === 1) {
+          births.add(id);
+          expect(Math.hypot(ph.x - p.x, ph.y - p.y)).toBeLessThan(20);
+        }
         const h = Math.atan2(ph.vy, ph.vx);
         const prev = heading.get(id);
         if (prev !== undefined) {
@@ -230,12 +235,35 @@ describe('nouvelles armes', () => {
           maxTurn = Math.max(maxTurn, d);
         }
         heading.set(id, h);
-        if (ph.a === 1 && Math.hypot(ph.x - p.x, ph.y - p.y) < 60) back = true;
       }
     });
-    expect(back).toBe(true);
+    expect(maxAlive).toBe(2);
+    // Vie de 4 s : en 10 s, chaque oiseau a renaît au moins une fois.
+    expect(births.size).toBeGreaterThan(2);
     expect(fires).toBeGreaterThan(3);
-    expect(maxTurn).toBeLessThan(0.5);
+    expect(maxTurn).toBeLessThan(0.2);
+    expect(p.hp).toBe(p.stats.maxHp);
+  });
+
+  it('le Fouet claque en éventail devant toi et le Lance-flammes en demi-cercle au max', () => {
+    const whip = arena('fouet', 5, 100000);
+    run(whip, 2);
+    const w = whip.players[0].weapons[0];
+    const spread = (a: Float64Array, n: number) => {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let k = 0; k < n; k++) {
+        lo = Math.min(lo, a[k]);
+        hi = Math.max(hi, a[k]);
+      }
+      return hi - lo;
+    };
+    expect(spread(w.angles, 5)).toBeCloseTo((2 * Math.PI) / 5, 5);
+    const fl = arena('flammes', 5, 100000);
+    run(fl, 2);
+    const f = fl.players[0].weapons[0];
+    // 5 jets de 1/10 de tour, côte à côte : un demi-cercle (bord à bord).
+    expect(spread(f.angles, 5) + 2 * (Math.PI / 10)).toBeCloseTo(Math.PI, 5);
   });
 
   it('le Mortier lance des obus qui explosent au loin, les Météores laissent un cratère', () => {

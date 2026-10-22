@@ -245,20 +245,39 @@ export function drawWeaponIcon(ctx: Ctx, id: string, cx: number, cy: number, siz
         ctx.quadraticCurveTo(-r * 0.3, -r * 0.62, r * 0.05, -r * 0.35);
         neon(ctx, c, lw, 0.35);
       } else {
-        // Manche + lanière en S qui claque
-        ctx.moveTo(-r * 0.85, r * 0.85);
-        ctx.lineTo(-r * 0.45, r * 0.45);
-        neon(ctx, '#ffffff', lw * 1.2);
+        // Manche avec pommeau, lanière qui fait une boucle puis se tend en s'affinant, claquement au bout.
+        ctx.moveTo(-r * 0.92, r * 0.9);
+        ctx.lineTo(-r * 0.5, r * 0.48);
+        neon(ctx, '#ffffff', lw * 1.5);
         ctx.beginPath();
-        ctx.moveTo(-r * 0.45, r * 0.45);
-        ctx.bezierCurveTo(r * 0.4, r * 0.3, -r * 0.4, -r * 0.5, r * 0.8, -r * 0.7);
-        neon(ctx, c, lw);
+        ctx.arc(-r * 0.92, r * 0.9, r * 0.08, 0, TAU);
+        solid(ctx, '#ffffff', lw * 0.4);
+        const lash: [number, number, number, number, number, number, number][] = [
+          // c1x, c1y, c2x, c2y, x, y, épaisseur
+          [-r * 0.1, r * 0.4, r * 0.55, r * 0.45, r * 0.48, r * 0.1, 1.1],
+          [r * 0.42, -r * 0.62, -r * 0.55, -r * 0.6, -r * 0.32, -r * 0.2, 0.85],
+          [-r * 0.15, r * 0.05, r * 0.35, -r * 0.5, r * 0.82, -r * 0.62, 0.6],
+        ];
+        let px = -r * 0.5;
+        let py = r * 0.48;
+        for (const [c1x, c1y, c2x, c2y, x, y, k] of lash) {
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x, y);
+          neon(ctx, c, lw * k);
+          px = x;
+          py = y;
+        }
+        // Claquement : une étincelle à 4 branches
         ctx.beginPath();
-        ctx.moveTo(r * 0.62, -r * 0.95);
-        ctx.lineTo(r * 0.9, -r * 0.88);
-        ctx.moveTo(r * 0.95, -r * 0.6);
-        ctx.lineTo(r * 1.0, -r * 0.4);
-        neon(ctx, c, lw * 0.6);
+        const sx = r * 0.82;
+        const sy = -r * 0.62;
+        for (let k = 0; k < 4; k++) {
+          const a = (k * Math.PI) / 2 + Math.PI / 4;
+          ctx.moveTo(sx + Math.cos(a) * r * 0.1, sy + Math.sin(a) * r * 0.1);
+          ctx.lineTo(sx + Math.cos(a) * r * 0.26, sy + Math.sin(a) * r * 0.26);
+        }
+        neon(ctx, '#fff4d6', lw * 0.55);
       }
       break;
     }
@@ -346,36 +365,79 @@ export function drawWeaponIcon(ctx: Ctx, id: string, cx: number, cy: number, siz
       solid(ctx, '#ffffff', lw * 0.4);
       break;
     }
-    case 'drone':
+    case 'drone': {
+      // Quadricoptère vu de dessus : bras en X, quatre rotors, un corps avec son œil vers l'avant.
+      const arm = r * 0.58;
+      for (const [sx, sy] of [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ]) {
+        ctx.moveTo(sx * r * 0.18, sy * r * 0.18);
+        ctx.lineTo(sx * arm, sy * arm);
+      }
+      neon(ctx, c, lw * 0.7);
+      ctx.beginPath();
+      for (const [sx, sy] of [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ]) {
+        ctx.moveTo(sx * arm + r * 0.3, sy * arm);
+        ctx.arc(sx * arm, sy * arm, r * 0.3, 0, TAU);
+      }
+      neon(ctx, c, lw * 0.75, 0.18);
+      // Pales (traits fins en travers des rotors)
+      ctx.beginPath();
+      for (const [sx, sy] of [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ]) {
+        ctx.moveTo(sx * arm - r * 0.2, sy * arm + r * 0.07);
+        ctx.lineTo(sx * arm + r * 0.2, sy * arm - r * 0.07);
+      }
+      neon(ctx, '#ffffff', lw * 0.4, 0, false);
+      ctx.beginPath();
+      ctx.moveTo(r * 0.3, 0);
+      ctx.lineTo(0, r * 0.24);
+      ctx.lineTo(-r * 0.24, 0);
+      ctx.lineTo(0, -r * 0.24);
+      ctx.closePath();
+      neon(ctx, c, lw, 0.45);
+      ctx.beginPath();
+      ctx.arc(r * 0.07, 0, r * 0.08, 0, TAU);
+      solid(ctx, '#ffffff', lw * 0.4);
+      break;
+    }
     case 'escadrille': {
-      // Losange(s) en vol, avec leurs rotors
-      const pts = id === 'escadrille' ? [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]] : [[0, 0]];
-      const k = id === 'escadrille' ? 0.45 : 0.8;
-      for (const [px, py] of pts) {
-        const x = px * r;
-        const y = py * r;
-        ctx.moveTo(x + r * k, y);
-        ctx.lineTo(x, y + r * k * 0.6);
-        ctx.lineTo(x - r * k, y);
-        ctx.lineTo(x, y - r * k * 0.6);
+      // Trois drones en orbite autour d'une cible, qui lancent un disque.
+      ctx.arc(0, 0, r * 0.62, 0, TAU);
+      ctx.setLineDash([lw, lw * 1.8]);
+      neon(ctx, c, lw * 0.5, 0, false);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.13, 0, TAU);
+      solid(ctx, '#ff4f9a', lw * 0.5);
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) {
+        const a = -Math.PI / 2 + (k * TAU) / 3;
+        const x = Math.cos(a) * r * 0.62;
+        const y = Math.sin(a) * r * 0.62;
+        // flèche tangente (sens de rotation)
+        const tx = -Math.sin(a);
+        const ty = Math.cos(a);
+        const L = r * 0.26;
+        ctx.moveTo(x + tx * L, y + ty * L);
+        ctx.lineTo(x - tx * L * 0.6 + Math.cos(a) * L * 0.6, y - ty * L * 0.6 + Math.sin(a) * L * 0.6);
+        ctx.lineTo(x - tx * L * 0.25, y - ty * L * 0.25);
+        ctx.lineTo(x - tx * L * 0.6 - Math.cos(a) * L * 0.6, y - ty * L * 0.6 - Math.sin(a) * L * 0.6);
         ctx.closePath();
       }
-      neon(ctx, c, lw * (id === 'escadrille' ? 0.7 : 1), 0.3);
-      if (id === 'drone') {
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.9, -r * 0.62);
-        ctx.lineTo(-r * 0.4, -r * 0.62);
-        ctx.moveTo(r * 0.4, -r * 0.62);
-        ctx.lineTo(r * 0.9, -r * 0.62);
-        neon(ctx, c, lw * 0.6);
-      } else {
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.14, 0, TAU);
-        solid(ctx, '#ff4f9a', lw * 0.5);
-      }
-      ctx.beginPath();
-      ctx.arc(id === 'drone' ? 0 : -r * 0.45, id === 'drone' ? 0 : -r * 0.45, r * 0.1, 0, TAU);
-      solid(ctx, '#ffffff', lw * 0.4);
+      neon(ctx, c, lw * 0.7, 0.45);
       break;
     }
     case 'kamikazes': {
@@ -437,22 +499,45 @@ export function drawWeaponIcon(ctx: Ctx, id: string, cx: number, cy: number, siz
       break;
     }
     case 'ricochet': {
-      // Disque à encoches + trajet en zigzag
-      ctx.moveTo(-r * 0.95, r * 0.7);
-      ctx.lineTo(-r * 0.4, -r * 0.1);
-      ctx.lineTo(0, r * 0.45);
-      ctx.setLineDash([lw, lw * 1.6]);
-      neon(ctx, c, lw * 0.6);
+      // Trajet qui rebondit sur deux impacts, puis le disque-scie qui file.
+      const hits: [number, number][] = [
+        [-r * 0.6, -r * 0.05],
+        [-r * 0.05, r * 0.62],
+      ];
+      ctx.moveTo(-r * 0.95, r * 0.75);
+      ctx.lineTo(...hits[0]);
+      ctx.lineTo(...hits[1]);
+      ctx.lineTo(r * 0.3, r * 0.05);
+      ctx.setLineDash([lw * 1.2, lw * 1.4]);
+      neon(ctx, c, lw * 0.55, 0, false);
       ctx.setLineDash([]);
       ctx.beginPath();
-      for (let k = 0; k < 3; k++) {
-        const a0 = -0.4 + (k * TAU) / 3;
-        ctx.moveTo(r * 0.4 + Math.cos(a0 + 0.35) * r * 0.48, -r * 0.35 + Math.sin(a0 + 0.35) * r * 0.48);
-        ctx.arc(r * 0.4, -r * 0.35, r * 0.48, a0 + 0.35, a0 + TAU / 3 - 0.35);
+      for (const [hx, hy] of hits) {
+        for (let k = 0; k < 5; k++) {
+          const a = (k * TAU) / 5 + 0.3;
+          ctx.moveTo(hx + Math.cos(a) * r * 0.07, hy + Math.sin(a) * r * 0.07);
+          ctx.lineTo(hx + Math.cos(a) * r * 0.17, hy + Math.sin(a) * r * 0.17);
+        }
       }
-      neon(ctx, c, lw);
+      neon(ctx, '#ffffff', lw * 0.45, 0, false);
+      // Disque-scie : 8 dents
+      const dx = r * 0.45;
+      const dy = -r * 0.38;
       ctx.beginPath();
-      ctx.arc(r * 0.4, -r * 0.35, r * 0.15, 0, TAU);
+      const T = 8;
+      for (let k = 0; k < T; k++) {
+        const a0 = (k * TAU) / T;
+        const a1 = a0 + TAU / T;
+        const p0 = [dx + Math.cos(a0) * r * 0.36, dy + Math.sin(a0) * r * 0.36];
+        const p1 = [dx + Math.cos(a0 + 0.2) * r * 0.5, dy + Math.sin(a0 + 0.2) * r * 0.5];
+        if (k === 0) ctx.moveTo(p0[0], p0[1]);
+        ctx.lineTo(p1[0], p1[1]);
+        ctx.lineTo(dx + Math.cos(a1) * r * 0.36, dy + Math.sin(a1) * r * 0.36);
+      }
+      ctx.closePath();
+      neon(ctx, c, lw * 0.85, 0.3);
+      ctx.beginPath();
+      ctx.arc(dx, dy, r * 0.12, 0, TAU);
       solid(ctx, '#ffffff', lw * 0.5);
       break;
     }

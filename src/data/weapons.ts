@@ -1,5 +1,5 @@
 /**
- * Armes de base et armes fusionnées.
+ * Armes de base et leurs évolutions (arme + passif).
  *
  * Chaque arme a un `behavior` (le code qui l'anime dans src/sim/weapons.ts) et une liste de niveaux.
  * Les niveaux sont CUMULATIFS : `prog(base, d2, d3, ...)` part de la base et applique chaque delta
@@ -46,6 +46,8 @@ export interface WeaponLevel {
   range?: number;
   knockback?: number;
   slow?: number;
+  /** durée du ralentissement laissé par une onde (s) */
+  slowTime?: number;
   trigger?: number;
   branch?: number;
   stun?: number;
@@ -86,6 +88,8 @@ export interface WeaponLevel {
   meteor?: number;
   /** virage max (radians par seconde) des drones et du Phénix : ils tournent en avançant */
   turn?: number;
+  /** drones qui tournent autour de leur cible à bonne distance (Escadrille) : 1 */
+  orbit?: number;
 }
 
 export interface WeaponDef {
@@ -233,12 +237,12 @@ export const BASE_WEAPONS: WeaponDef[] = [
   {
     id: 'klaxon',
     name: 'Onde de choc',
-    desc: 'Ondes qui blessent et repoussent tout autour de toi.',
+    desc: 'Ondes qui blessent, repoussent et ralentissent un peu tout autour de toi.',
     behavior: 'pulse',
     color: '#fff36a',
     levelText: ['1 onde.', '2 ondes successives', '3 ondes, rayon +10 %', '4 ondes', '5 ondes, rayon +10 %, dégâts +20 %'],
     levels: prog(
-      { damage: 10, cooldown: 3.0, radius: 150, duration: 0.35, knockback: 260, count: 1, delay: 0.2 },
+      { damage: 10, cooldown: 3.0, radius: 150, duration: 0.35, knockback: 260, count: 1, delay: 0.2, slow: 0.25, slowTime: 1.2 },
       { count: 2 },
       { count: 3, radius: 165 },
       { count: 4 },
@@ -248,12 +252,12 @@ export const BASE_WEAPONS: WeaponDef[] = [
   {
     id: 'fouet',
     name: 'Fouet',
-    desc: 'Une lanière qui claque devant toi, blesse et envoie valser les ennemis.',
+    desc: 'Des lanières qui claquent en éventail devant toi, blessent et envoient valser les ennemis.',
     behavior: 'whip',
     color: '#ff8c69',
     levelText: [
       '1 fouet devant toi : blesse et repousse loin.',
-      '2 fouets : devant et derrière',
+      '2 fouets en éventail',
       '3 fouets, plus longs, dégâts +25 %, repoussent plus loin',
       '4 fouets, plus larges, étourdissent 0,3 s',
       '5 fouets, encore plus longs, dégâts +20 %, étourdissent 0,5 s',
@@ -269,22 +273,22 @@ export const BASE_WEAPONS: WeaponDef[] = [
   {
     id: 'flammes',
     name: 'Lance-flammes',
-    desc: 'Un jet de flammes court vers l’ennemi le plus proche.',
+    desc: 'Des jets de flammes côte à côte, là où tu vises. Chaque jet couvre 1/10 de tour : au niveau max, un demi-cercle de feu.',
     behavior: 'flame',
     color: '#ff6a1a',
     levelText: [
       '1 jet de flammes vers l’ennemi le plus proche.',
-      '2 jets (devant et derrière)',
-      '3 jets, dégâts +25 %',
+      '2 jets côte à côte',
+      '3 jets, dégâts +30 %',
       '4 jets, brûlent plus longtemps',
-      '5 jets, portée +15 %, dégâts +20 %',
+      '5 jets (un demi-cercle), portée +15 %, dégâts +25 %',
     ],
     levels: prog(
-      { damage: 4, cooldown: 2.6, duration: 1.4, tick: 0.12, length: 135, arc: 0.32, count: 1 },
+      { damage: 7, cooldown: 2.6, duration: 1.4, tick: 0.12, length: 135, arc: Math.PI / 10, count: 1 },
       { count: 2 },
-      { count: 3, damage: 5 },
+      { count: 3, damage: 9 },
       { count: 4, duration: 2.0 },
-      { count: 5, length: 155, damage: 6 },
+      { count: 5, length: 155, damage: 11 },
     ),
   },
   {
@@ -364,7 +368,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
       '5 obus, explosion encore plus large, dégâts +20 %',
     ],
     levels: prog(
-      { damage: 28, cooldown: 2.2, count: 1, radius: 70, range: 480, duration: 0.7, knockback: 160 },
+      { damage: 28, cooldown: 2.2, count: 1, radius: 70, range: 420, duration: 0.7, knockback: 160 },
       { count: 2 },
       { count: 3, damage: 34, radius: 80 },
       { count: 4 },
@@ -377,7 +381,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'cotillons',
     name: 'Spirale',
-    desc: 'Fusion de Blaster et Surcadence.',
+    desc: 'Évolution de Blaster avec Surcadence.',
     behavior: 'spiral',
     color: '#c6fbff',
     fusion: true,
@@ -392,7 +396,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'trounoir',
     name: 'Trous noirs',
-    desc: 'Fusion d’Orbes et Aimant.',
+    desc: 'Évolution d’Orbes avec Aimant.',
     behavior: 'orbit',
     color: '#b98cff',
     fusion: true,
@@ -402,7 +406,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'malaise',
     name: 'Champ vampire',
-    desc: 'Fusion de Champ de force et Vitalité.',
+    desc: 'Évolution de Champ de force avec Vitalité.',
     behavior: 'aura',
     color: '#ff9af0',
     fusion: true,
@@ -412,7 +416,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'multiprise',
     name: 'Tempête électrique',
-    desc: 'Fusion d’Arc électrique et Laser.',
+    desc: 'Évolution d’Arc électrique avec Surcadence.',
     behavior: 'chain',
     color: '#9fd0ff',
     fusion: true,
@@ -422,7 +426,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'creperang',
     name: 'Boomerang miné',
-    desc: 'Fusion de Boomerang et Mines.',
+    desc: 'Évolution de Boomerang avec Amplificateur.',
     behavior: 'boomerang',
     color: '#ffd36a',
     fusion: true,
@@ -434,27 +438,27 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'periph',
     name: 'Séisme',
-    desc: 'Fusion d’Onde de choc et Propulseurs.',
+    desc: 'Évolution d’Onde de choc avec Propulseurs.',
     behavior: 'pulse',
     color: '#fffaa0',
     fusion: true,
-    levelText: ['Triple onde géante qui étourdit les ennemis.'],
-    levels: [{ damage: 28, cooldown: 1.5, radius: 265, duration: 0.4, knockback: 400, count: 3, delay: 0.18, stun: 0.5 }],
+    levelText: ['Triple onde géante qui fissure le sol et ralentit fortement les ennemis.'],
+    levels: [{ damage: 16, cooldown: 1.5, radius: 265, duration: 0.45, knockback: 300, count: 3, delay: 0.18, slow: 0.6, slowTime: 2.5 }],
   },
   {
     id: 'faux',
     name: 'Faux',
-    desc: 'Fusion de Fouet et Puissance.',
+    desc: 'Évolution de Fouet avec Puissance.',
     behavior: 'scythe',
     color: '#ffb39c',
     fusion: true,
-    levelText: ['Fauche tout autour de toi et achève les ennemis presque morts.'],
-    levels: [{ damage: 40, cooldown: 1.1, length: 200, arc: Math.PI, count: 1, knockback: 140, execute: 0.12 }],
+    levelText: ['Fauche tout autour de toi, très fort, et achève les ennemis presque morts. Ne repousse pas.'],
+    levels: [{ damage: 85, cooldown: 1.1, length: 200, arc: Math.PI, count: 1, knockback: 0, execute: 0.12 }],
   },
   {
     id: 'tornade',
     name: 'Tornade de feu',
-    desc: 'Fusion de Lance-flammes et Amplificateur.',
+    desc: 'Évolution de Lance-flammes avec Amplificateur.',
     behavior: 'flame',
     color: '#ff7a2e',
     fusion: true,
@@ -464,22 +468,22 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'phenix',
     name: 'Phénix',
-    desc: 'Fusion de Lance-flammes et Vitalité.',
+    desc: 'Évolution de Lance-flammes avec Vitalité.',
     behavior: 'phoenix',
     color: '#ffb03a',
     fusion: true,
-    levelText: ['Un oiseau de feu traverse la horde, fait demi-tour en planant et revient, en laissant une traînée de feu. Chaque brûlure te soigne un peu.'],
+    levelText: ['Deux oiseaux de feu s’envolent à travers la horde et mettent le feu partout où ils passent. Quand l’un s’éteint, un autre renaît près de toi.'],
     levels: [
       {
-        damage: 32, cooldown: 2.0, speed: 520, range: 440, size: 28, count: 1, hitCd: 0.35, lifesteal: 0.02, knockback: 60,
-        turn: 4.2, blazeDamage: 14, blazeRadius: 26, blazeLife: 1.4,
+        damage: 30, count: 2, speed: 470, life: 4, respawn: 0.8, size: 26, hitCd: 0.35, knockback: 40,
+        turn: 3.0, blazeDamage: 18, blazeRadius: 28, blazeLife: 1.8,
       },
     ],
   },
   {
     id: 'bastion',
     name: 'Bastion',
-    desc: 'Fusion de Tourelle et Blindage.',
+    desc: 'Évolution de Tourelle avec Blindage.',
     behavior: 'turret',
     color: '#e4ff9a',
     fusion: true,
@@ -494,32 +498,32 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   {
     id: 'escadrille',
     name: 'Escadrille',
-    desc: 'Fusion de Ricochet et Drone.',
+    desc: 'Évolution de Ricochet avec Blindage.',
     behavior: 'drone',
     color: '#ff9ccd',
     fusion: true,
-    levelText: ['Quatre drones chasseurs, plus solides, qui lancent des disques ricochets.'],
+    levelText: ['Quatre drones tournent autour de leur cible, à distance, et lancent de gros disques ricochets aux nombreux rebonds. Abattus, ils reviennent presque aussitôt.'],
     levels: [
       {
-        damage: 22, cooldown: 0.9, count: 4, speed: 300, range: 600, hp: 140, respawn: 2.5, attackRange: 260,
-        shotSpeed: 460, size: 10, bounces: 6, life: 3, turn: 3.4,
+        damage: 30, cooldown: 0.9, count: 4, speed: 300, range: 600, hp: 140, respawn: 0.4, attackRange: 280,
+        shotSpeed: 480, size: 12, bounces: 12, life: 4.5, turn: 3.4, orbit: 1,
       },
     ],
   },
   {
     id: 'kamikazes',
     name: 'Kamikazes',
-    desc: 'Fusion de Drone et Mortier.',
+    desc: 'Évolution de Drone avec Puissance.',
     behavior: 'drone',
     color: '#ff9a5c',
     fusion: true,
     levelText: ['Quatre drones foncent dans les groupes et explosent comme des bombes, puis réapparaissent près de toi.'],
-    levels: [{ damage: 75, count: 4, speed: 430, range: 520, radius: 150, knockback: 260, respawn: 1.6, dive: 1, hp: 1, turn: 4 }],
+    levels: [{ damage: 75, count: 4, speed: 430, range: 520, radius: 150, knockback: 260, respawn: 0.3, dive: 1, hp: 1, turn: 4 }],
   },
   {
     id: 'meteores',
     name: 'Météores',
-    desc: 'Fusion de Mortier et Chance.',
+    desc: 'Évolution de Mortier avec Chance.',
     behavior: 'mortar',
     color: '#ff5a24',
     fusion: true,

@@ -35,7 +35,7 @@ export const PICKUPS: PickupDef[] = [
   { id: 'clock', name: 'Horloge', kind: 'active', desc: 'Ralentit tout le reste du monde pendant 8 s : ennemis, boss et tirs vont 3× moins vite. Toi, non.', color: '#7f9cff', weight: 2 },
   { id: 'clone', name: 'Clone', kind: 'active', desc: 'Un double de toi apparaît 10 s : il reste sur place, tire avec tes armes et attire les ennemis proches.', color: '#5cf2d6', weight: 2 },
   { id: 'eradicate', name: 'Éradication', kind: 'active', desc: 'Détruit tous les ennemis présents. Le boss perd 20 % de ses PV.', color: '#ff3df5', weight: 1 },
-  { id: 'chest', name: 'Coffre', kind: 'chest', desc: 'Laissé par le boss : une fusion si possible, sinon 3 améliorations.', color: '#ffd23a', weight: 0 },
+  { id: 'chest', name: 'Coffre', kind: 'chest', desc: 'Laissé par le boss : une évolution si possible, sinon 3 améliorations.', color: '#ffd23a', weight: 0 },
 ];
 
 export const LOOT = {
@@ -80,7 +80,7 @@ export const LOOT = {
   swaps: { start: 1, perBoss: 1, max: 3 },
   /** caisse bonus : probabilité d'un activable (sinon un bonus) */
   propActiveChance: 0.4,
-  /** coffre de boss : fusion si possible, sinon N améliorations + soin */
+  /** coffre de boss : évolution si possible, sinon N améliorations + soin */
   chestUpgrades: 3,
   chestHeal: 0.3,
   bossGems: { count: 12, value: 12 },

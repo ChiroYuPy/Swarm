@@ -75,20 +75,27 @@ describe('fusions', () => {
     expect(p.banned).toContain(wIdx('confetti'));
   });
 
-  it('arme + arme : les deux disparaissent, un emplacement se libère', () => {
+  it('toute évolution = une arme de base + un passif, et chaque évolution a sa recette', () => {
+    for (const f of FUSIONS) {
+      expect(PASSIVES.some((x) => x.id === f.with), f.result).toBe(true);
+      expect(ALL_WEAPONS.find((w) => w.id === f.weapon)?.fusion, f.result).toBeFalsy();
+    }
+    for (const w of ALL_WEAPONS.filter((x) => x.fusion)) expect(FUSIONS.some((f) => f.result === w.id), w.id).toBe(true);
+  });
+
+  it('une évolution garde l’emplacement de son arme, et le passif reste', () => {
     const s = createGame({ seed: 'FUSION-3' });
     const p = s.players[0];
     giveWeapon(p, 'rallonge', 5);
-    giveWeapon(p, 'laser', 5);
-    expect(p.weapons.length).toBe(3);
+    givePassive(p, 'cafe', 5);
+    const before = p.weapons.length;
+    const slot = p.weapons.findIndex((w) => weaponDef(w.def).id === 'rallonge');
     const fi = FUSION_TABLE.findIndex((f) => weaponDef(f.result).id === 'multiprise');
     expect(availableFusions(p)).toContain(fi);
     levelUpAndPickFirst(s);
-    const ids = p.weapons.map((w) => weaponDef(w.def).id);
-    expect(ids).toContain('multiprise');
-    expect(ids).not.toContain('rallonge');
-    expect(ids).not.toContain('laser');
-    expect(p.weapons.length).toBe(2);
+    expect(weaponDef(p.weapons[slot].def).id).toBe('multiprise');
+    expect(p.weapons.length).toBe(before);
+    expect(p.passives.some((x) => PASSIVES[x.def].id === 'cafe')).toBe(true);
   });
 
   it('chaque arme fusionnée a un comportement qui inflige des dégâts', () => {

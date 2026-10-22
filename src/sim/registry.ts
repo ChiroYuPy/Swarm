@@ -84,14 +84,13 @@ export const LEADER_SPEED = ENEMIES.find((e) => e.behavior === 'leader')?.auraSp
 export interface CompiledFusion {
   result: number;
   weapon: number;
+  /** passif requis */
   with: number;
-  withPassive: boolean;
 }
 export const FUSION_TABLE: CompiledFusion[] = FUSIONS.map((f) => ({
   result: weaponId(f.result),
   weapon: weaponId(f.weapon),
-  with: f.withKind === 'weapon' ? weaponId(f.with) : passiveId(f.with),
-  withPassive: f.withKind === 'passive',
+  with: passiveId(f.with),
 }));
 
 export interface CompiledRate {
@@ -161,6 +160,7 @@ export const HORDE_TYPES = WAVES.horde.types.map(enemyId);
 export const SWARM_TYPE = enemyId(WAVES.swarm.type);
 export const RING_TYPE = enemyId(WAVES.ring.type);
 export const BOSS_TYPE = enemyId('boss');
+export const HEXAGONE_TYPE = enemyId('hexagone');
 export const PROP_TYPE = enemyId('distributeur');
 export const WALL_TYPE = enemyId('mur');
 export const EGG_TYPE = enemyId('oeuf');
