@@ -82,20 +82,6 @@ const E = [52, 56, 59];
 const LOOP = [AM, F, C, G];
 /** partie : A (la boucle historique) puis B qui monte en tension vers Mi majeur */
 const GAME_PROG = [AM, F, C, G, DM, F, G, E];
-/** [pas, note, durée en pas] sur 8 mesures */
-type Phrase = [number, number, number][];
-const MENU_MELODY: Phrase = [
-  [0, 69, 2], [3, 72, 2], [6, 76, 2], [8, 74, 1], [10, 72, 2], [12, 76, 3],
-  [16, 77, 2], [19, 76, 2], [22, 72, 2], [24, 69, 3], [28, 72, 2], [30, 74, 2],
-  [32, 76, 2], [35, 79, 2], [38, 76, 2], [40, 74, 1], [42, 72, 2], [44, 67, 3],
-  [48, 71, 2], [51, 74, 2], [54, 79, 2], [56, 77, 2], [58, 76, 2], [60, 74, 4],
-  [64, 69, 2], [67, 72, 2], [70, 76, 2], [72, 81, 2], [74, 79, 2], [76, 76, 3],
-  [80, 77, 2], [83, 81, 2], [86, 77, 2], [88, 76, 3], [92, 72, 2], [94, 74, 2],
-  [96, 76, 2], [99, 79, 2], [102, 84, 2], [104, 79, 2], [106, 76, 2], [108, 72, 3],
-  [112, 74, 2], [115, 71, 2], [118, 67, 2], [120, 71, 2], [122, 74, 2], [124, 76, 4],
-];
-const phraseAt = (p: Phrase) => new Map(p.map((n) => [n[0], n]));
-const MENU_MELODY_AT = phraseAt(MENU_MELODY);
 const LOOP_STEPS = 128;
 
 // ---------------- Intro ----------------
@@ -729,7 +715,7 @@ export class AudioEngine {
     this.tone('sawtooth', midi(n), midi(n), dur, g, when, { bus: this.music, filter: { type: 'lowpass', freq: cut, q: 2 } });
   }
 
-  /** Menu : la boucle historique, avec une mélodie syncopée jouée au son pincé (triangle + écho). */
+  /** Menu : la boucle historique (basse, arpège, kick, charleston), sans mélodie. */
   private menuNote(step: number, when: number): void {
     const bus = this.music;
     const chord = LOOP[Math.floor(step / 16) % 4];
@@ -742,12 +728,6 @@ export class AudioEngine {
     }
     if (s16 % 4 === 0) this.tone('sine', 120, 40, 0.18, 0.1, when, { bus });
     if (s16 % 4 === 2) this.noiseHit(0.04, 0.025, 'highpass', 7000, 7000, when, { bus });
-    const m = MENU_MELODY_AT.get(step);
-    if (m) {
-      const f = midi(m[1]);
-      this.tone('triangle', f, f, 0.3, 0.035, when, { bus, dly: 0.3, rev: 0.2 });
-      this.tone('square', f, f, 0.06, 0.012, when, { bus, filter: lp(2600) });
-    }
   }
 
   /**
