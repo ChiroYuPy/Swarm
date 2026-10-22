@@ -6,7 +6,7 @@ import { PI, TWO_PI, datan2, dcos, dsin } from './dmath';
 import { spawnEnemy, spawnGem, spawnPickup } from './entities';
 import { circleHitsObstacle } from './map';
 import { clearShotsIn } from './shots';
-import { BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO } from './registry';
+import { AFTER_BOSS_TICKS, BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO } from './registry';
 import { dmgMul, hpMul, spdMul } from './spawner';
 import { ENEMIES } from '../data/enemies';
 import {
@@ -74,12 +74,21 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
     dropPropLoot(s, e.x, e.y);
     return;
   }
+  // Murs et œufs : ni victime au compteur, ni butin (un œuf donne juste sa gemme).
+  if (beh === BEHAVIOR.WALL || beh === BEHAVIOR.EGG) {
+    if (e.xp > 0) spawnGem(s, e.x, e.y, e.xp);
+    return;
+  }
   if (SPLIT_INTO[e.type] >= 0) split(s, e.x, e.y, e.vx, e.vy, e.type, e.target);
   if (owner >= 0) s.players[owner].kills++;
   s.totalKills++;
   if (beh === BEHAVIOR.BOSS) {
     if (owner >= 0) s.players[owner].bossKills++;
-    if (s.bossId === e.id) s.bossId = -1;
+    if (s.bossId === e.id) {
+      s.bossId = -1;
+      // Un peu de calme pour ramasser le coffre avant que les vagues reprennent.
+      s.calmUntil = s.tick + AFTER_BOSS_TICKS;
+    }
     spawnPickup(s, PK_CHEST, e.x, e.y);
     spawnPickup(s, randomActive(s), e.x + 60, e.y);
     const n = LOOT.bossGems.count;

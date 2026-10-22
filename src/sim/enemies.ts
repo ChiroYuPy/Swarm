@@ -1,5 +1,5 @@
 /** IA des ennemis, du boss, séparation, contact avec les joueurs. */
-import { BOSS, ENEMIES } from '../data/enemies';
+import { BOSS, ENEMIES, ETOILE, HEXAGONE, OEIL, REINE, type BossPhaseKind } from '../data/enemies';
 import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DT, TICK_RATE } from './constants';
@@ -7,9 +7,36 @@ import { PI, TWO_PI, dcos, datan2, dsin } from './dmath';
 import { AVOID, avoidance, circleHitsObstacle, moveCircle, segmentClear } from './map';
 import { spawnEnemy, spawnProjectile } from './entities';
 import { explode, hurtPlayer, nearestPlayer } from './combat';
-import { BEHAVIOR, BOSS_SUMMON_TYPE, ENEMY_BEHAVIOR, LEADER_SPEED } from './registry';
+import {
+  BEHAVIOR,
+  BOSS_PATTERNS,
+  BOSS_SUMMONS,
+  BOSS_TYPE,
+  EGG_TYPE,
+  ENEMY_BEHAVIOR,
+  LEADER_SPEED,
+  SWARM_TYPE,
+  WALL_TYPE,
+} from './registry';
 import { dmgMul, hpMul, spdMul } from './spawner';
-import { EF_BOSS, EF_PROP, EV_BLINK, EV_ENEMY_SHOT, EV_FUSE, PJ_EBULLET, emit, type Enemy, type GameState, type Player } from './state';
+import {
+  EF_BOSS,
+  EF_PROP,
+  EV_BLINK,
+  EV_CAGE,
+  EV_ENEMY_SHOT,
+  EV_FUSE,
+  EV_HATCH,
+  EV_LASER,
+  EV_RING_WAVE,
+  EV_WALL_HIT,
+  PJ_EBULLET,
+  PJ_FIRE,
+  emit,
+  type Enemy,
+  type GameState,
+  type Player,
+} from './state';
 
 const SEP_STRENGTH = 95;
 const KB_DECAY = 0.82;
@@ -150,6 +177,19 @@ export function updateEnemies(s: GameState): void {
       }
       continue;
     }
+    if (beh === BEHAVIOR.WALL) {
+      // Mur : il monte (pas encore solide), tient, puis tombe tout seul.
+      e.timer -= tf;
+      if (e.ai === 0 && e.timer <= e.aux) e.ai = 1;
+      if (e.timer <= 0) e.alive = false;
+      continue;
+    }
+    if (beh === BEHAVIOR.EGG) {
+      if (e.frozenUntil > tick) continue;
+      e.timer -= tf;
+      if (e.timer <= 0) hatch(s, e);
+      continue;
+    }
     // Gelé : figé sur place (y compris sa mèche et ses tirs).
     if (e.frozenUntil > tick) continue;
 
@@ -166,7 +206,7 @@ export function updateEnemies(s: GameState): void {
     const dist = Math.sqrt(d2);
 
     if (beh === BEHAVIOR.BOSS) {
-      updateBoss(s, e, dx, dy, dist, tf);
+      updateBoss(s, e, p, dx, dy, dist, tf);
       continue;
     }
     if (d2 > relocate2) {
@@ -294,6 +334,9 @@ export function updateEnemies(s: GameState): void {
     // Séparation douce entre ennemis voisins (grille construite en début de tick).
     let sx = 0;
     let sy = 0;
+    // murs solides : on en ressort entièrement (pas de séparation douce)
+    let hx = 0;
+    let hy = 0;
     let checks = 0;
     const ccx = Math.min(cols - 1, Math.max(0, Math.floor((e.x - grid.ox) / 64)));
     const ccy = Math.min(rows - 1, Math.max(0, Math.floor((e.y - grid.oy) / 64)));
@@ -316,6 +359,14 @@ export function updateEnemies(s: GameState): void {
           const rr = e.r + o.r;
           const dd = ddx * ddx + ddy * ddy;
           if (dd >= rr * rr) continue;
+          if (o.type === WALL_TYPE) {
+            if (o.ai === 1 && dd > 0.0001) {
+              const dl = Math.sqrt(dd);
+              hx += (ddx / dl) * (rr - dl);
+              hy += (ddy / dl) * (rr - dl);
+            }
+            continue;
+          }
           checks++;
           if (dd < 0.0001) {
             sx += e.id < o.id ? 1 : -1;
@@ -332,7 +383,7 @@ export function updateEnemies(s: GameState): void {
 
     const vx = (DX * speed + sx * SEP_STRENGTH + e.kbx) * tf;
     const vy = (DY * speed + sy * SEP_STRENGTH + e.kby) * tf;
-    moveCircle(s.map, e, vx * DT, vy * DT, e.r);
+    moveCircle(s.map, e, vx * DT + hx, vy * DT + hy, e.r);
     e.kbx *= KB_DECAY;
     e.kby *= KB_DECAY;
     if (DX !== 0 || DY !== 0) {
@@ -342,69 +393,307 @@ export function updateEnemies(s: GameState): void {
   }
 }
 
-function updateBoss(s: GameState, e: Enemy, dx: number, dy: number, dist: number, tf: number): void {
-  const pat = BOSS.pattern;
+/** Vitesse voulue du boss ce tick (sortie des phases). */
+let VX = 0;
+let VY = 0;
+
+/**
+ * Boss : une séquence de phases qui boucle (data/enemies.ts). Chaque phase a une entrée (visée, cage,
+ * renforts…) et un comportement par tick. Le boss plane au-dessus des obstacles.
+ */
+function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, dist: number, tf: number): void {
+  const pat = BOSS_PATTERNS[e.type];
   if (e.timer <= 0) {
     e.ai = (e.ai + 1) % pat.length;
     e.timer = Math.round(pat[e.ai].duration * TICK_RATE);
-    const kind = pat[e.ai].kind;
-    if (kind === 'charge') e.aux = datan2(dy, dx);
-    if (kind === 'summon') summon(s, e);
+    enterPhase(s, e, pat[e.ai].kind, p, dx, dy);
   }
   e.timer -= 1;
   const ph = pat[e.ai];
-  const elapsed = Math.round(ph.duration * TICK_RATE) - e.timer;
-  let vx = 0;
-  let vy = 0;
+  const total = Math.round(ph.duration * TICK_RATE);
+  const elapsed = total - e.timer;
   const stunned = e.stunUntil > s.tick;
+  const dm = dmgMul(s);
+  VX = 0;
+  VY = 0;
   switch (ph.kind) {
     case 'chase':
       if (dist > 1 && !stunned) {
-        vx = (dx / dist) * e.speed;
-        vy = (dy / dist) * e.speed;
+        VX = (dx / dist) * e.speed;
+        VY = (dy / dist) * e.speed;
       }
       break;
     case 'spiral': {
-      const every = Math.max(1, Math.round(BOSS.spiralEvery * TICK_RATE));
+      const c = e.type === BOSS_TYPE ? BOSS : HEXAGONE;
+      const every = Math.max(1, Math.round(c.spiralEvery * TICK_RATE));
       if (elapsed % every === 0) {
-        const arms = BOSS.spiralArms + e.aux2;
-        for (let k = 0; k < arms; k++) {
-          fireEnemyBullet(s, e.x, e.y, e.aux + (k * TWO_PI) / arms, BOSS.bulletSpeed, BOSS.bulletDamage * dmgMul(s));
-        }
-        e.aux += BOSS.spiralTurn;
+        const arms = c.spiralArms + (e.type === BOSS_TYPE ? e.aux2 : 0);
+        for (let k = 0; k < arms; k++) fireEnemyBullet(s, e.x, e.y, e.aux + (k * TWO_PI) / arms, c.bulletSpeed, c.bulletDamage * dm);
+        e.aux += c.spiralTurn;
         if (elapsed % (every * 3) === 0) emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
       break;
     }
-    case 'charge': {
-      const tele = Math.round(BOSS.chargeTelegraph * TICK_RATE);
-      if (elapsed >= tele) {
-        vx = dcos(e.aux) * BOSS.chargeSpeed;
-        vy = dsin(e.aux) * BOSS.chargeSpeed;
+    case 'charge':
+      // Ligne d'avertissement, puis il fonce jusqu'au bout de la ligne (e.ax : distance parcourue).
+      if (elapsed >= Math.round(BOSS.chargeTelegraph * TICK_RATE) && e.ax < BOSS.chargeLength) {
+        VX = dcos(e.aux) * BOSS.chargeSpeed;
+        VY = dsin(e.aux) * BOSS.chargeSpeed;
+        e.ax += BOSS.chargeSpeed * DT * tf;
+      }
+      break;
+    case 'volley': {
+      const every = Math.round(HEXAGONE.volleyEvery * TICK_RATE);
+      if ((elapsed - 1) % every === 0) {
+        const a = datan2(dy, dx);
+        const n = HEXAGONE.volleyCount;
+        for (let k = 0; k < n; k++) {
+          fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * HEXAGONE.volleySpread, HEXAGONE.bulletSpeed, HEXAGONE.bulletDamage * dm);
+        }
+        emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
       break;
     }
-    case 'summon':
+    case 'dash':
+      dash(s, e, elapsed, dm);
+      break;
+    case 'burst':
+      if (elapsed === 1 || elapsed === total >> 1) {
+        const n = ETOILE.burstArms;
+        const off = elapsed === 1 ? 0 : PI / n;
+        for (let k = 0; k < n; k++) fireEnemyBullet(s, e.x, e.y, off + (k * TWO_PI) / n, ETOILE.bulletSpeed, ETOILE.bulletDamage * dm);
+        emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
+      }
+      break;
+    case 'watch': {
+      if (!stunned) {
+        keepAway(s, e, dx, dy, dist, OEIL.keepMin, OEIL.keepMax);
+        VX = DX * e.speed;
+        VY = DY * e.speed;
+      }
+      const every = Math.round(OEIL.shootEvery * TICK_RATE);
+      if (elapsed % every === 0 && dist < 600) {
+        fireEnemyBullet(s, e.x, e.y, datan2(dy, dx), OEIL.bulletSpeed, OEIL.bulletDamage * dm);
+        emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
+      }
+      break;
+    }
+    case 'sweep':
+      sweep(s, e, elapsed / total, dm);
+      break;
+    case 'flee':
+      if (!stunned) {
+        keepAway(s, e, dx, dy, dist, REINE.keepMin, REINE.keepMax);
+        VX = DX * e.speed;
+        VY = DY * e.speed;
+      }
+      break;
+    default:
+      // summon, build, aim, focus, lay : immobile (tout se passe à l'entrée de la phase)
       break;
   }
-  // Le boss plane au-dessus des obstacles. Horloge : ses phases continuent, mais il se traîne.
-  e.x += vx * DT * tf;
-  e.y += vy * DT * tf;
-  if (vx !== 0 || vy !== 0) {
-    const l = Math.sqrt(vx * vx + vy * vy);
-    e.vx = vx / l;
-    e.vy = vy / l;
+  // Horloge : ses phases continuent, mais il se traîne.
+  e.x += VX * DT * tf;
+  e.y += VY * DT * tf;
+  if (VX !== 0 || VY !== 0) {
+    const l = Math.sqrt(VX * VX + VY * VY);
+    e.vx = VX / l;
+    e.vy = VY / l;
   }
 }
 
-function summon(s: GameState, boss: Enemy): void {
-  const n = BOSS.summonCount + boss.aux2 * 2;
+function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: number, dy: number): void {
+  switch (kind) {
+    case 'charge':
+      e.aux = datan2(dy, dx);
+      e.ax = 0;
+      break;
+    case 'summon':
+      summon(s, e, p);
+      break;
+    case 'build':
+      buildCage(s, e, p);
+      break;
+    case 'aim':
+      // Étoile : direction de la ruée, et boîte de rebond centrée sur le joueur.
+      e.aux = datan2(dy, dx);
+      e.ax = p.x;
+      e.ay = p.y;
+      break;
+    case 'focus': {
+      // Œil : le cône va d'un bord à l'autre en passant par le joueur, dans un sens puis dans l'autre.
+      const c = datan2(dy, dx);
+      const dir = e.ai & 2 ? -1 : 1;
+      e.ax = c - (dir * OEIL.arc) / 2;
+      e.ay = c + (dir * OEIL.arc) / 2;
+      e.aux = e.ax;
+      break;
+    }
+    case 'sweep':
+      e.aux = e.ax;
+      emit(s, EV_LASER, e.x, e.y, 0, e.type);
+      break;
+    case 'lay': {
+      layEggs(s, e);
+      const a = datan2(dy, dx);
+      const n = REINE.volleyCount;
+      for (let k = 0; k < n; k++) {
+        fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * REINE.volleySpread, REINE.bulletSpeed, REINE.bulletDamage * dmgMul(s));
+      }
+      emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
+      break;
+    }
+  }
+}
+
+/** Étoile : fonce, rebondit sur les bords de sa boîte, sème des flammes. */
+function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
+  const H = ETOILE.box;
+  let ux = dcos(e.aux);
+  let uy = dsin(e.aux);
+  if ((e.x - e.ax > H && ux > 0) || (e.x - e.ax < -H && ux < 0)) {
+    e.aux = PI - e.aux;
+    ux = -ux;
+    emit(s, EV_WALL_HIT, e.x, e.y, 2, e.type);
+  }
+  if ((e.y - e.ay > H && uy > 0) || (e.y - e.ay < -H && uy < 0)) {
+    e.aux = -e.aux;
+    uy = -uy;
+    emit(s, EV_WALL_HIT, e.x, e.y, 2, e.type);
+  }
+  VX = ux * ETOILE.dashSpeed;
+  VY = uy * ETOILE.dashSpeed;
+  if (elapsed % ETOILE.fireEvery === 0) {
+    const b = spawnProjectile(s);
+    if (!b) return;
+    b.kind = PJ_FIRE;
+    b.owner = -1;
+    b.x = b.px = e.x;
+    b.y = b.py = e.y;
+    b.vx = b.vy = 0;
+    b.r = ETOILE.fireRadius;
+    b.a = ETOILE.fireDps * dm;
+    b.life = Math.round(ETOILE.fireLife * TICK_RATE);
+  }
+}
+
+/** Œil : le rayon tourne de e.ax à e.ay ; il blesse qui se trouve dessus (une fois, grâce à l'invulnérabilité). */
+function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
+  e.aux = e.ax + (e.ay - e.ax) * Math.min(1, f);
+  const ux = dcos(e.aux);
+  const uy = dsin(e.aux);
+  for (const q of s.players) {
+    if (!q.alive) continue;
+    const qx = q.x - e.x;
+    const qy = q.y - e.y;
+    const along = qx * ux + qy * uy;
+    const perp = Math.abs(qy * ux - qx * uy);
+    if (along > 0 && along < OEIL.beamLength + q.r && perp < OEIL.beamWidth / 2 + q.r) hurtPlayer(s, q, OEIL.beamDamage * dm);
+  }
+}
+
+/** Hexagone bâtisseur : une cage hexagonale de murs autour du joueur (ils montent, puis deviennent solides). */
+function buildCage(s: GameState, e: Enemy, p: Player): void {
+  const R = HEXAGONE.cageRadius;
+  const n = Math.max(1, Math.round(R / HEXAGONE.wallSpacing));
+  const life = Math.round(HEXAGONE.wallLife * TICK_RATE);
+  const solid = Math.round((HEXAGONE.wallLife - HEXAGONE.wallRise) * TICK_RATE);
+  const hm = hpMul(s);
+  for (let side = 0; side < 6; side++) {
+    const a0 = (side * PI) / 3 + PI / 6;
+    const a1 = a0 + PI / 3;
+    const x0 = p.x + dcos(a0) * R;
+    const y0 = p.y + dsin(a0) * R;
+    const x1 = p.x + dcos(a1) * R;
+    const y1 = p.y + dsin(a1) * R;
+    for (let j = 0; j < n; j++) {
+      const x = x0 + ((x1 - x0) * j) / n;
+      const y = y0 + ((y1 - y0) * j) / n;
+      if (circleHitsObstacle(s.map, x, y, 4)) continue;
+      const w = spawnEnemy(s, WALL_TYPE, x, y, hm, 1, 1, e.target);
+      if (!w) return;
+      w.timer = life;
+      w.aux = solid;
+    }
+  }
+  emit(s, EV_CAGE, p.x, p.y, R, e.type);
+}
+
+/** Reine : pond un œuf (trois de temps en temps) là où elle est. */
+function layEggs(s: GameState, e: Enemy): void {
+  let eggs = 0;
+  for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === EGG_TYPE) eggs++;
+  e.aux++;
+  const n = Math.min(REINE.maxEggs - eggs, e.aux % REINE.bigEvery === 0 ? 3 : 1);
+  const hm = hpMul(s);
+  for (let k = 0; k < n; k++) {
+    const a = (k * TWO_PI) / 3 + e.aux;
+    const egg = spawnEnemy(s, EGG_TYPE, e.x + (n > 1 ? dcos(a) * 34 : 0), e.y + (n > 1 ? dsin(a) * 34 : 0), hm, 1, 1, e.target);
+    if (!egg) return;
+    egg.timer = Math.round(REINE.hatchAfter * TICK_RATE) + k * 12;
+  }
+}
+
+/** Œuf : il éclot en Essaim. */
+function hatch(s: GameState, egg: Enemy): void {
+  egg.alive = false;
+  egg.hp = 0;
+  const n = REINE.hatchCount;
+  for (let k = 0; k < n; k++) {
+    const a = (k * TWO_PI) / n;
+    spawnEnemy(s, SWARM_TYPE, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s), dmgMul(s), spdMul(s), egg.target);
+  }
+  emit(s, EV_HATCH, egg.x, egg.y, n);
+}
+
+/** Renforts : un gros paquet d'un seul type, sauf s'il y a déjà du monde (il faut pouvoir taper le boss). */
+function summon(s: GameState, boss: Enemy, p: Player): void {
+  const sm = BOSS_SUMMONS[boss.type];
+  if (!sm) return;
+  let alive = 0;
+  for (let i = 0; i < s.enemyCount; i++) {
+    const o = s.enemies[i];
+    if (o.alive && !(o.flags & (EF_BOSS | EF_PROP)) && o.type !== WALL_TYPE) alive++;
+  }
+  const n = Math.min(sm.maxAlive - alive, sm.count + sm.perBoss * boss.aux2);
+  if (n <= 0) return;
+  const self = sm.around === 'self';
+  const cx = self ? boss.x : p.x;
+  const cy = self ? boss.y : p.y;
+  const R = self ? boss.r + sm.radius : sm.radius;
+  const r = ENEMIES[sm.typeId].radius;
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / n + PI / n;
-    const x = boss.x + dcos(a) * (boss.r + 40);
-    const y = boss.y + dsin(a) * (boss.r + 40);
-    if (circleHitsObstacle(s.map, x, y, 12)) continue;
-    spawnEnemy(s, BOSS_SUMMON_TYPE, x, y, hpMul(s), dmgMul(s), spdMul(s), boss.target);
+    const x = cx + dcos(a) * R;
+    const y = cy + dsin(a) * R;
+    if (circleHitsObstacle(s.map, x, y, r)) continue;
+    spawnEnemy(s, sm.typeId, x, y, hpMul(s), dmgMul(s), spdMul(s), boss.target);
+  }
+  if (!self) emit(s, EV_RING_WAVE, p.x, p.y, n);
+}
+
+/** Dégâts de contact d'un boss : bien plus forts quand il fonce (charge du Trapèze, ruée de l'Étoile). */
+function bossContactMul(e: Enemy): number {
+  const kind = BOSS_PATTERNS[e.type][e.ai]?.kind;
+  if (kind === 'charge' && e.ax > 0 && e.ax < BOSS.chargeLength) return BOSS.chargeDamage;
+  if (kind === 'dash') return ETOILE.dashDamage;
+  return 1;
+}
+
+/** Les murs de l'Hexagone bloquent les joueurs (glissement le long, comme contre un obstacle). */
+export function pushOutOfWalls(s: GameState, p: Player): void {
+  if (!p.alive) return;
+  for (let i = 0; i < s.enemyCount; i++) {
+    const w = s.enemies[i];
+    if (!w.alive || w.type !== WALL_TYPE || w.ai !== 1) continue;
+    const dx = p.x - w.x;
+    const dy = p.y - w.y;
+    const rr = p.r + w.r;
+    const d2 = dx * dx + dy * dy;
+    if (d2 >= rr * rr) continue;
+    const d = Math.sqrt(d2);
+    if (d < 0.001) moveCircle(s.map, p, rr, 0, p.r);
+    else moveCircle(s.map, p, (dx / d) * (rr - d), (dy / d) * (rr - d), p.r);
   }
 }
 
@@ -423,7 +712,7 @@ export function updateContacts(s: GameState): void {
       const dy = e.y - p.y;
       const rr = e.r + p.r;
       if (dx * dx + dy * dy >= rr * rr) continue;
-      if (!hurtPlayer(s, p, e.dmg)) continue;
+      if (!hurtPlayer(s, p, e.flags & EF_BOSS ? e.dmg * bossContactMul(e) : e.dmg)) continue;
       e.attackReady = tick + 30;
       if (!p.alive) break;
     }

@@ -129,8 +129,71 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       ctx.lineTo(-r * 0.9, -r);
       ctx.closePath();
       break;
+    case 'hexagon':
+    case 'block':
+      // Hexagone (le boss : un second, plus petit, au centre ; le mur : plein).
+      polygon(ctx, 6, r, Math.PI / 6);
+      if (d.shape === 'hexagon') polygon(ctx, 6, r * 0.5, 0);
+      break;
+    case 'star':
+      for (let k = 0; k < 10; k++) {
+        const a = (k * Math.PI) / 5 - Math.PI / 2;
+        const rr = k & 1 ? r * 0.45 : r * 1.1;
+        if (k === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      break;
+    case 'eye':
+      eyePath(ctx, 0, 0, r, 1, 0);
+      ctx.moveTo(r * 0.75, 0);
+      ctx.arc(r * 0.3, 0, r * 0.45, 0, Math.PI * 2);
+      break;
+    case 'queen':
+      queenPath(ctx, 0, 0, r);
+      break;
+    case 'egg':
+      ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2);
+      break;
   }
 }
+
+function polygon(ctx: CanvasRenderingContext2D, n: number, r: number, a0: number): void {
+  for (let k = 0; k < n; k++) {
+    const a = a0 + (k * Math.PI * 2) / n;
+    if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  ctx.closePath();
+}
+
+/** Œil en amande orienté vers (fx, fy). */
+export function eyePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fx: number, fy: number): void {
+  const ax = fx * r * 1.25;
+  const ay = fy * r * 1.25;
+  const nx = -fy * r * 1.1;
+  const ny = fx * r * 1.1;
+  ctx.moveTo(x - ax, y - ay);
+  ctx.quadraticCurveTo(x + nx, y + ny, x + ax, y + ay);
+  ctx.quadraticCurveTo(x - nx, y - ny, x - ax, y - ay);
+  ctx.closePath();
+}
+
+/** Reine : un corps rond et une couronne à trois pointes (toujours à l'endroit). */
+export function queenPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  ctx.moveTo(x + r * 0.85, y + r * 0.2);
+  ctx.arc(x, y + r * 0.2, r * 0.85, 0, Math.PI * 2);
+  ctx.moveTo(x - r * 0.7, y - r * 0.45);
+  ctx.lineTo(x - r * 0.75, y - r * 1.2);
+  ctx.lineTo(x - r * 0.35, y - r * 0.8);
+  ctx.lineTo(x, y - r * 1.35);
+  ctx.lineTo(x + r * 0.35, y - r * 0.8);
+  ctx.lineTo(x + r * 0.75, y - r * 1.2);
+  ctx.lineTo(x + r * 0.7, y - r * 0.45);
+}
+
+/** Toujours dessinés à l'endroit, sans yeux : caisse, murs, œufs, Reine. */
+const UPRIGHT = (d: EnemyDef) => d.behavior === 'prop' || d.behavior === 'wall' || d.behavior === 'egg' || d.shape === 'queen';
 
 /** Dessine un ennemi (orienté vers +x) au style tube néon. */
 export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: string): void {
@@ -149,7 +212,7 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
       neon(ctx, color === '#ffffff' ? color : '#ffd23a', 2.4);
     }
     // Yeux, tournés vers l'avant
-    if (r >= 9 && d.behavior !== 'prop') {
+    if (r >= 9 && !UPRIGHT(d) && d.shape !== 'eye') {
       ctx.beginPath();
       const er = r * 0.16;
       ctx.arc(r * 0.3, r * 0.32, er, 0, Math.PI * 2);
@@ -174,7 +237,7 @@ export function enemyPreview(id: string, size: number): HTMLCanvasElement {
   const k = (size * 0.36) / (d.radius * 1.3);
   ctx.translate(size / 2, size / 2);
   ctx.scale(k, k);
-  ctx.rotate(d.behavior === 'prop' ? 0 : -Math.PI / 2);
+  ctx.rotate(UPRIGHT(d) ? 0 : -Math.PI / 2);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   paintEnemy(ctx, d, d.color);

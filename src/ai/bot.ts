@@ -6,7 +6,7 @@
 import { FUSIONS } from '../data/fusions';
 import { BASE_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { BOSS, ENEMIES } from '../data/enemies';
+import { ENEMIES, OEIL } from '../data/enemies';
 import {
   OFFER_FUSION,
   OFFER_PASSIVE,
@@ -16,6 +16,8 @@ import {
   PK_CHEST,
   PK_HEAL,
   PJ_EBULLET,
+  PJ_FIRE,
+  BOSS_PATTERNS,
   circleHitsObstacle,
   choiceCode,
   encodeMove,
@@ -87,23 +89,27 @@ export function botInput(s: GameState, pi = 0): number {
     if (close >= 18 || p.hp < p.stats.maxHp * 0.35 || s.bossId >= 0) return INPUT_USE;
   }
 
-  // Charge du boss annoncée : on évite son axe (la ligne d'avertissement est visible à l'écran).
+  // Charge du Trapèze ou ruée de l'Étoile annoncée : on évite son axe (la ligne d'avertissement est
+  // visible à l'écran). Cône de l'Œil : on sort de sa portée.
   let chargeX = 0;
   let chargeY = 0;
   let chargeUx = 0;
   let chargeUy = 0;
   let charging = false;
+  let beam = false;
   if (s.bossId >= 0) {
     for (let i = 0; i < s.enemyCount; i++) {
       const e = s.enemies[i];
       if (!e.alive || !(e.flags & EF_BOSS)) continue;
-      if (BOSS.pattern[e.ai]?.kind === 'charge') {
+      const kind = BOSS_PATTERNS[e.type][e.ai]?.kind;
+      chargeX = e.x;
+      chargeY = e.y;
+      if (kind === 'charge' || kind === 'aim') {
         charging = true;
-        chargeX = e.x;
-        chargeY = e.y;
         chargeUx = Math.cos(e.aux);
         chargeUy = Math.sin(e.aux);
       }
+      beam = kind === 'focus' || kind === 'sweep';
       break;
     }
   }
@@ -126,13 +132,13 @@ export function botInput(s: GameState, pi = 0): number {
   }
   for (let i = 0; i < s.projCount && n < NEAR_X.length; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_EBULLET) continue;
+    if (b.kind !== PJ_EBULLET && b.kind !== PJ_FIRE) continue;
     const dx = b.x - p.x;
     const dy = b.y - p.y;
     if (dx * dx + dy * dy > 200 * 200) continue;
     NEAR_X[n] = b.x;
     NEAR_Y[n] = b.y;
-    NEAR_W[n] = b.damage + 6;
+    NEAR_W[n] = b.kind === PJ_FIRE ? 14 : b.damage + 6;
     n++;
   }
 
@@ -164,6 +170,16 @@ export function botInput(s: GameState, pi = 0): number {
       gy = dy;
       gw = it.kind === PK_CHEST ? 40 : 25;
       break;
+    }
+  }
+  // Boss : on va le chercher (sans se coller) quand rien n'est annoncé, comme un joueur qui veut le tuer.
+  if (s.bossId >= 0 && !charging && !beam && gw < 40) {
+    const bx = chargeX - p.x;
+    const by = chargeY - p.y;
+    if (bx * bx + by * by > 230 * 230) {
+      gx = bx;
+      gy = by;
+      gw = 30;
     }
   }
   const gl = Math.sqrt(gx * gx + gy * gy) || 1;
@@ -200,6 +216,12 @@ export function botInput(s: GameState, pi = 0): number {
       const along = rx * chargeUx + ry * chargeUy;
       const perp = Math.abs(rx * chargeUy - ry * chargeUx);
       if (along > -40 && perp < 90) threat += 80 * (1 - perp / 90) + 20;
+    }
+    if (beam) {
+      const rx = x2 - chargeX;
+      const ry = y2 - chargeY;
+      const d = Math.sqrt(rx * rx + ry * ry);
+      if (d < OEIL.beamLength + 40) threat += 60 * (1 - d / (OEIL.beamLength + 40)) + 10;
     }
     score -= threat;
     score += (gw * (dx * gx + dy * gy)) / gl / (1 + threat * 0.3);

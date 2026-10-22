@@ -7,7 +7,7 @@
  *   translucide en mode additif (jamais de shadowBlur) ;
  * - seules les entités visibles sont dessinées.
  */
-import { ENEMIES, BOSS } from '../data/enemies';
+import { ENEMIES, BOSS, ETOILE, HEXAGONE, OEIL } from '../data/enemies';
 import { ALL_WEAPONS } from '../data/weapons';
 import { PICKUPS } from '../data/loot';
 import {
@@ -21,7 +21,11 @@ import {
   PJ_MINE,
   PJ_BOOMERANG,
   PJ_RING,
+  PJ_FIRE,
   PK_CHEST,
+  BOSS_PATTERNS,
+  WALL_TYPE,
+  EGG_TYPE,
   MAX_ENEMIES,
   TICK_RATE,
   weaponDef,
@@ -35,7 +39,7 @@ import { COLORS, FX_COLORS, OBSTACLE_TINTS } from './palette';
 import type { Effects } from './effects';
 import { drawHud, formatTime, glowText, FONT, type HudOptions } from './hud';
 import { neon } from './icons';
-import { SpriteBank, type Sprite } from './sprites';
+import { SpriteBank, eyePath, queenPath, type Sprite } from './sprites';
 
 export interface RenderOptions extends HudOptions {
   quality: 'high' | 'low';
@@ -55,6 +59,7 @@ const ENEMY_LEADER = ENEMIES.findIndex((e) => e.behavior === 'leader');
 const BLINK_DEF = ENEMIES[ENEMY_BLINKER];
 const BLINK_FUSE = Math.round((BLINK_DEF?.fuse ?? 1) * TICK_RATE);
 const LEADER_DEF = ENEMIES[ENEMY_LEADER];
+const HEX_COLOR = ENEMIES.find((e) => e.id === 'hexagone')!.color;
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -343,6 +348,16 @@ export class Renderer {
     }
   }
 
+  private polygon(x: number, y: number, n: number, r: number, a0: number): void {
+    const ctx = this.ctx;
+    for (let k = 0; k < n; k++) {
+      const a = a0 + (k * Math.PI * 2) / n;
+      if (k === 0) ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      else ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+  }
+
   private enemyPath(e: Enemy, type: number, x: number, y: number, time: number): void {
     const ctx = this.ctx;
     const r = e.r;
@@ -414,6 +429,29 @@ export class Renderer {
         ctx.quadraticCurveTo(x + r * 0.25, y + r * 0.05, x + r * 0.5, y + r * 0.2);
         break;
       }
+      case 'hexagon':
+        // Deux hexagones qui tournent en sens contraire.
+        this.polygon(x, y, 6, r, time * 0.5);
+        this.polygon(x, y, 6, r * 0.5, -time * 0.9);
+        break;
+      case 'star': {
+        // Elle tourbillonne quand elle fonce.
+        const spin = BOSS_PATTERNS[e.type][e.ai]?.kind === 'dash' ? time * 9 : time * 1.2;
+        for (let k = 0; k < 10; k++) {
+          const a = spin + (k * Math.PI) / 5;
+          const rr = k & 1 ? r * 0.45 : r * 1.1;
+          if (k === 0) ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+          else ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+        }
+        ctx.closePath();
+        break;
+      }
+      case 'eye':
+        eyePath(ctx, x, y, r, 1, 0);
+        break;
+      case 'queen':
+        queenPath(ctx, x, y, r);
+        break;
     }
   }
 
@@ -538,14 +576,20 @@ export class Renderer {
       const cnt = n[t];
       if (!cnt) continue;
       const list = this.buckets[t];
-      const rotates = ENEMIES[t].shape !== 'box' && ENEMIES[t].shape !== 'dot';
+      const shape = ENEMIES[t].shape;
+      const rotates = shape !== 'box' && shape !== 'dot' && shape !== 'block' && shape !== 'egg';
       for (let pass = 0; pass < 2; pass++) {
         const sp = pass === 0 ? this.sprites.enemy[t] : this.sprites.enemyFlash[t];
         if (!rotates) this.worldTransform();
         for (let k = 0; k < cnt; k++) {
           const e = s.enemies[list[k]];
+          // Mur qui sort du sol : dessiné à part (pointillés), pas encore solide.
+          if (t === WALL_TYPE && e.ai === 0) continue;
           const flash =
-            e.frozenUntil > tick || tick - e.hitTick < 5 || ((t === ENEMY_KAMIKAZE || t === ENEMY_BLINKER) && e.ai === 1 && ((tick >> 2) & 1) === 1);
+            e.frozenUntil > tick ||
+            tick - e.hitTick < 5 ||
+            ((t === ENEMY_KAMIKAZE || t === ENEMY_BLINKER) && e.ai === 1 && ((tick >> 2) & 1) === 1) ||
+            (t === EGG_TYPE && e.timer < 50 && ((tick >> 2) & 1) === 1);
           if (flash !== (pass === 1)) continue;
           const x = lerp(e.px, e.x, alpha);
           const y = lerp(e.py, e.y, alpha);
@@ -574,6 +618,7 @@ export class Renderer {
 
     this.drawLeaders(s, alpha, time);
     this.drawBlinks(s, alpha);
+    if (n[WALL_TYPE] > 0) this.drawRisingWalls(s, time);
 
     // Zone d'explosion des bulles prêtes à éclater
     if (ENEMY_KAMIKAZE >= 0 && n[ENEMY_KAMIKAZE] > 0) {
@@ -600,14 +645,126 @@ export class Renderer {
       }
     }
 
-    // Boss : vectoriel (un seul), avec moustache, yeux et ligne d'avertissement de charge.
-    if (boss) {
-      const x = lerp(boss.px, boss.x, alpha);
-      const y = lerp(boss.py, boss.y, alpha);
+    // Boss : vectoriel (un seul), avec ses avertissements.
+    if (boss) this.drawBoss(s, boss, lerp(boss.px, boss.x, alpha), lerp(boss.py, boss.y, alpha), time);
+  }
+
+  /** Murs en train de sortir du sol : contour en pointillés qui grandit. */
+  private drawRisingWalls(s: GameState, time: number): void {
+    const ctx = this.ctx;
+    const rise = HEXAGONE.wallRise * TICK_RATE;
+    let any = false;
+    ctx.beginPath();
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.type !== WALL_TYPE || e.ai !== 0 || !this.visible(e.x, e.y, e.r)) continue;
+      const prog = Math.max(0, Math.min(1, 1 - (e.timer - e.aux) / rise));
+      this.polygon(e.x, e.y, 6, e.r * (0.4 + 0.6 * prog), Math.PI / 6);
+      any = true;
+    }
+    if (!any) return;
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -time * 20;
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = HEX_COLOR;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  private drawBoss(s: GameState, boss: Enemy, x: number, y: number, time: number): void {
+    const ctx = this.ctx;
+    const color = ENEMIES[boss.type].color;
+    const ph = BOSS_PATTERNS[boss.type][boss.ai];
+    const total = ph ? Math.round(ph.duration * TICK_RATE) : 1;
+    const elapsed = total - boss.timer;
+
+    // Avertissements, sous le boss.
+    if (ph?.kind === 'charge' && elapsed < BOSS.chargeTelegraph * TICK_RATE) {
+      this.dangerLine(x, y, boss.aux, BOSS.chargeLength, boss.r * 1.6, time);
+    }
+    if (ph?.kind === 'aim' || ph?.kind === 'dash') {
+      // Étoile : la boîte de rebond, et sa direction pendant qu'elle vise.
+      const H = ETOILE.box;
       ctx.beginPath();
-      this.enemyPath(boss, boss.type, x, y, time);
-      this.glow(tick - boss.hitTick < 4 ? '#ffffff' : ENEMIES[boss.type].color, 3.5);
+      ctx.rect(boss.ax - H, boss.ay - H, H * 2, H * 2);
+      ctx.setLineDash([10, 12]);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      if (ph.kind === 'aim') this.dangerLine(x, y, boss.aux, 700, boss.r * 1.4, time);
+    }
+    if (ph?.kind === 'focus' || ph?.kind === 'sweep') {
+      // Œil : le cône que le rayon va balayer, puis le rayon.
+      const L = OEIL.beamLength;
+      const a0 = Math.min(boss.ax, boss.ay);
+      const a1 = Math.max(boss.ax, boss.ay);
       ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.arc(x, y, L, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = '#ff2b2b';
+      ctx.globalAlpha = ph.kind === 'focus' ? 0.08 + 0.05 * Math.sin(time * 25) : 0.05;
+      ctx.fill();
+      ctx.globalAlpha = 0.6;
+      ctx.setLineDash([12, 10]);
+      ctx.strokeStyle = '#ff2b2b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      if (ph.kind === 'sweep') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(boss.aux) * L, y + Math.sin(boss.aux) * L);
+        ctx.strokeStyle = '#ff2b2b';
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = OEIL.beamWidth * 2.2;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = OEIL.beamWidth * 0.8;
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = OEIL.beamWidth * 0.3;
+        ctx.stroke();
+      }
+    }
+
+    ctx.beginPath();
+    this.enemyPath(boss, boss.type, x, y, time);
+    this.glow(s.tick - boss.hitTick < 4 ? '#ffffff' : color, 3.5);
+
+    // Regard : l'Œil a une pupille (vers le joueur, ou le long du rayon), les autres deux petits yeux.
+    ctx.beginPath();
+    if (ENEMIES[boss.type].shape === 'eye') {
+      let fx = 1;
+      let fy = 0;
+      const target = s.players[boss.target];
+      if (ph?.kind === 'focus' || ph?.kind === 'sweep') {
+        const a = ph.kind === 'focus' ? (boss.ax + boss.ay) / 2 : boss.aux;
+        fx = Math.cos(a);
+        fy = Math.sin(a);
+      } else if (target) {
+        const dx = target.x - x;
+        const dy = target.y - y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        fx = dx / d;
+        fy = dy / d;
+      }
+      const pr = boss.r * 0.38;
+      const px = x + fx * boss.r * 0.4;
+      const py = y + fy * boss.r * 0.4;
+      ctx.moveTo(px + pr, py);
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      this.glow(color, 2.5);
+      ctx.beginPath();
+      ctx.arc(px + fx * pr * 0.3, py + fy * pr * 0.3, pr * 0.45, 0, Math.PI * 2);
+    } else {
       const fx = boss.vx || 1;
       const fy = boss.vy || 0;
       const er = boss.r * 0.12;
@@ -617,29 +774,27 @@ export class Renderer {
         ctx.moveTo(ex + er, ey);
         ctx.arc(ex, ey, er, 0, Math.PI * 2);
       }
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      const ph = BOSS.pattern[boss.ai];
-      if (ph && ph.kind === 'charge') {
-        const total = Math.round(ph.duration * 60);
-        const elapsed = total - boss.timer;
-        if (elapsed < BOSS.chargeTelegraph * 60) {
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x + Math.cos(boss.aux) * 1100, y + Math.sin(boss.aux) * 1100);
-          ctx.setLineDash([24, 14]);
-          ctx.strokeStyle = '#ff2b2b';
-          ctx.lineWidth = boss.r * 1.6;
-          ctx.globalAlpha = 0.12 + 0.1 * Math.sin(time * 30);
-          ctx.stroke();
-          ctx.globalAlpha = 0.9;
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.globalAlpha = 1;
-        }
-      }
     }
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  /** Ligne d'avertissement rouge en pointillés (charge, ruée). */
+  private dangerLine(x: number, y: number, a: number, len: number, width: number, time: number): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+    ctx.setLineDash([24, 14]);
+    ctx.strokeStyle = '#ff2b2b';
+    ctx.lineWidth = width;
+    ctx.globalAlpha = 0.12 + 0.1 * Math.sin(time * 30);
+    ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   }
 
   private drawProjectiles(s: GameState, alpha: number): void {
@@ -686,6 +841,28 @@ export class Renderer {
       const b = s.projectiles[i];
       if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !this.visible(b.x, b.y, 20)) continue;
       this.spriteAt(sp.mineLight, b.x, b.y);
+    }
+    // Flammes de l'Étoile : disques orange qui vacillent et s'éteignent.
+    let fires = false;
+    ctx.beginPath();
+    for (let i = 0; i < s.projCount; i++) {
+      const b = s.projectiles[i];
+      if (b.kind !== PJ_FIRE || !this.visible(b.x, b.y, b.r)) continue;
+      const fade = Math.min(1, b.life / 40);
+      const r = b.r * (0.75 + 0.25 * fade) * (0.92 + 0.08 * Math.sin(b.age * 0.7 + i));
+      ctx.moveTo(b.x + r, b.y);
+      ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+      fires = true;
+    }
+    if (fires) {
+      ctx.fillStyle = '#ff8a1f';
+      ctx.globalAlpha = 0.28;
+      ctx.fill();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = '#ffd23a';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     // Balles ennemies : pleines, rouges à cœur blanc (distinctes de tout le reste). Celles des Tireurs,
     // cassables, sont violettes cerclées de pointillés.

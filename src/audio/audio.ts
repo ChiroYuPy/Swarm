@@ -12,6 +12,7 @@ const THROTTLE: Partial<Record<SfxName | 'ui', number>> = {
   kill: 0.04,
   gem: 0.025,
   hurt: 0.12,
+  hatch: 0.08,
   explosion: 0.05,
   enemyShot: 0.09,
   zap: 0.05,
@@ -292,6 +293,25 @@ export class AudioEngine {
         // Distorsion qui « aspire » puis claque
         this.tone('sawtooth', 1400, 180, 0.16, 0.04, 0, this.sfxBus, { type: 'lowpass', freq: 2400 });
         this.noiseHit(0.1, 0.05, 'highpass', 3000);
+        break;
+      case 'wave':
+        // Gong court : une vague arrive
+        this.tone('triangle', 330, 330, 0.25, 0.06);
+        this.tone('triangle', 495, 495, 0.35, 0.05, 0.1);
+        break;
+      case 'hatch':
+        this.tone('square', 900, 1500, 0.06, 0.025, 0, this.sfxBus, { type: 'lowpass', freq: 3000 });
+        this.noiseHit(0.06, 0.04, 'highpass', 4000);
+        break;
+      case 'bossLaser':
+        // Rayon qui monte en puissance puis balaie
+        this.tone('sawtooth', 120, 480, 0.9, 0.07, 0, this.sfxBus, { type: 'lowpass', freq: 1800 });
+        this.tone('square', 240, 960, 0.9, 0.03, 0, this.sfxBus, { type: 'lowpass', freq: 2400 });
+        break;
+      case 'cage':
+        // Murs qui sortent du sol
+        this.noiseHit(0.5, 0.12, 'lowpass', 900, 80);
+        [0, 0.08, 0.16].forEach((t) => this.tone('square', 160, 120, 0.07, 0.05, t));
         break;
       case 'revive':
         this.noiseHit(0.5, 0.12, 'lowpass', 2000, 120);

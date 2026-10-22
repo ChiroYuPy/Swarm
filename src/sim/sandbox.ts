@@ -6,8 +6,7 @@
 import { xpForLevel } from '../data/hero';
 import { PICKUPS } from '../data/loot';
 import { MAX_ITEM_LEVEL, MAX_PASSIVE_SLOTS, MAX_WEAPON_SLOTS, TICK_RATE } from './constants';
-import { WAVES } from '../data/waves';
-import { ENEMY_INDEX, FUSION_TABLE, PASSIVE_INDEX, WEAPON_INDEX, BOSS_TYPE, PROP_TYPE, weaponMaxLevel } from './registry';
+import { BEHAVIOR, BOSS_TICKS, ENEMY_BEHAVIOR, ENEMY_INDEX, FUSION_TABLE, PASSIVE_INDEX, WEAPON_INDEX, PROP_TYPE, weaponMaxLevel } from './registry';
 import { addWeapon } from './levelup';
 import { computeStats } from './player';
 import { PassiveInst, type GameState, type Player, type SandboxRules } from './state';
@@ -41,7 +40,7 @@ export function compileSandbox(c: SandboxConfig): SandboxRules {
     invincible: !!c.invincible,
     enemyMul: clamp(c.enemyMul, 0, 10),
     enemies: c.enemies
-      ? c.enemies.map((id) => ENEMY_INDEX[id]).filter((t) => t !== undefined && t !== BOSS_TYPE && t !== PROP_TYPE)
+      ? c.enemies.map((id) => ENEMY_INDEX[id]).filter((t) => t !== undefined && ENEMY_BEHAVIOR[t] !== BEHAVIOR.BOSS && t !== PROP_TYPE)
       : null,
     bosses: !!c.bosses,
     xp: clamp(c.xp, 0, 100),
@@ -53,8 +52,9 @@ export function applySandbox(s: GameState, c: SandboxConfig): void {
   s.sandbox = compileSandbox(c);
   const startTick = Math.round(clamp(c.startMinute, 0, 120) * 60 * TICK_RATE);
   s.tick = startTick;
-  // Les boss déjà « passés » comptent : le prochain a la force qu'il aurait eue à ce moment de la partie.
-  s.bossSpawned = Math.floor(startTick / Math.round(WAVES.bossEvery * TICK_RATE));
+  s.clock = startTick;
+  // Les boss déjà « passés » comptent : le prochain a la force (et le rang) qu'il aurait eus à ce moment.
+  s.bossSpawned = Math.floor(startTick / BOSS_TICKS);
   for (const p of s.players) applyLoadout(p, c);
 }
 

@@ -53,6 +53,9 @@ export class Enemy {
   timer = 0;
   aux = 0;
   aux2 = 0;
+  /** boss : point d'ancrage (Étoile : centre de la boîte de rebond) ou angles (Œil : début et fin du balayage) */
+  ax = 0;
+  ay = 0;
   /** joueur ciblé (pour le multi) */
   target = 0;
   immune = new Int32Array(IMMUNE_SLOTS);
@@ -63,6 +66,8 @@ export const PJ_EBULLET = 1;
 export const PJ_MINE = 2;
 export const PJ_BOOMERANG = 3;
 export const PJ_RING = 4;
+/** flamme au sol laissée par l'Étoile ricochet : a = dégâts par seconde */
+export const PJ_FIRE = 5;
 
 export class Projectile {
   kind = 0;
@@ -280,6 +285,16 @@ export const EV_REVIVE = 30;
 export const EV_CLONE_END = 31;
 /** Téléporteur : x, y = arrivée, v = rayon de l'impact */
 export const EV_BLINK = 32;
+/** ennemi chassé par l'arrivée d'un boss : x, y, v = rayon, k = type */
+export const EV_FLEE = 33;
+/** début de vague : v = numéro (1 = la première) */
+export const EV_WAVE = 34;
+/** œuf éclos : x, y, v = nombre d'Essaim */
+export const EV_HATCH = 35;
+/** l'Œil commence à balayer : x, y = l'Œil */
+export const EV_LASER = 36;
+/** l'Hexagone bâtisseur pose sa cage : x, y = centre, v = rayon */
+export const EV_CAGE = 37;
 
 /** Événement émis par la sim pour le rendu et l'audio. Purement informatif : la sim ne les relit jamais. */
 export class SimEvent {
@@ -332,6 +347,10 @@ export interface GameState {
   bossSpawned: number;
   /** id de l'ennemi boss vivant, -1 sinon */
   bossId: number;
+  /** horloge des vagues (ticks) : avance sauf pendant un boss et le calme qui suit */
+  clock: number;
+  /** calme après un boss jusqu'à ce tick (ni vague ni horloge) */
+  calmUntil: number;
   chestCount: number;
   totalKills: number;
   /** monde ralenti (Horloge) jusqu'à ce tick */

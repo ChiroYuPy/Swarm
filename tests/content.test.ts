@@ -15,6 +15,7 @@ import {
   EV_NEW_ENEMY,
   TICK_RATE,
 } from '../src/sim';
+import { damageEnemy } from '../src/sim/combat';
 import { addWeapon } from '../src/sim/levelup';
 import { weaponId } from '../src/sim/registry';
 import { BASE_WEAPONS } from '../src/data/weapons';
@@ -51,12 +52,22 @@ describe('contenu', () => {
       s.players[0].hp = 1e9;
       s.players[0].base.magnet = 0;
       const seen = new Map<string, number>();
-      for (let i = 0; i < seconds * TICK_RATE && !s.over; i++) {
+      // Temps des vagues (l'horloge s'arrête pendant les boss : on les abat dès qu'ils arrivent).
+      while (s.clock < seconds * TICK_RATE && !s.over) {
         step(s, [s.players[0].offers.length ? 200 : 0]);
         for (let k = 0; k < s.eventCount; k++) {
           const e = s.events[k];
-          if (e.type === EV_NEW_ENEMY && !seen.has(ENEMIES[e.k].id)) seen.set(ENEMIES[e.k].id, s.tick / TICK_RATE);
+          if (e.type === EV_NEW_ENEMY && !seen.has(ENEMIES[e.k].id)) seen.set(ENEMIES[e.k].id, s.clock / TICK_RATE);
         }
+        if (s.bossId >= 0)
+          damageEnemy(
+            s,
+            s.enemies.findIndex((e) => e.alive && e.id === s.bossId),
+            1e9,
+            0,
+            0,
+            0,
+          );
       }
       return seen;
     };

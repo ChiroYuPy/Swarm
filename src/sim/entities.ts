@@ -45,6 +45,8 @@ export function spawnEnemy(
   e.timer = 0;
   e.aux = 0;
   e.aux2 = 0;
+  e.ax = 0;
+  e.ay = 0;
   e.target = target;
   e.immune.fill(0);
   return e;

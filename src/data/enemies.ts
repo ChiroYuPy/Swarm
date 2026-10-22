@@ -1,7 +1,25 @@
 /** Ennemis. Les PV / dégâts / vitesses sont multipliés par les courbes de difficulté de waves.ts. */
 
-export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'leader' | 'blinker' | 'orbiter';
-export type EnemyShape = 'triangle' | 'diamond' | 'square' | 'pentagon' | 'circle' | 'dot' | 'box' | 'trapeze' | 'rock' | 'sun' | 'ring' | 'dart';
+export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'leader' | 'blinker' | 'orbiter' | 'wall' | 'egg';
+export type EnemyShape =
+  | 'triangle'
+  | 'diamond'
+  | 'square'
+  | 'pentagon'
+  | 'circle'
+  | 'dot'
+  | 'box'
+  | 'trapeze'
+  | 'rock'
+  | 'sun'
+  | 'ring'
+  | 'dart'
+  | 'hexagon'
+  | 'star'
+  | 'eye'
+  | 'queen'
+  | 'block'
+  | 'egg';
 
 export interface EnemyDef {
   id: string;
@@ -117,39 +135,211 @@ export const ENEMIES: EnemyDef[] = [
     hp: 40, speed: 0, damage: 0, radius: 18, xp: 0, kbResist: 1,
   },
   {
-    id: 'boss', name: 'Trapèze', desc: 'Boss toutes les 3 minutes : spirales de tirs, charges, renforts.',
+    id: 'boss', name: 'Trapèze', desc: 'Boss : spirales de tirs, renforts de Chasseurs, et des charges qui écrasent tout le long de la ligne rouge.',
     behavior: 'boss', shape: 'trapeze', color: '#ff3df5',
-    hp: 1800, speed: 58, damage: 18, radius: 46, xp: 0, kbResist: 1,
+    hp: 2000, speed: 68, damage: 20, radius: 46, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'hexagone', name: 'Hexagone bâtisseur', desc: 'Boss : t’enferme dans une cage de murs puis tire à travers. Casse un mur pour sortir (ils tombent seuls au bout de 6 s).',
+    behavior: 'boss', shape: 'hexagon', color: '#3dffe0',
+    hp: 2100, speed: 54, damage: 22, radius: 44, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'etoile', name: 'Étoile ricochet', desc: 'Boss : vise, puis fonce en rebondissant et laisse une traînée de feu. Ne reste pas dans les flammes.',
+    behavior: 'boss', shape: 'star', color: '#ffd23a',
+    hp: 1900, speed: 74, damage: 24, radius: 40, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'oeil', name: 'Œil laser', desc: 'Boss : un cône rouge annonce le balayage de son laser. Sors de sa portée ou passe derrière lui.',
+    behavior: 'boss', shape: 'eye', color: '#ff4d6d',
+    hp: 2100, speed: 66, damage: 20, radius: 42, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'reine', name: 'Reine de l’essaim', desc: 'Boss : te fuit en pondant des œufs qui éclosent en Essaim. Casse les œufs et rattrape-la.',
+    behavior: 'boss', shape: 'queen', color: '#ff9ecf',
+    hp: 1700, speed: 100, damage: 18, radius: 40, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'mur', name: 'Mur', desc: 'Posé par l’Hexagone bâtisseur.',
+    behavior: 'wall', shape: 'block', color: '#3dffe0', hidden: true,
+    hp: 26, speed: 0, damage: 0, radius: 15, xp: 0, kbResist: 1,
+  },
+  {
+    id: 'oeuf', name: 'Œuf', desc: 'Pondu par la Reine : éclot en Essaim.',
+    behavior: 'egg', shape: 'egg', color: '#ff9ecf', hidden: true,
+    hp: 16, speed: 0, damage: 0, radius: 11, xp: 1, kbResist: 1,
   },
 ];
 
-/** Comportement du boss : une séquence de phases qui boucle. */
+export type BossPhaseKind =
+  | 'chase'
+  | 'spiral'
+  | 'charge'
+  | 'summon'
+  | 'build'
+  | 'volley'
+  | 'aim'
+  | 'dash'
+  | 'burst'
+  | 'watch'
+  | 'focus'
+  | 'sweep'
+  | 'flee'
+  | 'lay';
+
+export interface BossPhase {
+  kind: BossPhaseKind;
+  duration: number;
+}
+
+/**
+ * Renforts d'un boss (phase 'summon') : un gros paquet d'un seul type, autour du boss ou en cercle
+ * autour du joueur. Rien s'il reste déjà `maxAlive` ennemis : il faut toujours une fenêtre pour le taper.
+ */
+export interface BossSummon {
+  type: string;
+  count: number;
+  /** ennemis en plus par boss déjà apparu */
+  perBoss: number;
+  around: 'self' | 'player';
+  radius: number;
+  maxAlive: number;
+}
+
+/** Les boss arrivent toujours dans cet ordre, puis on reboucle en « Mk II », « Mk III »… */
+export const BOSS_ORDER = ['boss', 'hexagone', 'etoile', 'oeil', 'reine'];
+
+const MARKS = ['', ' Mk II', ' Mk III', ' Mk IV', ' Mk V', ' Mk VI', ' Mk VII', ' Mk VIII'];
+
+/** Nom du k-ième boss de la partie (0 = le premier). */
+export function bossName(k: number): string {
+  const d = ENEMIES.find((e) => e.id === BOSS_ORDER[k % BOSS_ORDER.length])!;
+  return d.name + MARKS[Math.min(MARKS.length - 1, Math.floor(k / BOSS_ORDER.length))];
+}
+
+/** PV du k-ième boss × (1 + BOSS_HP_GROWTH × k) */
+export const BOSS_HP_GROWTH = 0.9;
+
+/** Trapèze : une séquence de phases qui boucle. */
 export const BOSS = {
-  names: [
-    'Trapèze',
-    'Trapèze Mk II',
-    'Trapèze Mk III',
-    'Trapèze Mk IV',
-    'Trapèze Mk V',
-  ],
-  /** multiplicateur de PV par apparition supplémentaire */
-  hpGrowth: 1.4,
   pattern: [
     { kind: 'chase', duration: 2.5 },
     { kind: 'spiral', duration: 3.0 },
     { kind: 'chase', duration: 1.5 },
-    { kind: 'charge', duration: 1.6 },
-    { kind: 'charge', duration: 1.6 },
-    { kind: 'summon', duration: 1.0 },
-  ] as { kind: 'chase' | 'spiral' | 'charge' | 'summon'; duration: number }[],
+    { kind: 'charge', duration: 1.9 },
+    { kind: 'charge', duration: 1.9 },
+    { kind: 'summon', duration: 1.2 },
+  ] as BossPhase[],
   spiralEvery: 0.1,
   spiralArms: 4,
   spiralTurn: 0.23,
-  bulletSpeed: 170,
+  bulletSpeed: 175,
   bulletDamage: 10,
-  /** part du temps de charge passée à prévenir (ligne d'avertissement) */
+  /** durée de la ligne d'avertissement (s) ; ensuite il fonce jusqu'au bout de la ligne */
   chargeTelegraph: 0.9,
-  chargeSpeed: 540,
-  summonType: 'triangle',
-  summonCount: 8,
+  chargeSpeed: 700,
+  /** portée de la charge (= longueur de la ligne d'avertissement) */
+  chargeLength: 560,
+  /** dégâts de contact × chargeDamage pendant qu'il fonce */
+  chargeDamage: 1.8,
+  summon: { type: 'triangle', count: 10, perBoss: 2, around: 'self', radius: 90, maxAlive: 20 } as BossSummon,
+};
+
+/** Hexagone bâtisseur : cage de murs cassables autour du joueur, puis tirs à travers. */
+export const HEXAGONE = {
+  pattern: [
+    { kind: 'chase', duration: 2.0 },
+    { kind: 'build', duration: 1.0 },
+    { kind: 'spiral', duration: 3.4 },
+    { kind: 'volley', duration: 2.0 },
+    { kind: 'chase', duration: 2.0 },
+    { kind: 'summon', duration: 1.0 },
+  ] as BossPhase[],
+  /** rayon de la cage (hexagone) et écart entre deux murs */
+  cageRadius: 210,
+  wallSpacing: 27,
+  /** durée de vie d'un mur, dont la montée (pas encore solide) */
+  wallLife: 6.5,
+  wallRise: 0.6,
+  spiralEvery: 0.2,
+  spiralArms: 5,
+  spiralTurn: 0.1,
+  volleyEvery: 0.5,
+  volleyCount: 5,
+  volleySpread: 0.14,
+  bulletSpeed: 185,
+  bulletDamage: 10,
+  summon: { type: 'carre', count: 5, perBoss: 1, around: 'player', radius: 420, maxAlive: 12 } as BossSummon,
+};
+
+/** Étoile ricochet : vise (ligne), fonce en rebondissant dans une boîte autour du joueur, laisse du feu. */
+export const ETOILE = {
+  pattern: [
+    { kind: 'chase', duration: 1.4 },
+    { kind: 'aim', duration: 0.9 },
+    { kind: 'dash', duration: 2.4 },
+    { kind: 'aim', duration: 0.7 },
+    { kind: 'dash', duration: 2.0 },
+    { kind: 'burst', duration: 1.4 },
+    { kind: 'summon', duration: 0.8 },
+  ] as BossPhase[],
+  dashSpeed: 520,
+  /** demi-côté de la boîte de rebond, centrée là où était le joueur quand elle a visé */
+  box: 380,
+  /** dégâts de contact × dashDamage pendant qu'elle fonce */
+  dashDamage: 1.6,
+  /** une flamme toutes les `fireEvery` images */
+  fireEvery: 3,
+  fireRadius: 20,
+  fireLife: 3.2,
+  /** dégâts par seconde passée dans les flammes */
+  fireDps: 22,
+  burstArms: 10,
+  bulletSpeed: 180,
+  bulletDamage: 10,
+  summon: { type: 'losange', count: 12, perBoss: 2, around: 'self', radius: 80, maxAlive: 20 } as BossSummon,
+};
+
+/** Œil laser : garde ses distances, annonce un cône puis le balaie avec un rayon. */
+export const OEIL = {
+  pattern: [
+    { kind: 'watch', duration: 2.0 },
+    { kind: 'focus', duration: 1.1 },
+    { kind: 'sweep', duration: 1.0 },
+    { kind: 'focus', duration: 0.9 },
+    { kind: 'sweep', duration: 1.0 },
+    { kind: 'watch', duration: 1.6 },
+    { kind: 'summon', duration: 0.8 },
+  ] as BossPhase[],
+  keepMin: 240,
+  keepMax: 330,
+  shootEvery: 0.45,
+  bulletSpeed: 210,
+  bulletDamage: 9,
+  beamLength: 520,
+  beamWidth: 16,
+  /** ouverture du balayage (radians) */
+  arc: 1.6,
+  beamDamage: 28,
+  summon: { type: 'orbiteur', count: 8, perBoss: 2, around: 'player', radius: 520, maxAlive: 14 } as BossSummon,
+};
+
+/** Reine de l'essaim : fuit (plus lente que toi) et pond des œufs qui éclosent en Essaim. */
+export const REINE = {
+  pattern: [
+    { kind: 'flee', duration: 1.2 },
+    { kind: 'lay', duration: 0.3 },
+  ] as BossPhase[],
+  keepMin: 260,
+  keepMax: 400,
+  /** une ponte sur `bigEvery` est triple */
+  bigEvery: 3,
+  hatchAfter: 3.6,
+  hatchCount: 5,
+  maxEggs: 8,
+  /** à chaque ponte, une salve vers le joueur */
+  volleyCount: 3,
+  volleySpread: 0.22,
+  bulletSpeed: 190,
+  bulletDamage: 10,
 };

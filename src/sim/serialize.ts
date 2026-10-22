@@ -53,6 +53,8 @@ export function hashState(s: GameState): string {
   h.num(s.spawnBudget);
   h.int(s.bossSpawned);
   h.int(s.bossId);
+  h.int(s.clock);
+  h.int(s.calmUntil);
   h.int(s.totalKills);
   h.int(s.nextEnemyId);
   for (const p of s.players) {
@@ -138,6 +140,8 @@ export function serializeState(s: GameState): string {
       spawnBudget: s.spawnBudget,
       bossSpawned: s.bossSpawned,
       bossId: s.bossId,
+      clock: s.clock,
+      calmUntil: s.calmUntil,
       chestCount: s.chestCount,
       totalKills: s.totalKills,
       clockUntil: s.clockUntil,
@@ -176,6 +180,8 @@ export function deserializeState(json: string): GameState {
   s.spawnBudget = c.spawnBudget as number;
   s.bossSpawned = c.bossSpawned as number;
   s.bossId = c.bossId as number;
+  s.clock = c.clock as number;
+  s.calmUntil = c.calmUntil as number;
   s.chestCount = c.chestCount as number;
   s.totalKills = c.totalKills as number;
   s.clockUntil = c.clockUntil as number;

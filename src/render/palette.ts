@@ -51,6 +51,8 @@ export const FX_COLORS = [
   '#c8ff3d', // 21 diviseur
   '#3d9bff', // 22 gardien
   '#8f5bff', // 23 téléporteur
+  '#3dffe0', // 24 hexagone bâtisseur
+  '#ff4d6d', // 25 œil laser
 ];
 
 export function fxColorIndex(hex: string): number {

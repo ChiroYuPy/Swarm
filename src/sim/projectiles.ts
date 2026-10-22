@@ -17,6 +17,7 @@ import {
   PJ_EBULLET,
   PJ_MINE,
   PJ_RING,
+  PJ_FIRE,
   emit,
   type GameState,
   type Projectile,
@@ -59,6 +60,9 @@ export function updateProjectiles(s: GameState): void {
         break;
       case PJ_RING:
         dead = ring(s, b);
+        break;
+      case PJ_FIRE:
+        fire(s, b);
         break;
     }
     if (!dead) {
@@ -121,6 +125,19 @@ function enemyBullet(s: GameState, b: Projectile): boolean {
     }
   }
   return false;
+}
+
+/** Flamme au sol (Étoile ricochet) : brûle qui reste dessus, par petites touches (sans invulnérabilité). */
+const FIRE_TICK = 10;
+function fire(s: GameState, b: Projectile): void {
+  if (s.tick % FIRE_TICK !== 0) return;
+  for (const p of s.players) {
+    if (!p.alive) continue;
+    const dx = p.x - b.x;
+    const dy = p.y - b.y;
+    const rr = b.r + p.r * 0.5;
+    if (dx * dx + dy * dy < rr * rr) hurtPlayer(s, p, (b.a * FIRE_TICK) / TICK_RATE, true);
+  }
 }
 
 /** Balle de Tireur touchée par une balle ou un boomerang du joueur ? (une balle sans perforation s'y use) */

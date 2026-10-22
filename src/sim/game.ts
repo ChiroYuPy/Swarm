@@ -18,7 +18,7 @@ import { Player, makePools, emit, EF_BOSS, EV_CLONE_END, type GameState } from '
 import { computeStats, updatePlayer, useActivable } from './player';
 import { addWeapon, applyChoice, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
-import { updateContacts, updateEnemies } from './enemies';
+import { pushOutOfWalls, updateContacts, updateEnemies } from './enemies';
 import { processShatters } from './combat';
 import { updateWeapons } from './weapons';
 import { updateProjectiles } from './projectiles';
@@ -73,6 +73,8 @@ export function createGame(cfg: GameConfig): GameState {
     spawnBudget: 0,
     bossSpawned: 0,
     bossId: -1,
+    clock: 0,
+    calmUntil: 0,
     chestCount: 0,
     totalKills: 0,
     clockUntil: 0,
@@ -155,7 +157,10 @@ function tick(s: GameState, inputs: ArrayLike<number>): void {
       emit(s, EV_CLONE_END, c.x, c.y, 0, 0, 0, 0, c.index);
     }
   }
-  for (let i = 0; i < s.players.length; i++) updatePlayer(s, s.players[i], inputs[i] ?? 0);
+  for (let i = 0; i < s.players.length; i++) {
+    updatePlayer(s, s.players[i], inputs[i] ?? 0);
+    pushOutOfWalls(s, s.players[i]);
+  }
   const a = anchor(s);
   updateSpawner(s);
   s.grid.build(s.enemies, s.enemyCount, a.x, a.y);

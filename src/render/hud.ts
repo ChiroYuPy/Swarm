@@ -1,15 +1,16 @@
 /**
  * HUD dessiné dans le canvas, même police et mêmes tailles que l'interface DOM.
- * Haut gauche : score, record, éliminés, difficulté. Haut centre : chrono, prochain boss / barre du boss.
+ * Haut gauche : le score et le mode (difficulté, sandbox). Haut centre : la frise des vagues à venir (une
+ * ligne : vagues, pauses, portraits des boss) ou la vie du boss en cours, puis le chrono.
  * Bas centre : une seule barre avec PV, XP + niveau, armes, objet activable (Espace) et passifs ;
  * les bonus temporaires actifs juste au-dessus. Les stats détaillées sont dans l'écran de pause.
  */
-import { BOSS } from '../data/enemies';
+import { ENEMIES } from '../data/enemies';
 import { HERO } from '../data/hero';
 import { PASSIVES } from '../data/passives';
 import { LOOT, PICKUPS } from '../data/loot';
 import { WAVES } from '../data/waves';
-import type { DifficultyDef } from '../data/difficulty';
+import { DIFFICULTIES, type DifficultyDef } from '../data/difficulty';
 import {
   MAX_PASSIVE_SLOTS,
   MAX_WEAPON_SLOTS,
@@ -22,10 +23,18 @@ import {
   PK_TOTEM,
   PK_TURBO,
   TICK_RATE,
+  BOSS_TYPES,
+  MIXES,
+  MIX_TICKS,
+  WAVE_TICKS,
+  mixAt,
+  spawnRate,
+  waveInfo,
   computeScore,
   findBoss,
   weaponDef,
   weaponMaxLevel,
+  type Enemy,
   type GameState,
   type Player,
   type PlayerStats,
@@ -33,6 +42,7 @@ import {
 } from '../sim';
 import { COLORS } from './palette';
 import { iconCanvas } from './icons';
+import { enemyPreview } from './sprites';
 
 export const FONT = '"Chakra Petch", "Trebuchet MS", sans-serif';
 /** Échelle de tailles commune (identique au CSS) */
@@ -69,6 +79,205 @@ function icon(kind: 'weapon' | 'passive' | 'pickup', id: string): CanvasImageSou
     }
   }
   return c;
+}
+
+const foeCache = new Map<number, CanvasImageSource>();
+function foeIcon(type: number): CanvasImageSource {
+  let c = foeCache.get(type);
+  if (!c) {
+    const cv = enemyPreview(ENEMIES[type].id, 40);
+    c = cv;
+    foeCache.set(type, cv);
+    if (typeof createImageBitmap === 'function') {
+      createImageBitmap(cv).then(
+        (bmp) => foeCache.set(type, bmp),
+        () => {},
+      );
+    }
+  }
+  return c;
+}
+
+/** Durée (s d'horloge des vagues) couverte par la frise, et place qu'y prend un boss. */
+const STRIP_SECONDS = 190;
+const BOSS_BLOCK = 30;
+/** Bandeau du haut (frise des vagues ou vie du boss) : sa hauteur, et la ligne au milieu. */
+const BAND_Y = 6;
+const BAND_H = 42;
+const LINE_Y = BAND_Y + 30;
+/** position de « maintenant » sur la ligne (à gauche : ce qui vient de passer, en fondu) */
+const NOW_X = 28;
+/** largeur des fondus gauche et droit */
+const FADE_L = 26;
+const FADE_R = 60;
+
+/** Couleur d'une vague selon sa difficulté (débit × solidité des ennemis) : du vert au magenta. */
+const WAVE_TIERS: [number, string][] = [
+  [0, '#39ff7a'],
+  [3, '#b8ff3d'],
+  [8, '#ffe14d'],
+  [18, '#ff8a1f'],
+  [40, '#ff3366'],
+  [90, '#ff3df5'],
+];
+
+function waveColor(s: GameState, slot: number): string {
+  const tick = slot * MIX_TICKS + WAVE_TICKS / 2;
+  const m = tick / TICK_RATE / 60;
+  const danger =
+    spawnRate(tick, s.difficulty).rate * (1 + m * WAVES.hpScalePerMinute + m * m * WAVES.hpScalePerMinute2) * DIFFICULTIES[s.difficulty].hp;
+  let col = WAVE_TIERS[0][1];
+  for (const [at, c] of WAVE_TIERS) if (danger >= at) col = c;
+  return col;
+}
+
+function bandWidth(W: number): number {
+  return Math.min(520, W * 0.46);
+}
+
+/** Les (au plus) 3 ennemis principaux d'une vague, du plus fréquent au moins fréquent. */
+function mainFoes(types: number[], weights?: Float64Array): number[] {
+  const out = [...types];
+  if (weights) out.sort((a, b) => weights[b] - weights[a]);
+  return out.slice(0, 3);
+}
+
+/** Calque de la frise : dessinée à part pour que ses bords s'effacent en fondu (sans fond ni cadre). */
+let layer: HTMLCanvasElement | null = null;
+
+/**
+ * Frise des vagues : une ligne qui défile vers la gauche. Chaque vague y est un trait à la couleur de
+ * sa difficulté, avec ses ennemis principaux au-dessus ; chaque boss, son portrait posé sur la ligne.
+ */
+function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink: boolean): void {
+  const bw = bandWidth(W);
+  const x0 = W / 2 - bw / 2;
+  const dpr = ctx.getTransform().a || 1;
+  if (!layer) layer = document.createElement('canvas');
+  const cw = Math.ceil(bw * dpr);
+  const ch = Math.ceil(BAND_H * dpr);
+  if (layer.width !== cw || layer.height !== ch) {
+    layer.width = cw;
+    layer.height = ch;
+  }
+  const g = layer.getContext('2d')!;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, bw, BAND_H);
+  g.lineCap = 'round';
+
+  const now = s.clock / TICK_RATE;
+  const slotSec = MIX_TICKS / TICK_RATE;
+  const waveSec = WAVE_TICKS / TICK_RATE;
+  const bossOn = !opt.sandbox || opt.sandbox.bosses;
+  const pool = s.sandbox?.enemies ?? null;
+  const scale = (bw - NOW_X) / STRIP_SECONDS;
+  const X = (t: number) => NOW_X + t * scale;
+  const ly = LINE_Y - BAND_Y;
+  const w = waveInfo(s.clock);
+  const toBoss = (w.toBoss + Math.max(0, s.calmUntil - s.tick)) / TICK_RATE;
+
+  // La ligne de fond, fine.
+  g.beginPath();
+  g.moveTo(0, ly);
+  g.lineTo(bw, ly);
+  g.strokeStyle = 'rgba(154, 143, 192, 0.35)';
+  g.lineWidth = 1;
+  g.stroke();
+
+  const first = Math.max(0, Math.floor(Math.max(0, s.clock - 1) / MIX_TICKS) - 1);
+  // rang du prochain boss (les suivants viennent dans l'ordre) ; chaque boss décale la suite
+  let k = s.bossSpawned;
+  let shift = 0;
+  for (let j = first; j < first + 7; j++) {
+    const ws = j * slotSec - now + shift;
+    const a = X(ws);
+    if (a > bw) break;
+    const b = X(ws + waveSec);
+    if (b > 0) {
+      const mix = pool ? null : MIXES[mixAt(s.seed, s.difficulty, j)];
+      const col = waveColor(s, j);
+      const current = j === w.slot && w.inWave;
+      g.beginPath();
+      g.moveTo(a + 2, ly);
+      g.lineTo(b - 2, ly);
+      g.strokeStyle = col;
+      g.globalAlpha = current ? 1 : 0.7;
+      g.lineWidth = current ? 4 : 3;
+      g.stroke();
+      g.globalAlpha = 1;
+      // Ses ennemis principaux au-dessus du trait, centrés sur la partie encore à venir.
+      const foes = mainFoes(pool ?? mix!.types, mix?.weights);
+      const step = 19;
+      const span = (foes.length - 1) * step;
+      const cx = Math.min(b - span / 2 - 8, Math.max((a + b) / 2, NOW_X + span / 2 + 6));
+      foes.forEach((t, i) => g.drawImage(foeIcon(t), cx - span / 2 + i * step - 14, ly - 31, 28, 28));
+    }
+    // Boss : à la fin de la pause de la dernière vague du cycle, son portrait sur la ligne.
+    if (bossOn && (j + 1) % WAVES.wavesPerBoss === 0 && j + 1 > s.bossSpawned * WAVES.wavesPerBoss) {
+      const type = BOSS_TYPES[k % BOSS_TYPES.length];
+      const col = ENEMIES[type].color;
+      const bx = X((j + 1) * slotSec - now + shift + BOSS_BLOCK / 2);
+      const soon = k === s.bossSpawned && toBoss <= 10;
+      g.beginPath();
+      g.arc(bx, ly, 15, 0, Math.PI * 2);
+      g.fillStyle = col;
+      g.globalAlpha = soon && blink ? 0.45 : 0.18;
+      g.fill();
+      g.globalAlpha = 1;
+      g.drawImage(foeIcon(type), bx - 26, ly - 26, 52, 52);
+      k++;
+      shift += BOSS_BLOCK;
+    }
+  }
+  // « Maintenant » : un point blanc.
+  g.beginPath();
+  g.arc(NOW_X, ly, 3, 0, Math.PI * 2);
+  g.fillStyle = '#ffffff';
+  g.fill();
+
+  // Fondus : la frise s'efface sur les bords (on gomme le calque, le jeu reste visible derrière).
+  g.globalCompositeOperation = 'destination-out';
+  const gl = g.createLinearGradient(0, 0, FADE_L, 0);
+  gl.addColorStop(0, 'rgba(0, 0, 0, 1)');
+  gl.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  g.fillStyle = gl;
+  g.fillRect(0, 0, FADE_L, BAND_H);
+  const gr = g.createLinearGradient(bw - FADE_R, 0, bw, 0);
+  gr.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gr.addColorStop(1, 'rgba(0, 0, 0, 1)');
+  g.fillStyle = gr;
+  g.fillRect(bw - FADE_R, 0, FADE_R, BAND_H);
+  g.globalCompositeOperation = 'source-over';
+  ctx.drawImage(layer, x0, BAND_Y, bw, BAND_H);
+}
+
+/** Pendant un boss : son portrait et sa vie, sur la même ligne que la frise. */
+function drawBossBand(ctx: Ctx, boss: Enemy, W: number): void {
+  const bw = bandWidth(W);
+  const x0 = W / 2 - bw / 2;
+  const col = ENEMIES[boss.type].color;
+  ctx.drawImage(foeIcon(boss.type), x0 + NOW_X - 23, LINE_Y - 27, 46, 46);
+  const bx = x0 + NOW_X + 22;
+  const len = bw - NOW_X - 22 - 10;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(bx, LINE_Y - 4);
+  ctx.lineTo(bx + len, LINE_Y - 4);
+  ctx.strokeStyle = 'rgba(154, 143, 192, 0.3)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  const f = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+  if (f > 0) {
+    ctx.beginPath();
+    ctx.moveTo(bx, LINE_Y - 4);
+    ctx.lineTo(bx + len * f, LINE_Y - 4);
+    ctx.strokeStyle = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  ctx.lineCap = 'butt';
 }
 
 export function formatTime(seconds: number): string {
@@ -239,40 +448,28 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const blink = Math.floor(opt.time * 3) % 2 === 0;
   ctx.textBaseline = 'middle';
 
-  // ---------- Haut centre : chrono + boss ----------
-  ctx.textAlign = 'center';
-  ctx.font = `700 30px ${FONT}`;
-  glowText(ctx, formatTime(score.tempsSurvecu), W / 2, 32, COLORS.player);
+  // ---------- Haut centre : bandeau (frise des vagues ou boss), chrono dessous ----------
   const boss = findBoss(s);
-  if (boss) {
-    const bw = Math.min(460, W * 0.42);
-    const name = BOSS.names[Math.min(boss.aux2, BOSS.names.length - 1)];
-    label(ctx, `Boss · ${name}`, W / 2, 60, 'center', COLORS.boss);
-    bar(ctx, W / 2 - bw / 2, 70, bw, 10, boss.hp / boss.maxHp, COLORS.boss, '');
-  } else if (!opt.sandbox || opt.sandbox.bosses) {
-    const every = WAVES.bossEvery;
-    const left = every - ((s.tick / TICK_RATE) % every);
-    const soon = left <= 10;
-    ctx.font = TEXT;
-    ctx.fillStyle = soon ? (blink ? COLORS.boss : '#ffffff') : COLORS.muted;
-    ctx.fillText(soon ? `Boss dans ${Math.ceil(left)} s` : `Prochain boss dans ${formatTime(left)}`, W / 2, 60);
-  }
+  if (boss) drawBossBand(ctx, boss, W);
+  else drawWaveStrip(ctx, s, W, opt, blink);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 28px ${FONT}`;
+  glowText(ctx, formatTime(score.tempsSurvecu), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
 
-  // ---------- Haut gauche : score, record, éliminés ----------
+  // ---------- Haut gauche : le score, et le mode ----------
   const lx = 18;
-  label(ctx, 'Score', lx, 20);
-  ctx.font = `700 26px ${FONT}`;
+  ctx.font = `700 34px ${FONT}`;
   ctx.textAlign = 'left';
-  glowText(ctx, pad7(score.score), lx, 44, '#ffe14d');
-  const beaten = opt.best > 0 && score.score > opt.best;
-  if (opt.sandbox) label(ctx, opt.sandbox.invincible ? 'Sandbox · invincible' : 'Sandbox · non classé', lx, 68, 'left', COLORS.sandbox);
-  else label(ctx, beaten ? 'Nouveau record' : `Record ${pad7(opt.best)}`, lx, 68, 'left', beaten ? COLORS.gold : COLORS.muted);
-  ctx.font = TEXT;
-  ctx.textAlign = 'left';
-  ctx.fillStyle = COLORS.text;
-  const killsText = `${p.kills.toLocaleString('fr-FR')} éliminés`;
-  ctx.fillText(killsText, lx, 87);
-  label(ctx, opt.difficulty.name, lx + ctx.measureText(killsText).width + 10, 87, 'left', opt.difficulty.color);
+  glowText(ctx, pad7(score.score), lx, 30, '#ffe14d');
+  ctx.font = `700 14px ${FONT}`;
+  ctx.fillStyle = opt.difficulty.color;
+  const mode = opt.difficulty.name;
+  ctx.fillText(mode, lx + 1, 60);
+  if (opt.sandbox) {
+    ctx.fillStyle = COLORS.sandbox;
+    ctx.fillText(opt.sandbox.invincible ? '· Sandbox invincible' : '· Sandbox', lx + ctx.measureText(mode).width + 8, 60);
+  }
 
   // ---------- Bas centre : barre principale (PV, XP, armes, objet, passifs) ----------
   const ws = 46; // emplacement d'arme

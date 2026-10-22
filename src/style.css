@@ -1942,7 +1942,7 @@ h2.go {
 /* ---------- Messages en jeu ---------- */
 #toasts {
   position: fixed;
-  top: 108px;
+  top: 96px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

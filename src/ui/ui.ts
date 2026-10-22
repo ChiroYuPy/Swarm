@@ -5,7 +5,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { ENEMIES } from '../data/enemies';
+import { BOSS_ORDER, ENEMIES } from '../data/enemies';
 import { PICKUPS } from '../data/loot';
 import { DIFFICULTIES } from '../data/difficulty';
 import { WAVES } from '../data/waves';
@@ -144,7 +144,7 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
     title: 'Ennemis',
     items: [
       { key: 'enemyMul', kind: 'choice', label: 'Quantité', options: [0, 0.25, 0.5, 1, 2, 3, 5].map((v) => [v, v ? times(v) : 'Aucun']) },
-      { key: 'bosses', kind: 'toggle', label: `Boss toutes les ${WAVES.bossEvery / 60} min` },
+      { key: 'bosses', kind: 'toggle', label: `Boss toutes les ${WAVES.wavesPerBoss} vagues` },
       { key: 'custom', kind: 'choice', label: 'Types', options: [[false, 'Progression normale'], [true, 'Sur mesure']] },
     ],
   },
@@ -171,7 +171,7 @@ function deathLine(d: DeathInfo): string {
   if (d.bossKills >= 2) return `${d.bossKills} boss vaincus. Respect.`;
   if (d.bossKills === 1) return 'Le Trapèze est tombé. Pas toi… enfin, pas tout de suite.';
   if (k >= 1000) return `${num(k)} formes éliminées avant de céder.`;
-  if (t >= WAVES.bossEvery - 20 && t < WAVES.bossEvery) return 'Si près du boss…';
+  if (t >= FIRST_BOSS - 20 && t < FIRST_BOSS) return 'Si près du boss…';
   return `Submergé après ${formatTime(t)}. La prochaine sera la bonne.`;
 }
 
@@ -227,13 +227,18 @@ const BEHAVIOR_LABEL: Record<string, string> = {
   leader: 'Soutien',
   blinker: 'Téléportation',
   orbiter: 'Tournoyant',
+  wall: 'Mur',
+  egg: 'Œuf',
 };
+
+/** Le premier boss arrive après `wavesPerBoss` vagues et leurs pauses (secondes). */
+const FIRST_BOSS = (WAVES.waveLength + WAVES.pause) * WAVES.wavesPerBoss;
 
 /** Seconde d'apparition de chaque type d'ennemi, par difficulté (-1 : jamais). */
 function enemyArrival(id: string): number[] {
   const t = ENEMIES.findIndex((e) => e.id === id);
   return DIFFICULTIES.map((d, di) => {
-    if (id === 'boss') return WAVES.bossEvery;
+    if (BOSS_ORDER.includes(id)) return FIRST_BOSS * (BOSS_ORDER.indexOf(id) + 1);
     const slot = UNLOCK_SLOT[di][t];
     let at = slot < 0 ? -1 : (slot * MIX_TICKS) / TICK_RATE;
     if (id === WAVES.swarm.type) {
@@ -273,7 +278,7 @@ function codexItems(tab: CodexTab): CodexItem[] {
     case 'ennemis': {
       const normal = DIFFICULTIES.findIndex((d) => d.id === 'normal');
       return ENEMIES.filter((e) => e.behavior !== 'prop' && !e.hidden)
-        .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 : enemyArrival(e.id)[Math.max(0, normal)] }))
+        .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 + BOSS_ORDER.indexOf(e.id) : enemyArrival(e.id)[Math.max(0, normal)] }))
         .sort((a, b) => a.at - b.at)
         .map(({ e }) => ({ tab, id: e.id, name: e.name, color: e.color, icon: `enemy:${e.id}` }));
     }
@@ -379,7 +384,7 @@ function codexDetail(it: CodexItem): string {
       const at = enemyArrival(e.id);
       body +=
         e.behavior === 'boss'
-          ? `<h3>Arrivée</h3><p>Toutes les ${WAVES.bossEvery / 60} minutes, quelle que soit la difficulté.</p>`
+          ? `<h3>Arrivée</h3><p>Boss n°${BOSS_ORDER.indexOf(e.id) + 1}, après la vague ${(BOSS_ORDER.indexOf(e.id) + 1) * WAVES.wavesPerBoss}, quelle que soit la difficulté. Les boss reviennent ensuite dans le même ordre, plus forts (Mk II…).</p>`
           : `<h3>Arrivée</h3><div class="arrivals">${DIFFICULTIES.map(
               (d, i) => `<span style="--c:${d.color}"><b>${esc(d.name)}</b>${at[i] < 0 ? '—' : at[i] === 0 ? 'dès le début' : formatTime(at[i])}</span>`,
             ).join('')}</div>`;
@@ -401,7 +406,7 @@ function codexRules(): string {
       <section><h3>Objectif</h3>
         <p>Survivre le plus longtemps possible dans un monde sans fin. Score : ${SCORE.perSecond} points par seconde, ${SCORE.perKill} par ennemi, ${SCORE.perBoss} par boss.</p>
         <p>Ramasse l’XP (losanges) pour monter de niveau et choisir 1 amélioration parmi 3. Jusqu’à ${MAX_WEAPON_SLOTS} armes et ${MAX_PASSIVE_SLOTS} passifs, 5 niveaux chacun.</p>
-        <p>Les ennemis arrivent par types, de plus en plus variés. Un boss toutes les ${WAVES.bossEvery / 60} minutes.</p>
+        <p>Les ennemis arrivent par vagues de ${WAVES.waveLength} s (2 ou 3 types à la fois), séparées de ${WAVES.pause} s de calme. Toutes les ${WAVES.wavesPerBoss} vagues, un boss : les autres ennemis s’enfuient, il ne reste que lui et ses renforts ; les vagues reprennent à sa mort. La frise en haut de l’écran montre ce qui arrive.</p>
       </section>
       <section><h3>Objets</h3>
         <p><b>Bonus</b> (dans un cercle) : effet immédiat ou temporaire. <b>Activables</b> (dans un losange) : gardés en réserve, un seul à la fois. <b>Reliques</b> (dans un hexagone) : se déclenchent toutes seules.</p>

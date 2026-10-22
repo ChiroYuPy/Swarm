@@ -2,7 +2,7 @@
  * Effets visuels côté rendu : particules, nombres de dégâts, éclairs, ondes, secousses.
  * Alimentés par les événements de la sim. Utilisent le flux COSMETIC : ils ne touchent jamais la sim.
  */
-import { ENEMIES, BOSS } from '../data/enemies';
+import { ENEMIES, bossName } from '../data/enemies';
 import { ALL_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { LOOT, PICKUPS } from '../data/loot';
@@ -41,6 +41,11 @@ import {
   EV_BLINK,
   EV_REVIVE,
   EV_CLONE_END,
+  EV_FLEE,
+  EV_WAVE,
+  EV_HATCH,
+  EV_LASER,
+  EV_CAGE,
   OFFER_FUSION,
   OFFER_PASSIVE,
   OFFER_WEAPON,
@@ -85,7 +90,11 @@ export type SfxName =
   | 'clock'
   | 'clone'
   | 'revive'
-  | 'blink';
+  | 'blink'
+  | 'wave'
+  | 'hatch'
+  | 'bossLaser'
+  | 'cage';
 
 export interface FxHooks {
   sfx(name: SfxName, v?: number): void;
@@ -290,11 +299,30 @@ export class Effects {
           h.sfx('ring');
           break;
         case EV_BOSS_SPAWN:
-          h.toast(`⚠ BOSS : ${BOSS.names[Math.min(e.v, BOSS.names.length - 1)]}`, '#ff3df5');
+          h.toast(`⚠ BOSS : ${bossName(e.v)}`, ENEMIES[e.k].color);
           h.sfx('boss');
-          this.addShake(8);
+          this.addShake(6);
           this.flash = 0.25;
-          this.flashColor = '#ff3df5';
+          this.flashColor = ENEMIES[e.k].color;
+          break;
+        case EV_FLEE:
+          // Les ennemis normaux laissent la place au boss : un petit souffle à leur couleur.
+          this.burst(e.x, e.y, 4, ENEMY_COL[e.k], 150, 0.5, 2);
+          break;
+        case EV_WAVE:
+          h.toast(`Vague ${e.v}`, '#f2eaff');
+          h.sfx('wave');
+          break;
+        case EV_HATCH:
+          this.burst(e.x, e.y, 10, 7, 160, 0.4, 3);
+          h.sfx('hatch');
+          break;
+        case EV_LASER:
+          h.sfx('bossLaser');
+          break;
+        case EV_CAGE:
+          this.ring(e.x, e.y, e.v, ENEMY_COL[e.k], 0.5);
+          h.sfx('cage');
           break;
         case EV_BOSS_DEAD:
           this.burst(e.x, e.y, 70, 10, 420, 1.0, 5);

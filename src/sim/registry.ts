@@ -5,7 +5,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, type WeaponDef, type WeaponLevel } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { ENEMIES, BOSS } from '../data/enemies';
+import { ENEMIES, BOSS, BOSS_ORDER, ETOILE, HEXAGONE, OEIL, REINE, type BossPhase, type BossSummon } from '../data/enemies';
 import { WAVES } from '../data/waves';
 import { DIFFICULTIES } from '../data/difficulty';
 import { TICK_RATE } from './constants';
@@ -49,7 +49,19 @@ export function weaponMaxLevel(i: number): number {
   return ALL_WEAPONS[i].levels.length;
 }
 
-export const BEHAVIOR = { CHASER: 0, SHOOTER: 2, KAMIKAZE: 3, SWARM: 4, PROP: 5, BOSS: 6, LEADER: 7, BLINKER: 8, ORBITER: 9 } as const;
+export const BEHAVIOR = {
+  CHASER: 0,
+  SHOOTER: 2,
+  KAMIKAZE: 3,
+  SWARM: 4,
+  PROP: 5,
+  BOSS: 6,
+  LEADER: 7,
+  BLINKER: 8,
+  ORBITER: 9,
+  WALL: 10,
+  EGG: 11,
+} as const;
 const BEHAVIOR_BY_NAME: Record<string, number> = {
   chaser: BEHAVIOR.CHASER,
   shooter: BEHAVIOR.SHOOTER,
@@ -60,6 +72,8 @@ const BEHAVIOR_BY_NAME: Record<string, number> = {
   leader: BEHAVIOR.LEADER,
   blinker: BEHAVIOR.BLINKER,
   orbiter: BEHAVIOR.ORBITER,
+  wall: BEHAVIOR.WALL,
+  egg: BEHAVIOR.EGG,
 };
 export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR_BY_NAME[e.behavior]);
 /** Diviseur : type d'ennemi né à sa mort (-1 : aucun). */
@@ -90,7 +104,12 @@ export const RATES_BY_DIFFICULTY: CompiledRate[][] = DIFFICULTIES.map((d) =>
   WAVES.rates.map((p) => ({ atTick: Math.round(p.at * d.pace * TICK_RATE), rate: p.rate * d.rate })),
 );
 
-export const MIX_TICKS = Math.round(WAVES.mixEvery * TICK_RATE);
+/** Une vague + sa pause : un créneau de mélange. */
+export const MIX_TICKS = Math.round((WAVES.waveLength + WAVES.pause) * TICK_RATE);
+export const WAVE_TICKS = Math.round(WAVES.waveLength * TICK_RATE);
+/** Horloge des vagues entre deux boss (le boss arrive à la fin de la pause de la dernière vague). */
+export const BOSS_TICKS = MIX_TICKS * WAVES.wavesPerBoss;
+export const AFTER_BOSS_TICKS = Math.round(WAVES.afterBoss * TICK_RATE);
 
 /**
  * Créneau de mélange à partir duquel chaque type apparaît, par difficulté (-1 : jamais dans le flux).
@@ -143,4 +162,24 @@ export const SWARM_TYPE = enemyId(WAVES.swarm.type);
 export const RING_TYPE = enemyId(WAVES.ring.type);
 export const BOSS_TYPE = enemyId('boss');
 export const PROP_TYPE = enemyId('distributeur');
-export const BOSS_SUMMON_TYPE = enemyId(BOSS.summonType);
+export const WALL_TYPE = enemyId('mur');
+export const EGG_TYPE = enemyId('oeuf');
+/** Boss dans leur ordre d'arrivée. */
+export const BOSS_TYPES = BOSS_ORDER.map(enemyId);
+
+export interface CompiledSummon extends BossSummon {
+  typeId: number;
+}
+/** Phases et renforts de chaque boss, par type d'ennemi (vide pour les autres). */
+export const BOSS_PATTERNS: BossPhase[][] = ENEMIES.map(() => []);
+export const BOSS_SUMMONS: (CompiledSummon | null)[] = ENEMIES.map(() => null);
+for (const [id, cfg] of [
+  ['boss', BOSS],
+  ['hexagone', HEXAGONE],
+  ['etoile', ETOILE],
+  ['oeil', OEIL],
+  ['reine', REINE],
+] as [string, { pattern: BossPhase[]; summon?: BossSummon }][]) {
+  BOSS_PATTERNS[enemyId(id)] = cfg.pattern;
+  if (cfg.summon) BOSS_SUMMONS[enemyId(id)] = { ...cfg.summon, typeId: enemyId(cfg.summon.type) };
+}
