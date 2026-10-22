@@ -94,19 +94,8 @@ const MENU_MELODY: Phrase = [
   [96, 76, 2], [99, 79, 2], [102, 84, 2], [104, 79, 2], [106, 76, 2], [108, 72, 3],
   [112, 74, 2], [115, 71, 2], [118, 67, 2], [120, 71, 2], [122, 74, 2], [124, 76, 4],
 ];
-const GAME_HOOK: Phrase = [
-  [0, 76, 3], [3, 74, 1], [4, 72, 2], [6, 74, 2], [8, 76, 4], [12, 79, 2], [14, 76, 2],
-  [16, 77, 4], [20, 76, 2], [22, 74, 2], [24, 72, 6], [30, 69, 2],
-  [32, 72, 3], [35, 74, 1], [36, 76, 2], [38, 79, 2], [40, 81, 4], [44, 79, 2], [46, 76, 2],
-  [48, 79, 6], [54, 77, 2], [56, 76, 4], [60, 74, 4],
-  [64, 74, 3], [67, 72, 1], [68, 74, 2], [70, 77, 2], [72, 81, 4], [76, 79, 2], [78, 77, 2],
-  [80, 77, 4], [84, 76, 2], [86, 77, 2], [88, 72, 8],
-  [96, 79, 3], [99, 77, 1], [100, 79, 2], [102, 81, 2], [104, 83, 4], [108, 81, 2], [110, 79, 2],
-  [112, 80, 6], [118, 83, 2], [120, 80, 4], [124, 76, 4],
-];
 const phraseAt = (p: Phrase) => new Map(p.map((n) => [n[0], n]));
 const MENU_MELODY_AT = phraseAt(MENU_MELODY);
-const GAME_HOOK_AT = phraseAt(GAME_HOOK);
 const LOOP_STEPS = 128;
 
 // ---------------- Intro ----------------
@@ -762,8 +751,8 @@ export class AudioEngine {
   }
 
   /**
-   * Partie : 8 mesures (A puis B). L'intensité ajoute des couches : charleston (25 %), arpège rapide et
-   * clap (50 %), basse en double-croches et mélodie (75 %), puis basse doublée et galop pour le boss.
+   * Partie : 8 mesures (A puis B), sans mélodie. L'intensité ajoute des couches : charleston (25 %),
+   * arpège rapide et clap (50 %), basse en double-croches (75 %), puis basse doublée et galop pour le boss.
    */
   private gameNote(step: number, when: number, I: number): void {
     const bus = this.music;
@@ -785,13 +774,5 @@ export class AudioEngine {
     if (I >= 0.25 && s16 % 4 === 2) this.hat(when, 0.035, boss);
     if (I >= 0.25 && s16 % 2 === 1) this.hat(when, 0.012);
     if (I >= 0.5 && (s16 === 4 || s16 === 12)) this.clap(when, 0.06);
-    const m = I >= 0.75 ? GAME_HOOK_AT.get(step) : undefined;
-    if (m) {
-      const f = midi(m[1]);
-      const dur = m[2] * STEP * 0.95;
-      const env = { bus, shape: 'lin' as const, attack: 0.015, release: Math.min(0.12, dur * 0.5) };
-      this.tone('square', f, f, dur, 0.022, when, { ...env, filter: lp(2400), dly: 0.25, rev: 0.15 });
-      this.tone('sawtooth', f, f, dur, 0.022 * 0.6, when, { ...env, detune: 9, filter: lp(2000) });
-    }
   }
 }

@@ -546,7 +546,6 @@ kbd {
 button {
   font: inherit;
   color: inherit;
-  cursor: pointer;
 }
 button:focus {
   outline: none;
@@ -574,7 +573,7 @@ button:focus {
   transform: scale(0.97);
 }
 .btn:focus,
-.btn:hover {
+:where(body:not(.kbd)) .btn:hover {
   border-color: var(--accent);
   background: rgba(56, 246, 255, 0.1);
   color: #fff;
@@ -584,7 +583,7 @@ button:focus {
   color: var(--accent);
 }
 .btn.primary:focus,
-.btn.primary:hover {
+:where(body:not(.kbd)) .btn.primary:hover {
   background: rgba(56, 246, 255, 0.16);
   color: #fff;
 }
@@ -593,9 +592,20 @@ button:focus {
   color: var(--green);
 }
 .btn.go:focus,
-.btn.go:hover {
+:where(body:not(.kbd)) .btn.go:hover {
   border-color: var(--green);
   background: rgba(57, 255, 122, 0.14);
+  color: #fff;
+}
+/* Bouton à la couleur de son contexte (--c), ex. « Jouer en Difficile » dans les records. */
+.btn.tint {
+  border-color: color-mix(in srgb, var(--c) 60%, transparent);
+  color: var(--c);
+}
+.btn.tint:focus,
+:where(body:not(.kbd)) .btn.tint:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
   color: #fff;
 }
 .btn.danger {
@@ -603,7 +613,7 @@ button:focus {
   color: var(--red);
 }
 .btn.danger:focus,
-.btn.danger:hover {
+:where(body:not(.kbd)) .btn.danger:hover {
   border-color: var(--red);
   background: rgba(255, 61, 110, 0.16);
   color: #fff;
@@ -689,7 +699,7 @@ button:focus {
   color: var(--muted);
 }
 .tab:focus,
-.tab:hover {
+:where(body:not(.kbd)) .tab:hover {
   border-color: var(--line-strong);
   color: var(--text);
 }
@@ -746,7 +756,7 @@ button:focus {
 }
 .card.focus,
 .card:focus,
-.card:hover {
+:where(body:not(.kbd)) .card:hover {
   border-color: var(--c);
   background: color-mix(in srgb, var(--c) 8%, rgba(12, 10, 26, 0.95));
   transform: translateY(-3px);
@@ -858,30 +868,23 @@ button:focus {
   transition:
     border-color 0.15s,
     transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.2s;
+    box-shadow 0.2s,
+    opacity 0.2s,
+    filter 0.2s;
   animation: diff-in 0.5s calc(0.22s + var(--i) * 0.07s) cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
-/* liseré de couleur en haut de la carte */
-.diff::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: var(--c);
-  opacity: 0.45;
-  transition: opacity 0.15s;
-}
 .diff:focus,
-.diff:hover {
+:where(body:not(.kbd)) .diff:hover {
   border-color: var(--c);
   transform: translateY(-5px);
   box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.45),
     0 0 26px color-mix(in srgb, var(--c) 30%, transparent);
 }
-.diff:focus::before,
-.diff:hover::before {
-  opacity: 1;
+/* les cartes non sélectionnées passent en retrait */
+.diffs:has(.diff:focus) .diff:not(:focus) {
+  opacity: 0.5;
+  filter: saturate(0.5);
 }
 .diff:active {
   transform: translateY(-2px) scale(0.985);
@@ -915,16 +918,6 @@ button:focus {
 .threat i.on {
   background: var(--c);
   filter: drop-shadow(0 0 4px var(--c));
-}
-.diff-last {
-  padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
-  border-radius: 999px;
-  font-size: var(--fs-s);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--c);
 }
 .diff-name {
   font-size: var(--fs-2xl);
@@ -995,35 +988,10 @@ button:focus {
   color: var(--yellow);
   text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
 }
-.diff-record.empty b {
-  color: rgba(255, 255, 255, 0.14);
-  text-shadow: none;
-}
 .diff-record em {
   font-style: normal;
   font-size: var(--fs-s);
   color: var(--muted);
-}
-/* « Jouer » : discret, s'allume quand la carte est sélectionnée */
-.diff-go {
-  align-self: stretch;
-  padding: 9px;
-  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
-  border-radius: var(--radius);
-  font-size: var(--fs-m);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
-  color: var(--c);
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.diff:focus .diff-go,
-.diff:hover .diff-go {
-  background: var(--c);
-  color: var(--bg);
 }
 @media (max-width: 860px) {
   .diffs {
@@ -1034,14 +1002,46 @@ button:focus {
   }
 }
 
-/* ---------- Records ---------- */
+/* ---------- Records : hall des records ---------- */
+/* Onglets en texte : la difficulté affichée est soulignée de sa couleur. */
 .dtab {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   min-width: 132px;
-  padding: 8px 18px;
+  padding: 6px 18px 12px;
+  border: none;
+}
+.dtab::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--c);
+  opacity: 0.5;
+  transform: scaleX(0);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s;
+}
+.dtab.on {
+  background: none;
+}
+.dtab.on::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.dtab:focus::after,
+:where(body:not(.kbd)) .dtab:hover::after {
+  transform: scaleX(1);
+}
+.dtab.on:focus {
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
 }
 .dtab small {
   font-size: var(--fs-s);
@@ -1056,55 +1056,145 @@ button:focus {
   --c: var(--accent);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  /* hauteur fixe : passer d'un onglet plein à un onglet vide ne fait pas sauter l'écran */
+  min-height: min(470px, 58vh);
+}
+/* Podium : 2e, 1er, 3e. Chaque marche est un aplat léger surmonté d'un filet à la couleur de la médaille. */
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 14px;
   width: 100%;
 }
-.rec-summary {
-  display: grid;
-  grid-template-columns: 1.4fr repeat(3, 1fr);
-  gap: 10px;
-}
-.rec-summary div {
+.pod {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
-  padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
+  width: 250px;
+  text-align: center;
 }
-.rec-summary .main {
-  border-color: color-mix(in srgb, var(--c) 50%, transparent);
-  background:
-    linear-gradient(120deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%),
-    var(--panel);
+.pod .medal {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  font-size: var(--fs-m);
 }
-.rec-summary small {
+.pod.p1 .medal {
+  width: 36px;
+  height: 36px;
+  font-size: var(--fs-l);
+}
+.pod-score {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--yellow);
+}
+.pod.p1 .pod-score {
+  font-size: 32px;
+  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
+}
+.pod-meta {
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pod-date {
+  opacity: 0.6;
+}
+.step {
+  align-self: stretch;
+  height: 8px;
+  margin-top: 8px;
+  border-top: 2px solid var(--m);
+  background: color-mix(in srgb, var(--m) 7%, transparent);
+}
+.p1 .step {
+  height: 34px;
+}
+.p2 .step {
+  height: 20px;
+}
+.medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.podium .medal {
+  border: 1px solid var(--m);
+  background: color-mix(in srgb, var(--m) 16%, transparent);
+  color: var(--m);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--m) 35%, transparent);
+}
+.p1 {
+  --m: var(--gold);
+}
+.p2 {
+  --m: #d6dcef;
+}
+.p3 {
+  --m: #e0975a;
+}
+/* meilleures performances : une ligne « libellé valeur », séparée par des filets */
+.stats.rec-bests div {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.stats.rec-bests b {
+  font-size: var(--fs-l);
+}
+/* Suite du top 10 : une liste à filets, sans cadre. */
+table.scores {
+  border-collapse: collapse;
+  width: min(760px, 100%);
+  font-size: var(--fs-m);
+}
+table.scores th,
+table.scores td {
+  padding: 5px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+}
+table.scores th {
   font-size: var(--fs-s);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.rec-summary b {
-  font-size: var(--fs-xl);
-  font-weight: 700;
+table.scores .num {
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.rec-summary .main b {
-  font-size: var(--fs-2xl);
+table.scores td.score {
+  font-weight: 700;
   color: var(--yellow);
-  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
 }
-/* hauteur fixe : passer d'un onglet plein à un onglet vide ne fait pas sauter l'écran */
-.records {
-  min-height: min(520px, 62vh);
+table.scores td.rank,
+table.scores td.date {
+  color: var(--muted);
 }
-.records .panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 10px 18px;
+table.scores td.date {
+  text-align: right;
+}
+table.scores tbody tr {
+  transition: background 0.12s;
+}
+:where(body:not(.kbd)) table.scores tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+table.scores tbody tr:last-child td {
+  border-bottom: none;
 }
 .empty-state {
   flex: 1;
@@ -1115,11 +1205,16 @@ button:focus {
   gap: 16px;
 }
 @media (max-width: 760px) {
-  .rec-summary {
-    grid-template-columns: 1fr 1fr;
+  .pod {
+    width: 33%;
+  }
+  .pod.p1 .pod-score {
+    font-size: var(--fs-xl);
+  }
+  .pod-meta {
+    display: none;
   }
 }
-
 /* ---------- Options : curseurs, interrupteurs, choix ---------- */
 .screen-settings .panel.form {
   width: min(640px, 100%);
@@ -1149,13 +1244,12 @@ button:focus {
   color: var(--text);
   font-size: var(--fs-l);
   text-align: left;
-  cursor: pointer;
   transition:
     border-color 0.12s,
     background 0.12s;
 }
 .set:focus,
-.set:hover {
+:where(body:not(.kbd)) .set:hover {
   outline: none;
   border-color: var(--line-strong);
   background: rgba(56, 246, 255, 0.05);
@@ -1186,7 +1280,6 @@ button:focus {
   position: relative;
   width: 220px;
   height: 22px;
-  cursor: pointer;
   touch-action: none;
 }
 .track::before,
@@ -1222,7 +1315,7 @@ button:focus {
   transition: transform 0.12s;
 }
 .set:focus .thumb,
-.set:hover .thumb,
+:where(body:not(.kbd)) .set:hover .thumb,
 .set.drag .thumb {
   transform: scale(1.2);
   background: var(--accent);
@@ -1279,7 +1372,7 @@ button:focus {
   font-size: var(--fs-xl);
   line-height: 1;
 }
-.ctl .arrow:hover {
+:where(body:not(.kbd)) .ctl .arrow:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -1383,7 +1476,6 @@ button:focus {
   opacity: 0.35;
 }
 .foes .tile:disabled {
-  cursor: default;
 }
 @media (max-width: 860px) {
   .sandbox-grid {
@@ -1414,79 +1506,6 @@ button:focus {
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
-}
-
-/* ---------- Records ---------- */
-table.scores {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: var(--fs-l);
-}
-table.scores th,
-table.scores td {
-  padding: 9px 10px;
-  text-align: left;
-  border-bottom: 1px solid rgba(150, 130, 255, 0.12);
-}
-table.scores th {
-  font-size: var(--fs-s);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-table.scores .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-table.scores td.score {
-  font-weight: 700;
-  color: var(--yellow);
-}
-table.scores td.rank,
-table.scores td.date {
-  color: var(--muted);
-}
-table.scores tbody tr {
-  transition: background 0.12s;
-}
-table.scores tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-table.scores tbody tr:last-child td {
-  border-bottom: none;
-}
-.medal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  font-size: var(--fs-s);
-  font-weight: 700;
-}
-.podium .medal {
-  border: 1px solid var(--m);
-  background: color-mix(in srgb, var(--m) 16%, transparent);
-  color: var(--m);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--m) 35%, transparent);
-}
-.p1 {
-  --m: var(--gold);
-}
-.p2 {
-  --m: #d6dcef;
-}
-.p3 {
-  --m: #e0975a;
-}
-table.scores tr.p1 {
-  background: linear-gradient(90deg, rgba(255, 210, 58, 0.1), transparent 70%);
-}
-table.scores tr.p1 td.score {
-  font-size: var(--fs-xl);
-  text-shadow: 0 0 12px rgba(255, 225, 77, 0.35);
 }
 
 /* ---------- Codex : catégories | grille | fiche ---------- */
@@ -1536,7 +1555,7 @@ table.scores tr.p1 td.score {
   color: var(--muted);
 }
 .cat:focus,
-.cat:hover {
+:where(body:not(.kbd)) .cat:hover {
   border-color: var(--line-strong);
   color: var(--text);
 }
@@ -1579,7 +1598,7 @@ table.scores tr.p1 td.score {
   line-height: 1.2;
 }
 .tile:focus,
-.tile:hover {
+:where(body:not(.kbd)) .tile:hover {
   border-color: var(--line-strong);
 }
 .tile.on {
@@ -1674,7 +1693,7 @@ table.scores tr.p1 td.score {
   font-weight: 600;
   color: var(--text);
 }
-.chip:hover,
+:where(body:not(.kbd)) .chip:hover,
 .chip:focus {
   border-color: var(--c);
 }
@@ -1989,37 +2008,35 @@ h2.go {
   text-shadow: 0 0 16px rgba(255, 225, 77, 0.45);
   font-variant-numeric: tabular-nums;
 }
+/* Rang de la partie : une ligne de texte, pas une pastille. */
 .badge {
-  padding: 4px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
   font-size: var(--fs-s);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.badge.gold {
-  color: var(--bg);
-  background: var(--gold);
-  border-color: var(--gold);
+.badge b {
+  color: var(--yellow);
+  font-variant-numeric: tabular-nums;
 }
+/* Stats de fin : des chiffres séparés par un filet, sans cadre. */
 .stats {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
+  margin: 4px 0;
 }
 .stats div {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 130px;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
+  gap: 4px;
+  min-width: 132px;
+  padding: 2px 26px;
+}
+.stats div + div {
+  border-left: 1px solid var(--line);
 }
 .stats small {
   font-size: var(--fs-s);
@@ -2031,6 +2048,22 @@ h2.go {
 .stats b {
   font-size: var(--fs-2xl);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Équipement final : les icônes à nu, centrées. */
+.final-build {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.final-build .items {
+  justify-content: center;
+  gap: 10px 26px;
+}
+.final-build .item {
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 /* ---------- Messages en jeu ---------- */
@@ -2100,4 +2133,53 @@ h2.go {
   .card {
     width: 100%;
   }
+}
+
+/* ---------- Curseur néon (voir ui/cursor.ts) ---------- */
+/* Le curseur système est masqué partout : c'est #cursor qui le remplace. */
+*,
+*::before,
+*::after {
+  cursor: none !important;
+}
+#cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+  will-change: transform;
+}
+#cursor svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 0 3px rgba(56, 246, 255, 0.85));
+}
+/* Même structure pour la flèche et le point (pointe = centre du point) : le passage de l'un à l'autre est un morphing. */
+#cursor path {
+  d: path('M 5 1 C 6.66 1 8 2.34 8 4 C 8 5.66 6.66 7 5 7 C 3.34 7 2 5.66 2 4 C 2 2.34 3.34 1 5 1 Z');
+  fill: var(--accent);
+  stroke: #eafdff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  transition:
+    d 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    fill 0.2s,
+    stroke 0.2s;
+}
+#cursor:not([data-state='off']) {
+  opacity: 1;
+}
+#cursor[data-state='arrow'] path,
+#cursor[data-state='hover'] path {
+  d: path('M 5 4 C 12 7.5 19 11 26 14.5 C 22.5 15.33 19 16.17 15.5 17 C 14.17 20.5 12.83 24 11.5 27.5 C 9.33 19.33 7.17 11.67 5 4 Z');
+}
+#cursor[data-state='arrow'] path {
+  fill: rgba(7, 6, 15, 0.85);
+  stroke: var(--accent);
+}
+#cursor[data-state='hover'] path {
+  fill: color-mix(in srgb, var(--accent) 55%, rgba(7, 6, 15, 0.85));
 }

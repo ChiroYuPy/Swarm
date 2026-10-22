@@ -31,6 +31,7 @@ import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
 import { INTRO_TIMING } from '../audio/audio';
 import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
 import { DEFAULT_SETTINGS, TOP_PER_DIFFICULTY, bestScore, defaultSandbox, topScores } from '../storage/storage';
+import { initCursor } from './cursor';
 
 export interface AppApi {
   save: SaveData;
@@ -488,10 +489,19 @@ export class UI {
   /** mode démo (inactivité sur le menu) */
   private attract = false;
   private lastActivity = performance.now();
+  /**
+   * Qui pilote la sélection : la souris (est sélectionné ce qui est sous le pointeur, rien sinon) ou
+   * le clavier / la manette (le pointeur est ignoré tant qu'il ne bouge pas vraiment).
+   */
+  private kbd = false;
+  /** Point de départ du clavier quand rien n'est sélectionné : dernier bouton sélectionné de l'écran. */
+  private navHome: HTMLElement | null = null;
+  private pointer = { x: -1, y: -1 };
 
   constructor(private readonly app: AppApi) {
     this.root = document.getElementById('ui')!;
     this.toasts = document.getElementById('toasts')!;
+    initCursor();
     // Garde-fou : #ui ne défile jamais de côté (les écrans qui glissent dépassent volontairement).
     this.root.addEventListener('scroll', () => {
       if (this.root.scrollLeft) this.root.scrollLeft = 0;
@@ -520,6 +530,75 @@ export class UI {
       this.noteActivity();
       if (this.attract) this.exitAttract();
     });
+    // Souris ou clavier : c'est le dernier des deux qui a servi qui pilote la sélection.
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (!['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) this.setKbd(true);
+      },
+      true,
+    );
+    const onPointer = (e: PointerEvent) => {
+      this.pointer = { x: e.clientX, y: e.clientY };
+      // Un écran qui glisse sous un pointeur immobile envoie aussi des mouvements, mais nuls.
+      if (e.type === 'pointerdown' || e.movementX || e.movementY) this.setKbd(false);
+      if (!this.kbd) this.syncPointer(e.target);
+    };
+    window.addEventListener('pointermove', onPointer);
+    window.addEventListener('pointerdown', onPointer, true);
+    window.addEventListener('mouseover', (e) => {
+      if (!this.kbd) this.syncPointer(e.target);
+    });
+    document.documentElement.addEventListener('mouseleave', () => {
+      if (!this.kbd) this.syncPointer(null);
+    });
+  }
+
+  private setKbd(on: boolean): void {
+    this.kbd = on;
+    document.body.classList.toggle('kbd', on);
+  }
+
+  /** Souris aux commandes : est sélectionné le bouton sous le pointeur, et rien s'il n'y en a pas. */
+  private syncPointer(target: EventTarget | null): void {
+    const el = this.screenEl;
+    if (!el || this.attract) return;
+    const t = target instanceof Element ? target : null;
+    if (this.current === 'levelup') {
+      const card = t?.closest<HTMLElement>('.card');
+      this.focusCard(card && el.contains(card) ? Number(card.dataset.i) : -1);
+      return;
+    }
+    const b = t?.closest<HTMLButtonElement>('.nav');
+    const ae = document.activeElement as HTMLElement | null;
+    if (b && el.contains(b) && !b.disabled) {
+      if (ae !== b) b.focus({ preventScroll: true });
+    } else if (ae && el.contains(ae) && ae.matches('.nav')) ae.blur();
+  }
+
+  /**
+   * Sélection de départ d'un écran : affichée d'emblée au clavier ; à la souris, c'est ce qui est
+   * sous le pointeur qui compte, et le clavier repartira de là.
+   */
+  private home(b: HTMLElement | null | undefined): void {
+    if (!b) return;
+    this.navHome = b;
+    if (this.kbd) b.focus({ preventScroll: true });
+    else this.syncPointer(document.elementFromPoint(this.pointer.x, this.pointer.y));
+  }
+
+  /** Rien de sélectionné (la souris était ailleurs) : la première touche fait juste réapparaître la sélection. */
+  private wake(): boolean {
+    const el = this.screenEl;
+    if (!el || this.current === 'levelup') return false;
+    const ae = document.activeElement;
+    if (ae && el.contains(ae) && ae.matches('.nav')) return false;
+    const b = this.navHome && el.contains(this.navHome) ? this.navHome : (el.querySelector<HTMLElement>('.nav.primary') ?? el.querySelector<HTMLElement>('.nav'));
+    if (!b) return false;
+    b.focus({ preventScroll: true });
+    reveal(b);
+    this.app.uiSound('uiMove');
+    return true;
   }
 
   get screen(): string {
@@ -570,9 +649,10 @@ export class UI {
         if (sfx) this.app.uiSound(sfx);
       }),
     );
-    // Survol à la souris = même sélection qu'au clavier.
-    el.querySelectorAll<HTMLButtonElement>('.nav').forEach((b) => b.addEventListener('mouseenter', () => b.focus({ preventScroll: true })));
-    (el.querySelector<HTMLButtonElement>('.nav.primary') ?? el.querySelector<HTMLButtonElement>('.nav'))?.focus({ preventScroll: true });
+    el.addEventListener('focusin', (e) => {
+      if ((e.target as Element).matches('.nav')) this.navHome = e.target as HTMLElement;
+    });
+    this.home(el.querySelector<HTMLButtonElement>('.nav.primary') ?? el.querySelector<HTMLButtonElement>('.nav'));
     return el;
   }
 
@@ -626,6 +706,8 @@ export class UI {
 
   /** Déplace la sélection entre les boutons de l'écran courant (flèches / croix de la manette). */
   navigate(dir: NavDir): void {
+    this.setKbd(true);
+    if (this.wake()) return;
     if (this.current === 'codex' && this.codexNav(dir)) return;
     if (this.current === 'scores' && (dir === 'left' || dir === 'right')) {
       // Records : gauche / droite passent d'une difficulté à l'autre (en boucle).
@@ -650,6 +732,8 @@ export class UI {
 
   /** Valide le bouton sélectionné (bouton A de la manette). */
   activate(): boolean {
+    this.setKbd(true);
+    if (this.wake()) return true;
     const ae = document.activeElement as HTMLElement | null;
     if (ae && ae.tagName === 'BUTTON' && this.screenEl?.contains(ae)) {
       ae.click();
@@ -955,7 +1039,7 @@ export class UI {
       duration: 650,
       easing: 'cubic-bezier(0.65, 0, 0.35, 1)',
     });
-    el.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
+    this.home(el.querySelector<HTMLButtonElement>('.nav.primary'));
     this.app.introDone();
   }
 
@@ -987,7 +1071,7 @@ export class UI {
     this.noteActivity();
     document.body.classList.remove('attract');
     document.querySelector('.attract-hud')?.remove();
-    this.screenEl?.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
+    this.home(this.screenEl?.querySelector<HTMLButtonElement>('.nav.primary'));
   }
 
   // ---------- Choix de la difficulté ----------
@@ -1013,17 +1097,15 @@ export class UI {
       const best = topScores(save, i)[0];
       const record = best
         ? `<small>Record</small><b>${pad7(best.score)}</b><em>${formatTime(best.tempsSurvecu)} · niv. ${best.level || '—'} · ${num(best.kills)} éliminés</em>`
-        : '<small>Record</small><b class="none">———————</b><em>Pas encore de partie</em>';
+        : '<small>Record</small><em>Aucun record</em>';
       return `<button class="diff nav ${i === save.difficulty ? 'primary' : ''}" data-d="${i}" style="--c:${d.color};--i:${i}">
         <span class="diff-top">
           <span class="threat">${DIFFICULTIES.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</span>
-          ${i === save.difficulty ? '<span class="diff-last">Dernier choix</span>' : ''}
         </span>
         <span class="diff-name">${esc(d.name)}</span>
         <span class="diff-desc">${esc(d.desc)}</span>
         <span class="meters">${crit.map((c) => meter(d, c)).join('')}</span>
-        <span class="diff-record ${best ? '' : 'empty'}">${record}</span>
-        <span class="diff-go">Jouer</span>
+        <span class="diff-record">${record}</span>
       </button>`;
     }).join('');
     const el = this.mount(
@@ -1211,18 +1293,33 @@ export class UI {
 
   // ---------- Records ----------
   /**
-   * Onglets par difficulté (avec leur record), quatre meilleures performances en tête, puis le top 10
-   * avec médailles pour le podium. Gauche / droite changent de difficulté.
+   * Hall des records : onglets par difficulté (avec leur record), podium pour les trois premières
+   * parties, les meilleures performances sur une ligne, puis la suite du top 10 en liste.
+   * Gauche / droite changent de difficulté.
    */
   showScores(difficulty: number): void {
     const save = this.app.save;
     const diff = DIFFICULTIES[difficulty];
     const list = topScores(save, difficulty);
     const date = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    // Podium : 2e à gauche, 1er au centre, 3e à droite.
+    const podium = [1, 0, 2]
+      .filter((i) => list[i])
+      .map((i) => {
+        const r = list[i];
+        return `<div class="pod p${i + 1}">
+          <span class="medal">${i + 1}</span>
+          <b class="pod-score">${pad7(r.score)}</b>
+          <span class="pod-meta">${formatTime(r.tempsSurvecu)} · niv. ${r.level || '—'} · ${num(r.kills)} éliminés <span class="pod-date">· ${date(r.date)}</span></span>
+          <span class="step"></span>
+        </div>`;
+      })
+      .join('');
     const rows = list
+      .slice(3)
       .map(
-        (r, i) => `<tr class="${i < 3 ? `podium p${i + 1}` : ''}">
-          <td class="rank"><span class="medal">${i + 1}</span></td>
+        (r, i) => `<tr>
+          <td class="rank">${i + 4}</td>
           <td class="num score">${pad7(r.score)}</td>
           <td class="num">${formatTime(r.tempsSurvecu)}</td>
           <td class="num">${r.level || '—'}</td>
@@ -1236,26 +1333,22 @@ export class UI {
       return `<button class="tab dtab nav ${i === difficulty ? 'on' : ''}" data-d="${i}" style="--c:${d.color}"><span>${esc(d.name)}</span><small>${best ? pad7(best) : '—'}</small></button>`;
     }).join('');
     const top = <K extends 'score' | 'tempsSurvecu' | 'level' | 'kills'>(k: K) => Math.max(...list.map((r) => r[k] || 0));
-    const summary = list.length
-      ? `<div class="rec-summary">
-          <div class="main"><small>Meilleur score</small><b>${pad7(top('score'))}</b></div>
-          <div><small>Plus longue survie</small><b>${formatTime(top('tempsSurvecu'))}</b></div>
-          <div><small>Plus haut niveau</small><b>${top('level') || '—'}</b></div>
-          <div><small>Plus d’éliminés</small><b>${num(top('kills'))}</b></div>
-        </div>`
-      : '';
-    const body = rows
-      ? `<table class="scores"><thead><tr><th>#</th><th class="num">Score</th><th class="num">Temps</th><th class="num">Niveau</th><th class="num">Éliminés</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>`
-      : `<div class="empty-state"><p class="empty">Aucune partie en ${esc(diff.name)} pour l’instant.</p><button class="btn nav go" id="go">Jouer en ${esc(diff.name)}</button></div>`;
+    const bests = `<div class="stats rec-bests">
+        <div><small>Plus longue survie</small><b>${formatTime(top('tempsSurvecu'))}</b></div>
+        <div><small>Plus haut niveau</small><b>${top('level') || '—'}</b></div>
+        <div><small>Plus d’éliminés</small><b>${num(top('kills'))}</b></div>
+      </div>`;
+    const body = list.length
+      ? `<div class="podium">${podium}</div>
+        ${bests}
+        ${rows ? `<table class="scores"><thead><tr><th>#</th><th class="num">Score</th><th class="num">Temps</th><th class="num">Niveau</th><th class="num">Éliminés</th><th class="num">Date</th></tr></thead><tbody>${rows}</tbody></table>` : ''}`
+      : `<div class="empty-state"><p class="empty">Aucune partie en ${esc(diff.name)} pour l’instant.</p><button class="btn nav tint" id="go">Jouer en ${esc(diff.name)}</button></div>`;
     const el = this.mount(
       'scores',
       `
       <header class="head"><h2>Records</h2><p class="sub">Tes ${TOP_PER_DIFFICULTY} meilleures parties, par difficulté.</p></header>
       <div class="tabs">${tabs}</div>
-      <div class="records" style="--c:${diff.color}">
-        ${summary}
-        <div class="panel wide">${body}</div>
-      </div>
+      <div class="records" style="--c:${diff.color}">${body}</div>
       <p class="foot">← → : difficulté · Échap : retour</p>
       <footer class="actions"><button class="btn nav" id="back">Retour</button></footer>
     `,
@@ -1263,7 +1356,7 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('.tab').forEach((b) => b.addEventListener('click', () => this.showScores(Number(b.dataset.d))));
     el.querySelector('#go')?.addEventListener('click', () => this.app.play(difficulty));
     el.querySelector('#back')!.addEventListener('click', () => this.showMenu());
-    el.querySelector<HTMLButtonElement>('.tab.on')?.focus({ preventScroll: true });
+    this.home(el.querySelector<HTMLButtonElement>('.tab.on'));
   }
 
   // ---------- Options ----------
@@ -1319,7 +1412,7 @@ export class UI {
         row.addEventListener('click', (e) => this.stepSetting(row, (e.target as HTMLElement).closest('.arrow.prev') ? -1 : 1));
       }
     });
-    el.querySelector<HTMLButtonElement>('.set')!.focus({ preventScroll: true });
+    this.home(el.querySelector<HTMLButtonElement>('.set'));
     el.querySelector('#back')!.addEventListener('click', () => this.settingsReturn());
     el.querySelector('#reset')!.addEventListener('click', () => {
       this.app.applySettings({ ...DEFAULT_SETTINGS });
@@ -1452,16 +1545,16 @@ export class UI {
     el.querySelectorAll<HTMLButtonElement>('.cat').forEach((b) =>
       b.addEventListener('click', () => {
         this.showCodex(b.dataset.tab as CodexTab);
-        this.screenEl?.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
+        this.home(this.screenEl?.querySelector<HTMLButtonElement>('.cat.on'));
       }),
     );
     el.querySelector('#back')!.addEventListener('click', () => this.codexReturn());
     if (items.length) {
       const i = Math.min(sel, items.length - 1);
       select(i);
-      tiles[i].focus({ preventScroll: true });
+      this.home(tiles[i]);
       reveal(tiles[i]);
-    } else el.querySelector<HTMLButtonElement>('.cat.on')?.focus({ preventScroll: true });
+    } else this.home(el.querySelector<HTMLButtonElement>('.cat.on'));
   }
 
   /**
@@ -1560,11 +1653,11 @@ export class UI {
     });
     el.querySelectorAll<HTMLButtonElement>('.card').forEach((b) => {
       b.addEventListener('click', () => this.app.pickOffer(Number(b.dataset.i)));
-      b.addEventListener('mouseenter', () => this.focusCard(Number(b.dataset.i)));
     });
     this.levelCount = offers.length;
     this.levelOpenedAt = performance.now();
-    this.focusCard(0);
+    if (this.kbd) this.focusCard(0);
+    else this.syncPointer(document.elementFromPoint(this.pointer.x, this.pointer.y));
   }
 
   private pips(level: number, max: number): string {
@@ -1573,18 +1666,28 @@ export class UI {
     return `${h}</span>`;
   }
 
+  /** Carte sélectionnée au level-up (-1 : aucune, la souris est ailleurs). */
   focusCard(i: number): void {
     if (this.current !== 'levelup') return;
-    this.levelFocus = (i + this.levelCount) % this.levelCount;
+    this.levelFocus = i < 0 ? -1 : (i + this.levelCount) % this.levelCount;
     this.screenEl?.querySelectorAll<HTMLElement>('.card').forEach((c, k) => c.classList.toggle('focus', k === this.levelFocus));
   }
   moveCard(d: number): void {
+    this.setKbd(true);
     this.app.uiSound('uiMove');
-    this.focusCard(this.levelFocus + d);
+    this.focusCard(this.levelFocus < 0 ? 0 : this.levelFocus + d);
   }
   confirmCard(): void {
+    this.setKbd(true);
+    if (this.current !== 'levelup') return;
+    // Rien de sélectionné : la touche fait d'abord apparaître la sélection.
+    if (this.levelFocus < 0) {
+      this.app.uiSound('uiMove');
+      this.focusCard(0);
+      return;
+    }
     // Garde-fou : une touche tenue au moment où l'écran s'ouvre ne choisit pas à la place du joueur.
-    if (this.current === 'levelup' && performance.now() - this.levelOpenedAt > 350) this.app.pickOffer(this.levelFocus);
+    if (performance.now() - this.levelOpenedAt > 350) this.app.pickOffer(this.levelFocus);
   }
 
   private buildHtml(b: BuildInfo, detailed: boolean): string {
@@ -1660,7 +1763,7 @@ export class UI {
         ? '<span class="badge">Sandbox · non classé</span>'
       : d.rank > 0
         ? `<span class="badge">${d.rank}<sup>e</sup> meilleure partie</span>`
-        : `<span class="badge">Record : ${pad7(d.bestBefore)}</span>`;
+        : `<span class="badge">Record à battre : <b>${pad7(d.bestBefore)}</b></span>`;
     const reveal = (i: number) => `reveal" style="--i:${i}`;
     const el = this.mount(
       'death',
@@ -1681,7 +1784,7 @@ export class UI {
         <div><small>Niveau</small><b>${r.level}</b></div>
         <div><small>Boss vaincus</small><b>${d.bossKills}</b></div>
       </div>
-      <div class="panel build wide ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
+      <div class="build final-build ${reveal(3)}"><h3>Équipement final</h3>${this.buildHtml(d.build, false)}</div>
       <footer class="actions ${reveal(4)}">
         <button class="btn nav primary" id="retry">Rejouer</button>
         ${d.sandbox ? '<button class="btn nav" id="edit">Modifier</button>' : ''}

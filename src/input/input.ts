@@ -27,6 +27,9 @@ export class InputManager {
         return;
       }
       if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+      // Entrée sans bouton sélectionné : c'est le jeu qui décide, et le bouton qu'il sélectionne alors
+      // ne doit pas être cliqué dans la foulée par le navigateur.
+      if (e.code === 'Enter' && document.activeElement?.tagName !== 'BUTTON') e.preventDefault();
       if (!e.repeat) this.keyAction(e.code);
       this.keys.add(e.code);
     });
