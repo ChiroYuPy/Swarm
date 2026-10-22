@@ -23,6 +23,7 @@ import {
   TICK_RATE,
   type GameConfig,
   type GameState,
+  type SandboxConfig,
   type Offer,
   type ScoreRecord,
 } from './sim';
@@ -32,7 +33,7 @@ import { DIFFICULTIES } from './data/difficulty';
 import { botInput } from './ai/bot';
 import { Renderer } from './render/renderer';
 import { Effects } from './render/effects';
-import { AudioEngine } from './audio/audio';
+import { AudioEngine, START_RISE } from './audio/audio';
 import { InputManager, type UiAction } from './input/input';
 import { UI, type AppApi, type BuildInfo, type DeathInfo } from './ui/ui';
 import { randomSeed } from './ui/seeds';
@@ -43,6 +44,50 @@ type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'dying' | 'dead' | 'repl
 
 const STEP_MS = 1000 / TICK_RATE;
 const params = new URLSearchParams(location.search);
+
+/**
+ * Démo derrière le menu : le bot joue une partie « bac à sable » déjà lancée (minute 6, ennemis plus
+ * nombreux, héros équipé et invincible) pour qu'il y ait tout de suite un vrai essaim à l'écran.
+ */
+const DEMO_SANDBOX: SandboxConfig = {
+  invincible: true,
+  level: 14,
+  startMinute: 6,
+  enemyMul: 2.5,
+  enemies: null,
+  bosses: false,
+  might: 1,
+  xp: 1,
+  weapons: [
+    { id: 'aura', level: 4 },
+    { id: 'boomerang', level: 4 },
+    { id: 'laser', level: 3 },
+    { id: 'confetti', level: 4 },
+  ],
+  passives: [
+    { id: 'aimant', level: 3 },
+    { id: 'chaussettes', level: 2 },
+  ],
+  item: null,
+};
+/** la démo est d'abord avancée de 15 s (hors écran, par petits bouts) pour que l'essaim soit déjà là */
+const DEMO_WARMUP = 15 * TICK_RATE;
+/** au-delà, l'essaim devient trop dense : on en prépare une nouvelle */
+const DEMO_LIFETIME = 3 * 60 * TICK_RATE;
+/** temps de calcul accordé par image à la préparation d'une démo (ms) */
+const DEMO_BUDGET_MS = 4;
+
+/** caméra au début de la chute (fraction du zoom normal) */
+const DROP_ZOOM = 0.28;
+
+const newDemo = (seed: string): GameState => createGame({ seed, difficulty: 1, sandbox: DEMO_SANDBOX });
+
+/** Intensité de la musique de partie : monte avec le temps et le nombre d'ennemis, 1 pendant un boss. */
+function musicIntensity(s: GameState): number {
+  if (s.bossId >= 0) return 1;
+  const minutes = s.tick / TICK_RATE / 60;
+  return Math.min(0.9, Math.max(Math.min(0.7, 0.1 + minutes * 0.06), s.enemyCount / 350));
+}
 
 class App implements AppApi {
   save: SaveData = loadSave();
@@ -55,6 +100,13 @@ class App implements AppApi {
   private pauseFrom: Mode = 'playing';
   private state: GameState;
   private demo = true;
+  /** partie de démonstration (gardée pendant les parties : le menu la reprend où elle en était) */
+  private demoState: GameState;
+  /** démo en préparation et pas de simulation qu'il lui reste avant d'être montrée */
+  private demoNext: { state: GameState; left: number } | null = null;
+  private demoSwapping = false;
+  /** début de la chute du héros (performance.now), -1 hors chute */
+  private dropAt = -1;
   private readonly log = new InputLog();
   /** dernière partie terminée, rejouable depuis l'écran de fin (en mémoire uniquement) */
   private lastRun: { config: GameConfig; codes: Uint8Array } | null = null;
@@ -97,8 +149,9 @@ class App implements AppApi {
     if (params.get('fps') === '1') this.save.settings.showFps = true;
     this.applySettings(this.save.settings, false);
 
-    // Partie de démonstration jouée par le bot derrière le menu.
-    this.state = createGame({ seed: 'DEMO-NEONAWAK' });
+    // Partie de démonstration jouée par le bot derrière le menu, préparée pendant l'intro.
+    this.demoState = this.state = newDemo('DEMO-NEONAWAK');
+    this.demoNext = { state: this.state, left: DEMO_WARMUP };
     this.fx.reset(this.state.seed);
 
     this.input.onAction((a) => this.onAction(a));
@@ -109,7 +162,7 @@ class App implements AppApi {
     });
     const unlock = () => {
       this.audio.unlock();
-      this.audio.startMusic();
+      this.audio.startMusic(this.mode === 'menu' ? 'menu' : 'game');
     };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -129,15 +182,22 @@ class App implements AppApi {
   }
 
   // ---------------- AppApi ----------------
-  uiSound(kind: 'ui' | 'uiMove'): void {
+  uiSound(kind: 'ui' | 'uiMove' | 'uiBack'): void {
     this.audio.unlock();
     this.audio.play(kind);
   }
 
-  /** Fin de l'intro : c'est le geste du joueur qui autorise le son, la musique démarre avec un accord. */
+  /** Le joueur allume l'écran : ce geste autorise le son, toute la bande-son de l'intro part. */
+  introPowerOn(): void {
+    this.audio.unlock();
+    this.audio.playIntro();
+  }
+
+  /** Fin de l'intro (ou intro passée) : le menu arrive, la musique démarre avec un accord. */
   introDone(): void {
     this.audio.unlock();
-    this.audio.startMusic();
+    this.audio.stopIntro();
+    this.audio.startMusic('menu');
     this.audio.play('powerOn');
   }
 
@@ -177,12 +237,14 @@ class App implements AppApi {
     this.acc = 0;
     this.last = performance.now();
     this.mode = 'playing';
+    // Arrivée : le héros est lâché d'en haut et atterrit pile sur l'impact de la musique.
+    this.dropAt = this.botMode || this.stressMode ? -1 : performance.now();
     this.ui.hide();
     this.input.clear();
     this.audio.unlock();
-    this.audio.startMusic();
+    this.audio.setIntensity(0);
+    this.audio.startGame();
     this.audio.setDuck(1);
-    this.audio.intensity = 0;
   }
 
   pickOffer(i: number): void {
@@ -223,9 +285,10 @@ class App implements AppApi {
     this.mode = 'menu';
     this.replay = null;
     this.demo = true;
-    this.state = createGame({ seed: 'DEMO-NEONAWAK' });
+    this.state = this.demoState;
     this.fx.reset(this.state.seed);
-    this.audio.intensity = 0;
+    this.audio.setIntensity(0);
+    this.audio.switchTrack('menu', false);
     this.audio.setDuck(1);
     if (screen === 'sandbox') this.ui.showSandbox();
     else this.ui.showMenu();
@@ -243,7 +306,8 @@ class App implements AppApi {
     this.mode = 'replay';
     this.ui.hide();
     this.audio.unlock();
-    this.audio.startMusic();
+    this.audio.setIntensity(0);
+    this.audio.startMusic('game');
   }
 
   applySettings(s: Settings, persist = true): void {
@@ -262,9 +326,15 @@ class App implements AppApi {
 
   // ---------------- Logique ----------------
   private onAction(a: UiAction): void {
-    // Pendant l'intro, n'importe quelle touche (ou bouton de manette) la termine, sans autre effet.
+    this.ui.noteActivity();
+    // Pendant l'intro, n'importe quelle touche (ou bouton de manette) allume l'écran puis la passe.
     if (this.ui.introActive) {
-      this.ui.finishIntro();
+      this.ui.introInput();
+      return;
+    }
+    // Mode démo : le premier geste ramène le menu, sans autre effet.
+    if (this.ui.attractActive) {
+      this.ui.exitAttract();
       return;
     }
     if (a === 'mute') {
@@ -278,6 +348,7 @@ class App implements AppApi {
     const dir = a === 'left' || a === 'up' || a === 'right' || a === 'down' ? a : null;
     switch (this.mode) {
       case 'playing':
+        if (this.dropAt >= 0) break; // pendant la chute, la partie n'a pas encore commencé
         if (a === 'pause') this.pause();
         else if (a === 'use' || a === 'confirm') this.usePending = true;
         break;
@@ -292,8 +363,10 @@ class App implements AppApi {
         break;
       case 'paused':
         if (a === 'pause' || a === 'back') {
-          if (this.ui.screen === 'settings' || this.ui.screen === 'codex') this.ui.showPause(this.buildInfo());
-          else this.resume();
+          if (this.ui.screen === 'settings' || this.ui.screen === 'codex') {
+            this.uiSound('uiBack');
+            this.ui.showPause(this.buildInfo());
+          } else this.resume();
         } else if (dir) this.ui.navigate(dir);
         else if (a === 'confirm') this.ui.activate();
         break;
@@ -305,7 +378,10 @@ class App implements AppApi {
         else if (a === 'speed4') this.replay.speed = 4;
         break;
       case 'menu':
-        if ((a === 'pause' || a === 'back') && this.ui.screen !== 'menu') this.ui.showMenu();
+        if ((a === 'pause' || a === 'back') && this.ui.screen !== 'menu') {
+          this.uiSound('uiBack');
+          this.ui.showMenu();
+        }
         else if (dir) this.ui.navigate(dir);
         else if (a === 'confirm') this.ui.activate();
         break;
@@ -316,7 +392,10 @@ class App implements AppApi {
       case 'dead':
         if (dir) this.ui.navigate(dir);
         else if (a === 'confirm' && !this.ui.activate()) this.retry();
-        else if (a === 'pause' || a === 'back') this.toMenu();
+        else if (a === 'pause' || a === 'back') {
+          this.uiSound('uiBack');
+          this.toMenu();
+        }
         break;
     }
   }
@@ -370,7 +449,7 @@ class App implements AppApi {
     this.log.push(code);
     step(s, [code]);
     this.fx.consume(s);
-    this.audio.intensity = s.bossId >= 0 ? 1 : 0;
+    this.audio.setIntensity(musicIntensity(s));
     if (s.over) {
       this.mode = 'dying';
       this.deathTimer = this.deathTotal = 2.2;
@@ -415,13 +494,67 @@ class App implements AppApi {
       survived: this.state.players[0].alive,
     };
     this.mode = 'dead';
-    this.audio.intensity = 0;
+    this.audio.setIntensity(0);
     this.ui.showDeath(info);
   }
 
   private endReplay(): void {
     this.replay = null;
     this.showDeathScreen(makeScoreRecord(this.state, new Date().toISOString()), 0, 0, true);
+  }
+
+  /** Fin de la chute : secousse, ondes de choc et éclats autour du héros. */
+  private land(): void {
+    this.dropAt = -1;
+    const p = this.state.players[0];
+    this.fx.addShake(12);
+    this.fx.ring(p.x, p.y, 70, 1, 0.4);
+    this.fx.ring(p.x, p.y, 200, 1, 0.65);
+    this.fx.ring(p.x, p.y, 340, 0, 0.8);
+    this.fx.burst(p.x, p.y, 40, 1, 620, 0.6, 3);
+    this.fx.burst(p.x, p.y, 18, 0, 380, 0.45, 2);
+    this.fx.flash = 0.2;
+    this.fx.flashColor = '#38f6ff';
+  }
+
+  /** Avancement de la chute (0 → 1), ou -1 hors chute. */
+  private dropProgress(now: number): number {
+    return this.dropAt < 0 || this.mode !== 'playing' ? -1 : Math.min(1, (now - this.dropAt) / (START_RISE * 1000));
+  }
+
+  /**
+   * Prépare la démo par petits bouts (quelques ms par image) : la première pendant l'intro, puis une
+   * nouvelle quand l'essaim de la démo en cours devient trop dense. La relève arrive en fondu.
+   */
+  private prepareDemo(): void {
+    const cur = this.demoState;
+    if (!this.demoNext && cur.tick - DEMO_SANDBOX.startMinute * 60 * TICK_RATE > DEMO_LIFETIME + DEMO_WARMUP)
+      this.demoNext = { state: newDemo(`DEMO-${Math.floor(this.time)}`), left: DEMO_WARMUP };
+    const next = this.demoNext;
+    if (!next || this.demoSwapping) return;
+    const t0 = performance.now();
+    while (next.left > 0 && performance.now() - t0 < DEMO_BUDGET_MS) {
+      step(next.state, [botInput(next.state, 0)]);
+      next.left--;
+    }
+    if (next.left > 0) return;
+    if (next.state === cur) {
+      this.demoNext = null;
+      return;
+    }
+    // Relève : la démo s'efface (transition d'opacité de #game), on échange, elle revient.
+    this.demoSwapping = true;
+    document.body.classList.add('demo-swap');
+    setTimeout(() => {
+      this.demoSwapping = false;
+      this.demoNext = null;
+      this.demoState = next.state;
+      if (this.mode === 'menu') {
+        this.state = next.state;
+        this.fx.reset(this.state.seed);
+      }
+      document.body.classList.remove('demo-swap');
+    }, 1000);
   }
 
   private frame(now: number): void {
@@ -441,8 +574,10 @@ class App implements AppApi {
     let alpha = 1;
     switch (this.mode) {
       case 'menu': {
-        // Démo en arrière-plan. Pendant l'intro elle est masquée et figée : elle démarre avec le menu.
-        if (this.ui.introActive) {
+        this.prepareDemo();
+        this.ui.idleTick(now);
+        // Démo en arrière-plan. Pendant l'intro (et sa préparation) elle est masquée et figée.
+        if (this.ui.introActive || this.demoNext?.state === this.state) {
           this.acc = 0;
           break;
         }
@@ -453,16 +588,20 @@ class App implements AppApi {
           const s = this.state;
           step(s, [botInput(s, 0)]);
           this.fx.consume(s);
-          if (s.over) {
-            this.state = createGame({ seed: `DEMO-${Math.floor(this.time)}` });
-            this.fx.reset(this.state.seed);
-          }
         }
         if (n >= 4) this.acc = 0;
         alpha = this.acc / STEP_MS;
         break;
       }
       case 'playing': {
+        // Chute : la simulation attend l'atterrissage (rien n'est enregistré, la partie reste identique).
+        if (this.dropAt >= 0) {
+          if (now - this.dropAt < START_RISE * 1000) {
+            this.acc = 0;
+            break;
+          }
+          this.land();
+        }
         this.acc += dtMs;
         let n = 0;
         while (this.acc >= STEP_MS) {
@@ -490,7 +629,7 @@ class App implements AppApi {
           const c = r.cursor.next();
           if (c < 0) break;
           this.fx.consume(this.state);
-          this.audio.intensity = this.state.bossId >= 0 ? 1 : 0;
+          this.audio.setIntensity(musicIntensity(this.state));
           if (isZeroTimeCode(c)) continue; // choix et objets ne consomment pas de temps
           this.acc -= STEP_MS;
           n++;
@@ -514,10 +653,15 @@ class App implements AppApi {
 
     // Les effets cosmétiques continuent de s'estomper même en pause (la sim, elle, est figée).
     this.fx.update(this.mode === 'dying' ? dt * 0.4 : dt);
+    // Chute : on voit toute la zone de haut, puis la caméra plonge de plus en plus vite sur le héros.
+    const drop = this.dropProgress(now);
+    const zoom = drop >= 0 ? DROP_ZOOM + (1 - DROP_ZOOM) * drop * drop * drop : this.demo ? 0.8 : 1;
     this.renderer.render(this.state, alpha, this.fx, {
       quality: this.save.settings.quality,
       time: this.time,
-      hud: !this.demo,
+      hud: !this.demo && drop < 0,
+      zoom,
+      drop: drop >= 0 ? drop : undefined,
       showFps: this.save.settings.showFps && !this.demo,
       fps: this.fps,
       replay: this.replay ? { speed: this.replay.speed, progress: this.replay.cursor.progress } : null,

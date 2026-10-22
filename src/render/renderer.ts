@@ -47,6 +47,10 @@ export interface RenderOptions extends HudOptions {
   time: number;
   /** HUD affiché (masqué pendant la démo du menu) */
   hud: boolean;
+  /** < 1 : caméra reculée (démo du menu, chute du héros au lancement) */
+  zoom?: number;
+  /** 0 → 1 : avancement de la chute du héros au lancement d'une partie */
+  drop?: number;
   /** 0..1 : progression de l'animation de mort (assombrissement + GAME OVER) */
   deathFade: number;
 }
@@ -71,6 +75,8 @@ export class Renderer {
   cw = 0;
   ch = 0;
   scale = 1;
+  /** échelle sans le zoom de la caméra */
+  private baseScale = 1;
   camX = 0;
   camY = 0;
   private quality: 'high' | 'low' = 'high';
@@ -132,7 +138,7 @@ export class Renderer {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     // Surface monde visible à peu près constante, quelle que soit la résolution.
-    this.scale = Math.min(this.cw / 1400, this.ch / 860);
+    this.scale = this.baseScale = Math.min(this.cw / 1400, this.ch / 860);
   }
 
   /** Lueur néon : trait large translucide puis trait fin. */
@@ -157,6 +163,7 @@ export class Renderer {
     const ctx = this.ctx;
     const p = s.players[0];
     const shake = fx.shakeOffset();
+    this.scale = this.baseScale * (opt.zoom ?? 1);
     this.camX = lerp(p.px, p.x, alpha) + shake.x;
     this.camY = lerp(p.py, p.y, alpha) + shake.y;
     const sc = this.scale;
@@ -180,11 +187,13 @@ export class Renderer {
     ctx.globalCompositeOperation = 'lighter';
     this.drawPickups(s, opt.time);
     this.drawGems(s, alpha);
-    this.drawWeaponFx(s, alpha, true);
+    const falling = opt.drop !== undefined;
+    if (!falling) this.drawWeaponFx(s, alpha, true);
     this.drawProjectiles(s, alpha);
     this.drawEnemies(s, alpha, opt.time);
-    this.drawWeaponFx(s, alpha, false);
-    this.drawPlayer(s, alpha, opt.time);
+    if (!falling) this.drawWeaponFx(s, alpha, false);
+    if (falling) this.drawDrop(s, opt.drop!, opt.zoom ?? 1, opt.time);
+    else this.drawPlayer(s, alpha, opt.time);
     this.drawFx(fx);
     ctx.globalCompositeOperation = 'source-over';
     this.drawTexts(fx);
@@ -218,6 +227,7 @@ export class Renderer {
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
     }
+    if (opt.drop !== undefined) this.drawSpeedLines(W, H, opt.drop, opt.time);
     if (opt.hud) drawHud(ctx, s, W, H, opt);
     if (opt.deathFade > 0) this.drawGameOver(s, W, H, opt.deathFade, opt.time);
   }
@@ -1038,6 +1048,76 @@ export class Renderer {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+  }
+
+  /**
+   * Chute du héros au lancement : une cible se resserre au sol pendant que le héros, vu de haut,
+   * descend vers elle (plus gros à l'écran au début, il retrouve sa taille en touchant le sol).
+   */
+  private drawDrop(s: GameState, k: number, zoom: number, time: number): void {
+    const ctx = this.ctx;
+    const p = s.players[0];
+    const r = p.r * 1.15;
+    // Cible au sol, en pointillés qui tournent, de plus en plus nette.
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (r * (1.6 + 3 * (1 - k))) / zoom, 0, Math.PI * 2);
+    // Tailles divisées par le zoom : la cible garde la même allure à l'écran pendant toute la plongée.
+    ctx.setLineDash([12 / zoom, 10 / zoom]);
+    ctx.lineDashOffset = (-time * 60) / zoom;
+    ctx.globalAlpha = 0.25 + 0.6 * k;
+    this.glow(COLORS.player, 2.5 / zoom);
+    ctx.setLineDash([]);
+    // Le héros : taille à l'écran 1,8× au départ, 1× à l'atterrissage.
+    const h = (1 + 0.8 * (1 - k)) / zoom;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      const px = p.x + Math.cos(a) * r * h;
+      const py = p.y + Math.sin(a) * r * h;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#062a33';
+    ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    neon(ctx, COLORS.player, 3.2 * h);
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      const ex = p.x + side * r * 0.3 * h;
+      const ey = p.y - r * 0.2 * h;
+      ctx.moveTo(ex + 3 * h, ey);
+      ctx.arc(ex, ey, 3 * h, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  }
+
+  /** Lignes de vitesse pendant la plongée de la caméra (repère écran), de plus en plus marquées. */
+  private drawSpeedLines(W: number, H: number, k: number, time: number): void {
+    const f = Math.max(0, (k - 0.35) / 0.65);
+    if (f <= 0) return;
+    const ctx = this.ctx;
+    const R = Math.hypot(W, H) / 2;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = COLORS.player;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 36; i++) {
+      const a = i * 2.39996;
+      const d = R * (0.25 + ((time * (0.6 + f * 1.8) + i * 0.137) % 1) * 0.85);
+      const len = R * 0.12 * f;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ctx.moveTo(W / 2 + c * d, H / 2 + sn * d);
+      ctx.lineTo(W / 2 + c * (d + len), H / 2 + sn * (d + len));
+    }
+    ctx.globalAlpha = 0.35 * f;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   /** Clone : silhouette du héros en hologramme turquoise, qui grésille avant de disparaître. */

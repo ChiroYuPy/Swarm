@@ -61,6 +61,15 @@ body.intro-bg #ui.menu::before {
 body.demo #game {
   filter: saturate(0.85) brightness(0.5);
 }
+/* Menu principal et mode démo : la démo reste bien visible, sous un simple filtre léger. */
+body.demo.menu-home #game,
+body.demo.attract #game {
+  filter: saturate(0.95) brightness(0.85);
+}
+/* Relève de la démo : elle s'efface le temps d'échanger (voir prepareDemo dans main.ts). */
+body.demo-swap #game {
+  opacity: 0;
+}
 body.dead #game {
   filter: saturate(0.4) brightness(0.35) blur(2px);
 }
@@ -94,6 +103,18 @@ body.dead #game {
 }
 #ui.menu::before {
   background: radial-gradient(ellipse at center, rgba(7, 6, 15, 0.9) 0%, rgba(7, 6, 15, 0.75) 55%, rgba(7, 6, 15, 0.45) 100%);
+}
+/* Menu principal : voile seulement derrière le logo et les boutons, l'essaim reste visible autour. */
+#ui.on-menu::before {
+  background: radial-gradient(ellipse 380px 340px at center, rgba(7, 6, 15, 0.82) 0%, rgba(7, 6, 15, 0.5) 65%, rgba(7, 6, 15, 0.12) 100%);
+}
+/* Mode démo : le menu s'efface, la démo prend tout l'écran. */
+#ui {
+  transition: opacity 0.6s ease-in-out;
+}
+body.attract #ui {
+  opacity: 0;
+  pointer-events: none;
 }
 #ui.overlay::before {
   background: rgba(7, 6, 15, 0.72);
@@ -197,11 +218,51 @@ body.dead #game {
   }
 }
 /* ---------- Intro du premier chargement ---------- */
-/* Rien ne s'affiche avant le début de l'intro (police pas encore chargée). */
+/* Rien ne s'affiche avant l'allumage (seule la veille est visible). */
 body.booting #game,
-body.booting #ui,
-body.booting #mute {
+body.booting #ui {
   visibility: hidden;
+}
+/* 0. Veille : écran noir, un voyant rouge au centre (il deviendra le point lumineux), l'invitation dessous. */
+.standby {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.standby .led {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow:
+    0 0 8px var(--red),
+    0 0 22px rgba(255, 61, 110, 0.6);
+  animation: led-pulse 2.4s ease-in-out infinite;
+}
+@keyframes led-pulse {
+  50% {
+    opacity: 0.35;
+    box-shadow: 0 0 4px var(--red);
+  }
+}
+.standby p {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + 34px);
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-m);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: fade-in 0.8s 0.4s ease-out backwards;
 }
 /*
  * 1. Allumage cathodique, en deux temps (durées alignées sur CRT_MS dans ui.ts) :
@@ -216,9 +277,6 @@ body.crt-on {
 body.crt-on #game,
 body.crt-on #ui {
   animation: crt-open 0.6s 0.45s cubic-bezier(0.65, 0, 0.35, 1) backwards;
-}
-body.crt-on #mute {
-  animation: fade-in 0.3s 1s ease-out backwards;
 }
 @keyframes crt-open {
   from {
@@ -298,7 +356,19 @@ body.crt-on #mute {
     opacity: 0;
   }
 }
-/* 2. Logo seul, plus grand, centré pile en hauteur, qui s'allume lettre par lettre. */
+/*
+ * 2. Logo seul, plus grand, centré pile en hauteur. L'essaim (canvas .swarm-intro, voir swarmLogo dans
+ *    ui.ts) le dessine de 1,05 s à 2,65 s, puis les lettres s'allument une par une (délais alignés sur
+ *    INTRO_TIMING dans audio.ts).
+ */
+.swarm-intro {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 7;
+  pointer-events: none;
+}
 .screen-menu.intro {
   position: relative;
 }
@@ -310,10 +380,10 @@ body.crt-on #mute {
   transform: scale(1.6);
 }
 .screen-menu.intro .title span {
-  opacity: 0.1;
+  opacity: 0;
   text-shadow: none;
   animation: letter-on 0.6s steps(1, end) forwards;
-  animation-delay: calc(1.05s + var(--i) * 0.2s);
+  animation-delay: calc(2.65s + var(--i) * 0.2s);
 }
 @keyframes letter-on {
   0% {
@@ -338,36 +408,19 @@ body.crt-on #mute {
     text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
   }
 }
-/* 3. « Appuie sur une touche », une seconde après la dernière lettre, sous le logo (hors mise en page). */
-.press {
-  position: absolute;
-  top: calc(100% + 64px);
-  left: 0;
-  right: 0;
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-l);
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text);
-  text-shadow: 0 0 12px rgba(56, 246, 255, 0.5);
-  animation:
-    fade-in 0.5s 3.45s ease-out backwards,
-    press-blink 1.4s 3.95s ease-in-out infinite;
-}
-@keyframes press-blink {
-  50% {
-    opacity: 0.25;
-  }
-}
-/* 4. Le logo remonte (animé en JS), les boutons se déroulent de haut en bas, un par un. */
+/* 3. Le logo remonte (animé en JS), les boutons se déroulent de haut en bas, un par un. */
 .screen-menu.intro-out .stack {
   animation: unroll-clip 0.6s 0.3s cubic-bezier(0.65, 0, 0.35, 1) backwards;
 }
 .screen-menu.intro-out .stack .btn {
   transform-origin: 50% 0;
   animation: unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+/* le bouton sélectionné garde son déroulé en plus du balayage (délais : règles nth-child ci-dessous) */
+.screen-menu.intro-out .stack .btn:focus {
+  animation:
+    unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards,
+    btn-sweep 0.55s ease-out;
 }
 .screen-menu.intro-out .stack .btn:nth-child(1) {
   animation-delay: 0.32s;
@@ -564,6 +617,47 @@ button:focus {
 .stack .btn {
   width: 100%;
   text-align: center;
+}
+.screen-menu .stack .btn {
+  position: relative;
+  background-image: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.16) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: -30% 0;
+}
+.screen-menu .stack .btn::before,
+.screen-menu .stack .btn::after {
+  position: absolute;
+  top: 50%;
+  color: var(--accent);
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.screen-menu .stack .btn::before {
+  content: '›';
+  left: 16px;
+  transform: translate(-8px, -52%);
+}
+.screen-menu .stack .btn::after {
+  content: '‹';
+  right: 16px;
+  transform: translate(8px, -52%);
+}
+.screen-menu .stack .btn:focus::before,
+.screen-menu .stack .btn:focus::after {
+  opacity: 1;
+  transform: translate(0, -52%);
+}
+.screen-menu .stack .btn:focus {
+  text-shadow: 0 0 10px rgba(56, 246, 255, 0.7);
+  animation: btn-sweep 0.55s ease-out;
+}
+@keyframes btn-sweep {
+  from {
+    background-position: 130% 0;
+  }
 }
 .actions {
   display: flex;
@@ -1971,22 +2065,33 @@ h2.go {
   transform: translateY(-8px);
 }
 
-#mute {
+.attract-hud {
   position: fixed;
-  top: 12px;
-  right: 12px;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  font-size: 18px;
-  z-index: 10;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(7, 6, 15, 0.66);
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  animation: fade-in 0.8s 0.3s ease-out backwards;
 }
-#mute:hover {
-  border-color: var(--accent);
+.attract-tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: press-blink 2.4s ease-in-out infinite;
 }
+@keyframes press-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 
 @media (max-width: 760px) {
   .split {

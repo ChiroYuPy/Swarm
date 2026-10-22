@@ -28,6 +28,7 @@ import {
 import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
 import { dec, formatTime, pad7, type StatDetail } from '../render/hud';
+import { INTRO_TIMING } from '../audio/audio';
 import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
 import { DEFAULT_SETTINGS, TOP_PER_DIFFICULTY, bestScore, defaultSandbox, topScores } from '../storage/storage';
 
@@ -42,7 +43,8 @@ export interface AppApi {
   toMenu(screen?: 'menu' | 'sandbox'): void;
   watchLastRun(): void;
   applySettings(s: Settings): void;
-  uiSound(kind: 'ui' | 'uiMove'): void;
+  uiSound(kind: 'ui' | 'uiMove' | 'uiBack'): void;
+  introPowerOn(): void;
   introDone(): void;
 }
 
@@ -434,7 +436,20 @@ const depth = (name: string) => DEPTH[name] ?? 0;
 const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
 /** Durée de l'allumage cathodique (ms), alignée sur style.css. */
 const CRT_MS = 1100;
+/** début de l'allumage des lettres (ms après l'allumage de l'écran), aligné sur letter-on dans style.css */
+const LETTERS_AT = INTRO_TIMING.crt + INTRO_TIMING.swarm;
+/** l'intro se termine seule une fois le logo allumé (dernière lettre + un temps de pose) */
+const INTRO_END_MS = LETTERS_AT + 4 * INTRO_TIMING.letterGap + 600 + 600;
+/** inactivité sur le menu avant de passer en mode démo (ms) */
+const ATTRACT_MS = 20000;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Son joué au clic d'un bouton : « retour » pour revenir, rien pour lancer une partie (elle a le sien). */
+function clickSound(b: HTMLButtonElement): 'ui' | 'uiBack' | null {
+  if (b.id === 'back' || b.id === 'menu') return 'uiBack';
+  if (b.id === 'start' || b.id === 'go' || b.id === 'retry' || b.matches('.diff[data-d]')) return null;
+  return 'ui';
+}
 
 /**
  * Fait défiler verticalement le premier conteneur défilant pour montrer `el`. Jamais de défilement
@@ -455,7 +470,6 @@ function reveal(el: HTMLElement): void {
 export class UI {
   private readonly root: HTMLElement;
   private readonly toasts: HTMLElement;
-  private readonly muteBtn: HTMLButtonElement;
   private current = '';
   private levelFocus = 0;
   private levelCount = 0;
@@ -469,21 +483,42 @@ export class UI {
   /** écran affiché (ceux qui sortent restent un instant dans #ui, inertes) */
   private screenEl: HTMLElement | null = null;
   private closeTimer = 0;
-  /** intro en cours : la prochaine touche ou le prochain clic la termine */
-  private intro: { stop: () => void } | null = null;
+  /** intro en cours : en veille, la prochaine touche allume l'écran ; ensuite, elle passe l'intro */
+  private intro: { stage: 'standby' | 'on'; ready: Promise<unknown>; timers: number[]; stop: () => void } | null = null;
+  /** mode démo (inactivité sur le menu) */
+  private attract = false;
+  private lastActivity = performance.now();
 
   constructor(private readonly app: AppApi) {
     this.root = document.getElementById('ui')!;
     this.toasts = document.getElementById('toasts')!;
-    this.muteBtn = document.getElementById('mute') as HTMLButtonElement;
-    this.muteBtn.addEventListener('click', () => {
-      this.toggleMute();
-      this.muteBtn.blur(); // Espace ne doit pas re-déclencher le bouton en jeu
-    });
-    this.refreshMute();
     // Garde-fou : #ui ne défile jamais de côté (les écrans qui glissent dépassent volontairement).
     this.root.addEventListener('scroll', () => {
       if (this.root.scrollLeft) this.root.scrollLeft = 0;
+    });
+    // Activité du joueur : repousse le mode démo, et en sort (ce geste-là ne fait rien d'autre).
+    const swallow = (e: Event) => {
+      this.noteActivity();
+      if (!this.attract) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === 'pointerdown') {
+        const block = (c: Event) => {
+          c.preventDefault();
+          c.stopPropagation();
+        };
+        window.addEventListener('click', block, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', block, true), 600);
+      }
+      this.exitAttract();
+    };
+    window.addEventListener('keydown', swallow, true);
+    window.addEventListener('pointerdown', swallow, true);
+    window.addEventListener('wheel', () => this.noteActivity(), { capture: true, passive: true });
+    window.addEventListener('pointermove', (e) => {
+      if (Math.abs(e.movementX) + Math.abs(e.movementY) < 3) return;
+      this.noteActivity();
+      if (this.attract) this.exitAttract();
     });
   }
 
@@ -503,7 +538,8 @@ export class UI {
     const prevName = this.current;
     this.current = name;
     this.toasts.replaceChildren(); // les messages de jeu ne doivent pas traîner sur un écran
-    this.root.className = `visible ${overlay ? 'overlay' : 'menu'}`;
+    this.root.className = `visible ${overlay ? 'overlay' : 'menu'} on-${name}`;
+    document.body.classList.toggle('menu-home', name === 'menu');
     const el = document.createElement('div');
     el.className = `screen screen-${name}`;
     el.innerHTML = html;
@@ -528,7 +564,12 @@ export class UI {
       this.root.appendChild(el);
     }
     this.screenEl = el;
-    el.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this.app.uiSound('ui')));
+    el.querySelectorAll('button').forEach((b) =>
+      b.addEventListener('click', () => {
+        const sfx = clickSound(b);
+        if (sfx) this.app.uiSound(sfx);
+      }),
+    );
     // Survol à la souris = même sélection qu'au clavier.
     el.querySelectorAll<HTMLButtonElement>('.nav').forEach((b) => b.addEventListener('mouseenter', () => b.focus({ preventScroll: true })));
     (el.querySelector<HTMLButtonElement>('.nav.primary') ?? el.querySelector<HTMLButtonElement>('.nav'))?.focus({ preventScroll: true });
@@ -555,6 +596,7 @@ export class UI {
 
   hide(): void {
     cancelAnimationFrame(this.countAnim);
+    document.body.classList.remove('menu-home');
     const prev = this.screenEl;
     const prevName = this.current;
     this.current = '';
@@ -623,9 +665,6 @@ export class UI {
   }
 
   refreshMute(): void {
-    const m = this.app.save.settings.muted;
-    this.muteBtn.textContent = m ? '🔇' : '🔊';
-    this.muteBtn.title = m ? 'Son coupé (M)' : 'Couper le son (M)';
     const row = this.screenEl?.querySelector<HTMLElement>('.set[data-key="muted"]');
     if (row) this.paintSetting(row);
   }
@@ -673,10 +712,14 @@ export class UI {
   }
 
   /**
-   * Allumage façon vieux téléviseur : toute l'image (jeu + interface) part d'une ligne lumineuse et
-   * s'étire jusqu'à plein écran. Le logo, seul au centre, s'allume lettre par lettre comme un néon,
-   * avec « Appuie sur une touche » juste dessous. Ce premier geste autorise le son, puis le logo
-   * remonte à sa place et les boutons du menu se déroulent un par un.
+   * Intro en trois temps :
+   * 0. veille : écran noir, un voyant au centre, « Appuie pour allumer ». Ce geste autorise le son :
+   *    toute l'intro est sonorisée ;
+   * 1. allumage façon vieux téléviseur : le voyant devient un point lumineux qui s'étire en trait,
+   *    puis l'image s'ouvre jusqu'à plein écran ;
+   * 2. un essaim de particules arrive en tourbillon de tous les bords et forme le logo, dont les
+   *    lettres s'allument ensuite une par une comme des néons ;
+   * 3. le logo remonte à sa place et les boutons du menu se déroulent (seul, ou dès qu'on appuie).
    */
   showIntro(): void {
     const body = document.body;
@@ -685,62 +728,202 @@ export class UI {
       this.showMenu();
       return;
     }
+    // Capturées avant InputManager : pendant l'intro, une touche ou un clic ne fait rien d'autre.
     const onKey = (e: KeyboardEvent) => {
-      // Capturée avant InputManager : la touche termine l'intro et ne fait rien d'autre.
       e.preventDefault();
       e.stopPropagation();
-      this.finishIntro();
+      this.introInput();
     };
     const onPointer = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Le clic qui suit ce geste ne doit rien déclencher d'autre (bouton du son, etc.).
+      // Le clic qui suit ce geste ne doit rien déclencher d'autre (un bouton du menu, etc.).
       const block = (c: Event) => {
         c.preventDefault();
         c.stopPropagation();
       };
       window.addEventListener('click', block, { capture: true, once: true });
       setTimeout(() => window.removeEventListener('click', block, true), 600);
-      this.finishIntro();
+      this.introInput();
     };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('pointerdown', onPointer, true);
     // Fond uni pendant l'intro : la partie de démonstration n'apparaît qu'avec le menu.
     body.classList.add('intro-bg');
-    const intro = {
+    // Écran noir tant que la police du titre n'est pas là (sinon on verrait le logo changer de police).
+    const fontReady = document.fonts?.load('700 88px "Chakra Petch"') ?? Promise.resolve();
+    const ready = Promise.race([fontReady, new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
+    const intro: NonNullable<UI['intro']> = {
+      stage: 'standby',
+      ready,
+      timers: [],
       stop: () => {
         window.removeEventListener('keydown', onKey, true);
         window.removeEventListener('pointerdown', onPointer, true);
+        intro.timers.forEach((t) => clearTimeout(t));
       },
     };
     this.intro = intro;
-    // Écran noir tant que la police du titre n'est pas là (sinon on verrait le logo changer de police).
-    const fontReady = document.fonts?.load('700 88px "Chakra Petch"') ?? Promise.resolve();
-    const timeout = new Promise((r) => setTimeout(r, 1500));
-    void Promise.race([fontReady, timeout])
-      .catch(() => {})
-      .then(() => {
-        if (this.intro !== intro) return;
-        this.showMenu();
-        const el = this.screenEl!;
-        // Pas de glissement : l'écran est déjà en place quand l'image s'allume.
-        el.classList.remove('enter-fwd');
-        el.classList.add('intro');
-        el.insertAdjacentHTML('beforeend', '<p class="press">Appuie sur une touche</p>');
-        // Le point qui devient trait, puis les deux lignes qui s'écartent (voir style.css).
-        const lines = ['crt-line', 'crt-edge up', 'crt-edge down'].map((c) => {
-          const d = document.createElement('div');
-          d.className = c;
-          body.appendChild(d);
-          return d;
-        });
-        body.classList.remove('booting');
-        body.classList.add('crt-on');
-        setTimeout(() => {
-          lines.forEach((d) => d.remove());
-          body.classList.remove('crt-on');
-        }, CRT_MS);
+    void ready.then(() => {
+      if (this.intro !== intro || intro.stage !== 'standby') return;
+      const sb = document.createElement('div');
+      sb.className = 'standby';
+      sb.innerHTML = '<i class="led"></i><p>Appuie pour allumer</p>';
+      body.appendChild(sb);
+    });
+  }
+
+  /** Une touche, un clic ou un bouton de manette pendant l'intro : allume l'écran, ou passe la suite. */
+  introInput(): void {
+    const intro = this.intro;
+    if (!intro) return;
+    if (intro.stage === 'on') {
+      this.finishIntro();
+      return;
+    }
+    intro.stage = 'on';
+    // Dans le geste lui-même : c'est ce qui autorise le navigateur à jouer du son.
+    this.app.introPowerOn();
+    void intro.ready.then(() => {
+      if (this.intro !== intro) return;
+      const body = document.body;
+      document.querySelector('.standby')?.remove();
+      this.showMenu();
+      const el = this.screenEl!;
+      // Pas de glissement : l'écran est déjà en place quand l'image s'allume.
+      el.classList.remove('enter-fwd');
+      el.classList.add('intro');
+      // Le point qui devient trait, puis les deux lignes qui s'écartent (voir style.css).
+      const lines = ['crt-line', 'crt-edge up', 'crt-edge down'].map((c) => {
+        const d = document.createElement('div');
+        d.className = c;
+        body.appendChild(d);
+        return d;
       });
+      body.classList.remove('booting');
+      body.classList.add('crt-on');
+      const later = (fn: () => void, ms: number) => intro.timers.push(window.setTimeout(fn, ms));
+      later(() => {
+        lines.forEach((d) => d.remove());
+        body.classList.remove('crt-on');
+      }, CRT_MS);
+      later(() => {
+        const stopSwarm = this.swarmLogo(el);
+        const stop = intro.stop;
+        intro.stop = () => {
+          stop();
+          stopSwarm();
+        };
+      }, INTRO_TIMING.crt);
+      later(() => this.finishIntro(), INTRO_END_MS);
+    });
+  }
+
+  /**
+   * L'essaim qui forme le logo : des particules aux couleurs des ennemis arrivent en spirale de
+   * tous les bords et se posent sur le dessin des lettres, puis s'effacent quand chaque lettre
+   * s'allume. Retourne de quoi tout arrêter.
+   */
+  private swarmLogo(screen: HTMLElement): () => void {
+    const title = screen.querySelector<HTMLElement>('.title');
+    const spans = [...(title?.querySelectorAll<HTMLElement>('span') ?? [])];
+    if (!title || !spans.length) return () => {};
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cv = document.createElement('canvas');
+    cv.className = 'swarm-intro';
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    document.body.appendChild(cv);
+    const ctx = cv.getContext('2d')!;
+
+    // Cibles : le dessin des lettres, à leur place et à leur taille à l'écran (logo agrandi compris).
+    const zoom = title.getBoundingClientRect().width / title.offsetWidth || 1;
+    const size = parseFloat(getComputedStyle(title).fontSize) * zoom;
+    const off = document.createElement('canvas');
+    off.width = W;
+    off.height = H;
+    const oc = off.getContext('2d', { willReadFrequently: true })!;
+    oc.font = `700 ${size}px "Chakra Petch"`;
+    oc.textBaseline = 'alphabetic';
+    oc.fillStyle = '#fff';
+    const rects = spans.map((sp) => sp.getBoundingClientRect());
+    for (let i = 0; i < spans.length; i++) {
+      const ascent = oc.measureText(spans[i].textContent ?? '').fontBoundingBoxAscent;
+      oc.fillText(spans[i].textContent ?? '', rects[i].left, rects[i].top + ascent);
+    }
+    const x0 = Math.max(0, Math.floor(rects[0].left - 10));
+    const y0 = Math.max(0, Math.floor(rects[0].top - 10));
+    const x1 = Math.min(W, Math.ceil(rects[rects.length - 1].right + 10));
+    const y1 = Math.min(H, Math.ceil(Math.max(...rects.map((r) => r.bottom)) + 10));
+    const img = oc.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+    const gap = Math.max(3, Math.round(size / 26));
+    type P = { tx: number; ty: number; a: number; r: number; d: number; c: number; l: number };
+    const ps: P[] = [];
+    let seed = 7;
+    const rnd = () => {
+      seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+      return seed / 4294967296;
+    };
+    const reach = Math.hypot(W, H) * 0.6;
+    for (let y = 0; y < y1 - y0; y += gap)
+      for (let x = 0; x < x1 - x0; x += gap) {
+        if (img[(y * (x1 - x0) + x) * 4 + 3] < 128) continue;
+        const tx = x0 + x;
+        const l = Math.max(0, rects.findIndex((r) => tx < r.right));
+        ps.push({ tx, ty: y0 + y, a: rnd() * Math.PI * 2, r: reach * (1 + rnd() * 0.35), d: rnd() * 0.35, c: Math.floor(rnd() * 5), l });
+      }
+    const colors = ['#38f6ff', '#ff3df5', '#39ff7a', '#ffd23a', '#b48cff'];
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const T = INTRO_TIMING.swarm / 1000;
+    const letterGap = INTRO_TIMING.letterGap / 1000;
+    const start = performance.now();
+    let raf = 0;
+    const frame = () => {
+      const t = (performance.now() - start) / 1000;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Traînées : l'image précédente s'efface en partie.
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = `rgba(0,0,0,${t < T ? 0.32 : 0.6})`;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of ps) {
+        const k = Math.min(1, Math.max(0, (t - p.d) / (T - p.d)));
+        const e = k * k * (3 - 2 * k);
+        // Chaque lettre s'éteint côté essaim quand le néon prend le relais (fin de son allumage).
+        const lit = T + p.l * letterGap + 0.35;
+        const alpha = t < lit ? 1 : Math.max(0, 1 - (t - lit) / 0.3);
+        if (alpha <= 0) continue;
+        const rad = p.r * Math.pow(1 - e, 1.4);
+        const ang = p.a + 5 * (1 - e);
+        const x = p.tx + Math.cos(ang) * rad;
+        const y = p.ty + Math.sin(ang) * rad;
+        ctx.globalAlpha = alpha * (0.35 + 0.65 * Math.min(1, k * 3));
+        ctx.fillStyle = e > 0.85 ? '#eafdff' : colors[p.c];
+        const sz = e > 0.85 ? gap * 0.7 : 2;
+        ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+      }
+      // Onde de choc quand l'essaim se pose (en même temps que l'impact sonore).
+      if (t > T && t < T + 0.5) {
+        const k = (t - T) / 0.5;
+        ctx.globalAlpha = 0.6 * (1 - k);
+        ctx.strokeStyle = '#38f6ff';
+        ctx.lineWidth = 3 * (1 - k) + 1;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, (x1 - x0) * (0.4 + k * 0.9), (y1 - y0) * (0.4 + k * 1.6), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      if (t < T + spans.length * letterGap + 1) raf = requestAnimationFrame(frame);
+      else cv.remove();
+    };
+    raf = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(raf);
+      cv.remove();
+    };
   }
 
   /** Termine l'intro (ou la passe si elle est encore en cours) et révèle le menu. */
@@ -752,7 +935,8 @@ export class UI {
     const body = document.body;
     // Passée pendant l'allumage : l'image se remet d'un coup, sans écran noir. La démo apparaît en fondu.
     body.classList.remove('booting', 'crt-on', 'intro-bg');
-    document.querySelectorAll('.crt-line, .crt-edge').forEach((d) => d.remove());
+    document.querySelectorAll('.crt-line, .crt-edge, .standby, .swarm-intro').forEach((d) => d.remove());
+    this.noteActivity();
     const el = this.screenEl;
     if (this.current !== 'menu' || !el?.classList.contains('intro')) {
       if (!this.current) this.showMenu();
@@ -760,15 +944,7 @@ export class UI {
       return;
     }
     const brand = el.querySelector<HTMLElement>('.brand')!;
-    const press = el.querySelector<HTMLElement>('.press');
     const first = brand.getBoundingClientRect();
-    // Le message sort du flux (figé à sa place) et s'efface.
-    if (press) {
-      const r = press.getBoundingClientRect();
-      Object.assign(press.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, margin: '0' });
-      press.animate([{ opacity: getComputedStyle(press).opacity }, { opacity: 0 }], { duration: 200, fill: 'forwards' });
-      setTimeout(() => press.remove(), 220);
-    }
     el.classList.remove('intro');
     el.classList.add('intro-out');
     // Le logo glisse du centre jusqu'à sa place (FLIP : on part de l'ancienne position).
@@ -781,6 +957,37 @@ export class UI {
     });
     el.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
     this.app.introDone();
+  }
+
+  // ---------- Mode démo (inactivité sur le menu) ----------
+  get attractActive(): boolean {
+    return this.attract;
+  }
+
+  noteActivity(): void {
+    this.lastActivity = performance.now();
+  }
+
+  /** Appelé à chaque image sur le menu : passé un moment sans rien toucher, la démo prend tout l'écran. */
+  idleTick(now: number): void {
+    if (this.attract || this.intro || this.current !== 'menu' || reducedMotion()) return;
+    if (now - this.lastActivity < ATTRACT_MS) return;
+    this.attract = true;
+    (document.activeElement as HTMLElement | null)?.blur();
+    const hud = document.createElement('div');
+    hud.className = 'attract-hud';
+    hud.innerHTML = '<p class="attract-tag">Démo · appuie sur une touche</p>';
+    document.body.appendChild(hud);
+    document.body.classList.add('attract');
+  }
+
+  exitAttract(): void {
+    if (!this.attract) return;
+    this.attract = false;
+    this.noteActivity();
+    document.body.classList.remove('attract');
+    document.querySelector('.attract-hud')?.remove();
+    this.screenEl?.querySelector<HTMLButtonElement>('.nav.primary')?.focus({ preventScroll: true });
   }
 
   // ---------- Choix de la difficulté ----------
