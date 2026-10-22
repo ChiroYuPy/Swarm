@@ -47,7 +47,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 55, speed: 46, damage: 12, radius: 21, xp: 4, kbResist: 0.75,
   },
   {
-    id: 'pentagone', name: 'Tireur', desc: 'Garde ses distances et tire des boules rouges.',
+    id: 'pentagone', name: 'Tireur', desc: 'Garde ses distances et tire des boules violettes. Tes armes peuvent les casser.',
     behavior: 'shooter', shape: 'pentagon', color: '#c46bff',
     hp: 20, speed: 62, damage: 6, radius: 14, xp: 3, kbResist: 0.2,
     keepMin: 240, keepMax: 340, shootEvery: 2.6, bulletSpeed: 190, bulletDamage: 7,

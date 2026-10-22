@@ -5,7 +5,7 @@
 import { ENEMIES, BOSS } from '../data/enemies';
 import { ALL_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS } from '../data/loot';
 import {
   Rng,
   STREAM,
@@ -36,11 +36,17 @@ import {
   EV_SHOOT,
   EV_SWARM,
   EV_WALL_HIT,
+  EV_SHOT_DOWN,
+  EV_SHATTER,
+  EV_REVIVE,
+  EV_CLONE_END,
   OFFER_FUSION,
   OFFER_PASSIVE,
   OFFER_WEAPON,
   PK_BOMB,
   PK_CHEST,
+  PK_CLOCK,
+  PK_CLONE,
   PK_ERADICATE,
   PK_FREEZE,
   PK_VACUUM,
@@ -72,7 +78,12 @@ export type SfxName =
   | 'bomb'
   | 'magnet'
   | 'fuse'
-  | 'alert';
+  | 'alert'
+  | 'shotDown'
+  | 'shatter'
+  | 'clock'
+  | 'clone'
+  | 'revive';
 
 export interface FxHooks {
   sfx(name: SfxName, v?: number): void;
@@ -86,7 +97,15 @@ const MAXR = 48;
 
 /** Message au ramassage : bonus = effet immédiat, activable = rangé (Espace pour l'utiliser). */
 const PICKUP_TOASTS = PICKUPS.map((d) =>
-  d.kind === 'active' ? `${d.name} en réserve · Espace` : d.kind === 'timed' ? `${d.name} · ${d.duration} s` : d.kind === 'instant' ? `${d.name} +30 % PV` : '',
+  d.kind === 'active'
+    ? `${d.name} en réserve · Espace`
+    : d.kind === 'timed'
+      ? `${d.name} · ${d.duration} s`
+      : d.kind === 'instant'
+        ? `${d.name} +30 % PV`
+        : d.kind === 'relic'
+          ? `${d.name} : il te ramènera une fois`
+          : '',
 );
 
 const ENEMY_COL = ENEMIES.map((e) => fxColorIndex(e.color));
@@ -318,10 +337,20 @@ export class Effects {
             this.ring(e.x, e.y, 500, 1, 0.7);
             h.sfx('magnet');
           } else if (e.k === PK_FREEZE) {
-            this.flash = 0.35;
+            this.flash = 0.3;
             this.flashColor = '#9feaff';
-            this.ring(e.x, e.y, 700, 0, 0.9);
-            h.sfx('magnet');
+            this.ring(e.x, e.y, LOOT.freezeRadius, 16, 0.6);
+            this.burst(e.x, e.y, 40, 16, 420, 0.6, 3);
+            h.sfx('shatter');
+          } else if (e.k === PK_CLOCK) {
+            this.flash = 0.3;
+            this.flashColor = '#7f9cff';
+            this.ring(e.x, e.y, 900, 18, 1.0);
+            h.sfx('clock');
+          } else if (e.k === PK_CLONE) {
+            this.ring(e.x, e.y, 120, 17, 0.5);
+            this.burst(e.x, e.y, 30, 17, 220, 0.6, 3);
+            h.sfx('clone');
           } else if (e.k === PK_BOMB) {
             this.flash = 0.5;
             this.flashColor = '#ffffff';
@@ -348,6 +377,28 @@ export class Effects {
           break;
         case EV_ENEMY_SHOT:
           h.sfx('enemyShot', e.v);
+          break;
+        case EV_SHOT_DOWN:
+          this.burst(e.x, e.y, 5, 5, 120, 0.25, 2);
+          h.sfx('shotDown');
+          break;
+        case EV_SHATTER:
+          this.burst(e.x, e.y, 9, 16, 240, 0.45, 3);
+          this.ring(e.x, e.y, e.v, 16, 0.25);
+          h.sfx('shatter');
+          break;
+        case EV_REVIVE:
+          this.flash = 0.55;
+          this.flashColor = '#ffb347';
+          this.ring(e.x, e.y, e.v, 13, 0.7);
+          this.ring(e.x, e.y, e.v * 1.6, 11, 1.0);
+          this.burst(e.x, e.y, 60, 13, 380, 1.0, 4);
+          this.addShake(10);
+          h.toast('Totem : tu reviens !', '#ffb347');
+          h.sfx('revive');
+          break;
+        case EV_CLONE_END:
+          this.burst(e.x, e.y, 18, 17, 160, 0.5, 3);
           break;
         case EV_WALL_HIT:
           this.burst(e.x, e.y, 2, e.v === 1 ? 6 : 15, 90, 0.15, 2);

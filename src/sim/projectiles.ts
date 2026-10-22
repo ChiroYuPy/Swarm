@@ -1,5 +1,7 @@
 /** Mise à jour des projectiles : balles, balles ennemies, mines, boomerangs, ondes. */
 import { DT, TICK_RATE } from './constants';
+import { LOOT } from '../data/loot';
+import { clearShotsIn } from './shots';
 import { pointInObstacle } from './map';
 import { removeProjectile } from './entities';
 import { damageEnemy, explode, hurtPlayer } from './combat';
@@ -8,6 +10,7 @@ import { spawnMine } from './weapons';
 import {
   EF_BOSS,
   EF_PROP,
+  EV_SHOT_DOWN,
   EV_WALL_HIT,
   PJ_BOOMERANG,
   PJ_BULLET,
@@ -32,6 +35,11 @@ function addHit(b: Projectile, id: number): void {
 export function updateProjectiles(s: GameState): void {
   for (let i = s.projCount - 1; i >= 0; i--) {
     const b = s.projectiles[i];
+    // Détruit en cours de pas (balle de Tireur abattue, balle du joueur usée sur elle).
+    if (b.life <= 0) {
+      removeProjectile(s, i);
+      continue;
+    }
     b.px = b.x;
     b.py = b.y;
     b.age++;
@@ -91,8 +99,13 @@ function bullet(s: GameState, b: Projectile): boolean {
 }
 
 function enemyBullet(s: GameState, b: Projectile): boolean {
-  b.x += b.vx * DT;
-  b.y += b.vy * DT;
+  const tf = s.clockUntil > s.tick ? LOOT.clockFactor : 1;
+  b.x += b.vx * DT * tf;
+  b.y += b.vy * DT * tf;
+  if (b.a === 1 && hitByShot(s, b)) {
+    emit(s, EV_SHOT_DOWN, b.x, b.y);
+    return true;
+  }
   if (pointInObstacle(s.map, b.x, b.y)) {
     emit(s, EV_WALL_HIT, b.x, b.y, 1, 0);
     return true;
@@ -106,6 +119,24 @@ function enemyBullet(s: GameState, b: Projectile): boolean {
       hurtPlayer(s, p, b.damage);
       return true;
     }
+  }
+  return false;
+}
+
+/** Balle de Tireur touchée par une balle ou un boomerang du joueur ? (une balle sans perforation s'y use) */
+function hitByShot(s: GameState, b: Projectile): boolean {
+  for (let j = 0; j < s.projCount; j++) {
+    const o = s.projectiles[j];
+    if ((o.kind !== PJ_BULLET && o.kind !== PJ_BOOMERANG) || o.life <= 0) continue;
+    const dx = o.x - b.x;
+    const dy = o.y - b.y;
+    const rr = o.r + b.r;
+    if (dx * dx + dy * dy >= rr * rr) continue;
+    if (o.kind === PJ_BULLET) {
+      if (o.pierce === 0) o.life = 0;
+      else if (o.pierce > 0) o.pierce--;
+    }
+    return true;
   }
   return false;
 }
@@ -201,6 +232,7 @@ function ring(s: GameState, b: Projectile): boolean {
   const prevR = (b.a * (b.age - 1)) / b.b;
   const rr = (b.a * b.age) / b.b;
   b.r = rr;
+  clearShotsIn(s, b.x, b.y, rr);
   const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, rr);
   for (let k = 0; k < n; k++) {

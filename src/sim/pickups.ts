@@ -9,12 +9,14 @@ import {
   EV_GEM,
   EV_PICKUP,
   PK_CHEST,
+  PK_FEVER,
   PK_FIRST_ACTIVE,
   PK_FRENZY,
   PK_HEAL,
   PK_LAST_ACTIVE,
   PK_RAGE,
   PK_SHIELD,
+  PK_TOTEM,
   PK_TURBO,
   emit,
   type GameState,
@@ -25,7 +27,7 @@ function nearestAlive(s: GameState, x: number, y: number): { p: Player | null; d
   let best: Player | null = null;
   let bestD = Infinity;
   for (const p of s.players) {
-    if (!p.alive) continue;
+    if (!p.alive || p.master >= 0) continue; // les clones ne ramassent rien
     const dx = p.x - x;
     const dy = p.y - y;
     const d = dx * dx + dy * dy;
@@ -120,6 +122,14 @@ function applyPickup(s: GameState, p: Player, kind: number, x: number, y: number
       break;
     case PK_SHIELD:
       p.shieldUntil = until(p.shieldUntil);
+      break;
+    case PK_FEVER:
+      p.feverUntil = until(p.feverUntil);
+      break;
+    case PK_TOTEM:
+      // Un seul Totem à la fois : le suivant se transforme en soin.
+      if (p.totem > 0) healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
+      else p.totem = 1;
       break;
     case PK_CHEST:
       openChest(s, p);

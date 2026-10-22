@@ -262,7 +262,7 @@ function codexItems(tab: CodexTab): CodexItem[] {
       const groups: [string, string[]][] = [
         ['Bonus temporaires', ['timed']],
         ['Activables · Espace', ['active']],
-        ['Autres', ['instant', 'chest']],
+        ['Autres', ['instant', 'relic', 'chest']],
       ];
       const out: CodexItem[] = [];
       for (const [group, kinds] of groups)
@@ -345,6 +345,9 @@ function codexDetail(it: CodexItem): string {
       } else if (p.kind === 'active') {
         tag = 'Activable · Espace';
         body = `<p class="hint">Rangé dans l’emplacement « Objet » et déclenché avec Espace (bouton A). Un seul en réserve : en ramasser un autre le remplace.</p>`;
+      } else if (p.kind === 'relic') {
+        tag = 'Relique · automatique';
+        body = `<p class="hint">Gardée à part (elle n’occupe pas l’emplacement « Objet ») et affichée au-dessus de ta barre. Une seule à la fois. Très rare : lâchée par les ennemis et les caisses bonus.</p>`;
       } else if (p.kind === 'instant') {
         tag = 'Effet immédiat';
         body = `<p class="hint">Lâché au hasard par les ennemis, et proposé au level-up quand ton équipement est complet.</p>`;
@@ -394,7 +397,8 @@ function codexRules(): string {
         <p>Les ennemis arrivent par types, de plus en plus variés. Un boss toutes les ${WAVES.bossEvery / 60} minutes.</p>
       </section>
       <section><h3>Objets</h3>
-        <p><b>Bonus</b> (dans un cercle) : effet immédiat ou temporaire. <b>Activables</b> (dans un losange) : gardés en réserve, un seul à la fois.</p>
+        <p><b>Bonus</b> (dans un cercle) : effet immédiat ou temporaire. <b>Activables</b> (dans un losange) : gardés en réserve, un seul à la fois. <b>Reliques</b> (dans un hexagone) : se déclenchent toutes seules.</p>
+        <p>Les boules violettes des Tireurs se cassent : tes tirs, explosions, ondes, orbes, aura et laser les détruisent.</p>
         <p>Les caisses bonus <b>?</b> apparaissent régulièrement près de toi : casse-les.</p>
       </section>
     </div>`;

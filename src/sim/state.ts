@@ -42,6 +42,8 @@ export class Enemy {
   slowUntil = 0;
   slowFactor = 0;
   stunUntil = 0;
+  /** gelé (objet Gel) jusqu'à ce tick : immobile, fragile, éclate à sa mort */
+  frozenUntil = 0;
   hitTick = -1000;
   attackReady = 0;
   /** état d'IA (phase), minuteur et variables auxiliaires */
@@ -106,11 +108,15 @@ export const PK_RAGE = 1;
 export const PK_FRENZY = 2;
 export const PK_TURBO = 3;
 export const PK_SHIELD = 4;
-export const PK_VACUUM = 5;
-export const PK_FREEZE = 6;
-export const PK_BOMB = 7;
-export const PK_ERADICATE = 8;
-export const PK_CHEST = 9;
+export const PK_FEVER = 5;
+export const PK_TOTEM = 6;
+export const PK_VACUUM = 7;
+export const PK_FREEZE = 8;
+export const PK_BOMB = 9;
+export const PK_CLOCK = 10;
+export const PK_CLONE = 11;
+export const PK_ERADICATE = 12;
+export const PK_CHEST = 13;
 export const PK_FIRST_ACTIVE = PK_VACUUM;
 export const PK_LAST_ACTIVE = PK_ERADICATE;
 
@@ -212,6 +218,12 @@ export class Player {
   frenzyUntil = 0;
   turboUntil = 0;
   shieldUntil = 0;
+  feverUntil = 0;
+  /** Totem en réserve (0 ou 1) : se déclenche tout seul à la mort */
+  totem = 0;
+  /** clone : index du joueur copié (-1 = vrai joueur) et tick de disparition */
+  master = -1;
+  expires = 0;
   /** objet activable en réserve (code PK_*, -1 = aucun) */
   activable = -1;
   /** dernière direction regardée */
@@ -256,6 +268,14 @@ export const EV_NEW_ENEMY = 25;
 export const EV_ACTIVATE = 26;
 /** caisse bonus apparue */
 export const EV_PROP = 27;
+/** balle de Tireur détruite par une arme */
+export const EV_SHOT_DOWN = 28;
+/** ennemi gelé qui éclate (v = rayon) */
+export const EV_SHATTER = 29;
+/** le Totem ramène le joueur */
+export const EV_REVIVE = 30;
+/** le clone disparaît */
+export const EV_CLONE_END = 31;
 
 /** Événement émis par la sim pour le rendu et l'audio. Purement informatif : la sim ne les relit jamais. */
 export class SimEvent {
@@ -310,13 +330,15 @@ export interface GameState {
   bossId: number;
   chestCount: number;
   totalKills: number;
-  /** ennemis figés (Gel) jusqu'à ce tick */
-  freezeUntil: number;
+  /** monde ralenti (Horloge) jusqu'à ce tick */
+  clockUntil: number;
   /** règles du bac à sable (null = partie normale) */
   sandbox: SandboxRules | null;
   // Caches dérivés (non sérialisés, reconstruits à la volée).
   grid: SpatialGrid;
   nav: NavField;
+  /** éclats de Gel en attente (x, y, dégâts, joueur crédité), vidée dans le même pas */
+  shatters: number[];
   events: SimEvent[];
   eventCount: number;
 }

@@ -374,18 +374,36 @@ function flakePath(ctx: Ctx, r: number): void {
   }
 }
 
-export type PickupIcon = 'heal' | 'rage' | 'frenzy' | 'turbo' | 'shield' | 'vacuum' | 'freeze' | 'bomb' | 'eradicate' | 'chest';
+export type PickupIcon =
+  | 'heal'
+  | 'rage'
+  | 'frenzy'
+  | 'turbo'
+  | 'shield'
+  | 'fever'
+  | 'totem'
+  | 'vacuum'
+  | 'freeze'
+  | 'bomb'
+  | 'clock'
+  | 'clone'
+  | 'eradicate'
+  | 'chest';
 
 /** Familles d'objets : un cadre différent les rend reconnaissables d'un coup d'œil. */
-const FAMILY: Record<PickupIcon, 'bonus' | 'active' | 'chest'> = {
+const FAMILY: Record<PickupIcon, 'bonus' | 'active' | 'relic' | 'chest'> = {
   heal: 'bonus',
   rage: 'bonus',
   frenzy: 'bonus',
   turbo: 'bonus',
   shield: 'bonus',
+  fever: 'bonus',
+  totem: 'relic',
   vacuum: 'active',
   freeze: 'active',
   bomb: 'active',
+  clock: 'active',
+  clone: 'active',
   eradicate: 'active',
   chest: 'chest',
 };
@@ -396,9 +414,13 @@ export const PICKUP_COLORS: Record<PickupIcon, string> = {
   frenzy: '#ffe14d',
   turbo: '#38f6ff',
   shield: '#a0b4ff',
+  fever: '#b8ff3d',
+  totem: '#ffb347',
   vacuum: '#ff5a5a',
   freeze: '#9feaff',
   bomb: '#ffd23a',
+  clock: '#7f9cff',
+  clone: '#5cf2d6',
   eradicate: '#ff3df5',
   chest: '#ffd23a',
 };
@@ -420,7 +442,15 @@ export function drawPickupIcon(ctx: Ctx, kind: PickupIcon, cx: number, cy: numbe
   if (framed && fam !== 'chest') {
     ctx.beginPath();
     if (fam === 'bonus') ctx.arc(0, 0, r * 0.95, 0, TAU);
-    else {
+    else if (fam === 'relic') {
+      // Relique : hexagone (ni cercle de bonus, ni losange d'activable)
+      for (let k = 0; k < 6; k++) {
+        const a = -Math.PI / 2 + (k * Math.PI) / 3;
+        if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+    } else {
       ctx.moveTo(0, -r);
       ctx.lineTo(r, 0);
       ctx.lineTo(0, r);
@@ -429,7 +459,7 @@ export function drawPickupIcon(ctx: Ctx, kind: PickupIcon, cx: number, cy: numbe
     }
     neon(ctx, c, lw * 0.6, 0.12);
   }
-  const k = framed && fam !== 'chest' ? (fam === 'active' ? 0.5 : 0.62) : 1;
+  const k = framed && fam !== 'chest' ? (fam === 'active' ? 0.5 : fam === 'relic' ? 0.58 : 0.62) : 1;
   const q = r * k;
   ctx.beginPath();
   switch (kind) {
@@ -482,6 +512,64 @@ export function drawPickupIcon(ctx: Ctx, kind: PickupIcon, cx: number, cy: numbe
     case 'shield':
       shieldPath(ctx, q * 0.9);
       neon(ctx, c, lw * 0.9, 0.3);
+      break;
+    case 'fever': {
+      // Gemme d'XP surmontée d'une flèche montante
+      ctx.moveTo(0, -q * 0.15);
+      ctx.lineTo(q * 0.5, q * 0.35);
+      ctx.lineTo(0, q * 0.85);
+      ctx.lineTo(-q * 0.5, q * 0.35);
+      ctx.closePath();
+      neon(ctx, c, lw * 0.8, 0.35);
+      ctx.beginPath();
+      ctx.moveTo(0, -q * 0.35);
+      ctx.lineTo(0, -q * 0.95);
+      ctx.moveTo(-q * 0.28, -q * 0.68);
+      ctx.lineTo(0, -q * 0.95);
+      ctx.lineTo(q * 0.28, -q * 0.68);
+      neon(ctx, c, lw * 0.8);
+      break;
+    }
+    case 'totem':
+      // Ankh : boucle, tige et barre, le symbole de la vie qui revient
+      ctx.ellipse(0, -q * 0.48, q * 0.3, q * 0.4, 0, 0, TAU);
+      ctx.moveTo(0, -q * 0.08);
+      ctx.lineTo(0, q * 0.95);
+      ctx.moveTo(-q * 0.55, q * 0.12);
+      ctx.lineTo(q * 0.55, q * 0.12);
+      neon(ctx, c, lw * 0.9);
+      break;
+    case 'clock':
+      ctx.arc(0, 0, q * 0.82, 0, TAU);
+      neon(ctx, c, lw * 0.8, 0.2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -q * 0.55);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(q * 0.38, q * 0.2);
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2;
+        ctx.moveTo(Math.cos(a) * q * 0.62, Math.sin(a) * q * 0.62);
+        ctx.lineTo(Math.cos(a) * q * 0.78, Math.sin(a) * q * 0.78);
+      }
+      neon(ctx, c, lw * 0.8);
+      break;
+    case 'clone':
+      // Deux octogones décalés : le héros et son double
+      for (const [ox, oy] of [
+        [-q * 0.25, -q * 0.2],
+        [q * 0.25, q * 0.2],
+      ]) {
+        for (let k = 0; k < 8; k++) {
+          const a = Math.PI / 8 + (k * Math.PI) / 4;
+          const px = ox + Math.cos(a) * q * 0.55;
+          const py = oy + Math.sin(a) * q * 0.55;
+          if (k === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      }
+      neon(ctx, c, lw * 0.8, 0.2);
       break;
     case 'vacuum':
       ctx.arc(0, -q * 0.05, q * 0.6, Math.PI, 0, true);

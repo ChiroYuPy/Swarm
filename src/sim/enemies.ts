@@ -1,5 +1,6 @@
 /** IA des ennemis, du boss, séparation, contact avec les joueurs. */
 import { BOSS, ENEMIES } from '../data/enemies';
+import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DT, TICK_RATE } from './constants';
 import { PI, TWO_PI, dcos, datan2, dsin } from './dmath';
@@ -54,11 +55,13 @@ function pathDir(s: GameState, e: Enemy, dx: number, dy: number, dist: number): 
   DY = uy;
 }
 
-function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, speed: number, damage: number): void {
+/** `breakable` : balle de Tireur, que les armes du joueur peuvent détruire (b.a = 1). */
+function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, speed: number, damage: number, breakable = false): void {
   const b = spawnProjectile(s);
   if (!b) return;
   b.kind = PJ_EBULLET;
   b.owner = -1;
+  b.a = breakable ? 1 : 0;
   b.x = b.px = x;
   b.y = b.py = y;
   b.vx = dcos(angle) * speed;
@@ -91,7 +94,8 @@ export function updateEnemies(s: GameState): void {
   const enemies = s.enemies;
   const relocate2 = WAVES.relocateDistance * WAVES.relocateDistance;
   const despawn2 = WAVES.props.despawn * WAVES.props.despawn;
-  const frozen = s.freezeUntil > tick;
+  // Horloge : tout le reste du monde avance au ralenti (déplacements et minuteurs).
+  const tf = s.clockUntil > tick ? LOOT.clockFactor : 1;
   navPlayer = -1;
   for (const p of s.players) {
     if (!p.alive) continue;
@@ -117,8 +121,8 @@ export function updateEnemies(s: GameState): void {
       }
       continue;
     }
-    // Gel : tout est figé (y compris les mèches et les tirs).
-    if (frozen) continue;
+    // Gelé : figé sur place (y compris sa mèche et ses tirs).
+    if (e.frozenUntil > tick) continue;
 
     let ti = e.target;
     if (!s.players[ti] || !s.players[ti].alive) {
@@ -133,7 +137,7 @@ export function updateEnemies(s: GameState): void {
     const dist = Math.sqrt(d2);
 
     if (beh === BEHAVIOR.BOSS) {
-      updateBoss(s, e, dx, dy, dist);
+      updateBoss(s, e, dx, dy, dist, tf);
       continue;
     }
     if (d2 > relocate2) {
@@ -177,11 +181,11 @@ export function updateEnemies(s: GameState): void {
           DX = (-dy / dist) * side * 0.8;
           DY = (dx / dist) * side * 0.8;
         }
-        e.timer -= 1;
+        e.timer -= tf;
         if (e.timer <= 0) {
           if (dist < 560 && !stunned) {
             const a = datan2(dy, dx);
-            fireEnemyBullet(s, e.x, e.y, a, d.bulletSpeed ?? 190, (d.bulletDamage ?? 8) * dmgMul(s));
+            fireEnemyBullet(s, e.x, e.y, a, d.bulletSpeed ?? 190, (d.bulletDamage ?? 8) * dmgMul(s), true);
             emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
             e.timer = Math.round((d.shootEvery ?? 2.6) * TICK_RATE);
           } else {
@@ -200,7 +204,7 @@ export function updateEnemies(s: GameState): void {
           }
         } else {
           speed = 0;
-          e.timer -= 1;
+          e.timer -= tf;
           if (e.timer <= 0) {
             e.alive = false;
             e.hp = 0;
@@ -251,8 +255,8 @@ export function updateEnemies(s: GameState): void {
       }
     }
 
-    const vx = DX * speed + sx * SEP_STRENGTH + e.kbx;
-    const vy = DY * speed + sy * SEP_STRENGTH + e.kby;
+    const vx = (DX * speed + sx * SEP_STRENGTH + e.kbx) * tf;
+    const vy = (DY * speed + sy * SEP_STRENGTH + e.kby) * tf;
     moveCircle(s.map, e, vx * DT, vy * DT, e.r);
     e.kbx *= KB_DECAY;
     e.kby *= KB_DECAY;
@@ -263,7 +267,7 @@ export function updateEnemies(s: GameState): void {
   }
 }
 
-function updateBoss(s: GameState, e: Enemy, dx: number, dy: number, dist: number): void {
+function updateBoss(s: GameState, e: Enemy, dx: number, dy: number, dist: number, tf: number): void {
   const pat = BOSS.pattern;
   if (e.timer <= 0) {
     e.ai = (e.ai + 1) % pat.length;
@@ -308,9 +312,9 @@ function updateBoss(s: GameState, e: Enemy, dx: number, dy: number, dist: number
     case 'summon':
       break;
   }
-  // Le boss plane au-dessus des obstacles.
-  e.x += vx * DT;
-  e.y += vy * DT;
+  // Le boss plane au-dessus des obstacles. Horloge : ses phases continuent, mais il se traîne.
+  e.x += vx * DT * tf;
+  e.y += vy * DT * tf;
   if (vx !== 0 || vy !== 0) {
     const l = Math.sqrt(vx * vx + vy * vy);
     e.vx = vx / l;
@@ -332,7 +336,6 @@ function summon(s: GameState, boss: Enemy): void {
 /** Dégâts de contact ennemis -> joueurs. */
 export function updateContacts(s: GameState): void {
   const tick = s.tick;
-  if (s.freezeUntil > tick) return;
   const grid = s.grid;
   for (const p of s.players) {
     if (!p.alive) continue;
@@ -340,7 +343,7 @@ export function updateContacts(s: GameState): void {
     const out = grid.out;
     for (let k = 0; k < n; k++) {
       const e = s.enemies[out[k]];
-      if (!e.alive || e.dmg <= 0 || e.attackReady > tick) continue;
+      if (!e.alive || e.dmg <= 0 || e.attackReady > tick || e.frozenUntil > tick) continue;
       const dx = e.x - p.x;
       const dy = e.y - p.y;
       const rr = e.r + p.r;

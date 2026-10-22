@@ -28,6 +28,7 @@ import {
   type GameState,
   type Enemy,
   type Obstacle,
+  type Player,
 } from '../sim';
 import { COLORS, FX_COLORS, OBSTACLE_TINTS } from './palette';
 import type { Effects } from './effects';
@@ -191,8 +192,13 @@ export class Renderer {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
     }
-    if (s.freezeUntil > s.tick) {
-      ctx.fillStyle = 'rgba(120, 220, 255, 0.08)';
+    if (s.clockUntil > s.tick) {
+      // Horloge : voile bleuté et bords sombres, qui s'estompent sur la dernière demi-seconde.
+      const k = Math.min(1, (s.clockUntil - s.tick) / 30);
+      const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+      g.addColorStop(0, `rgba(110, 140, 255, ${0.05 * k})`);
+      g.addColorStop(1, `rgba(60, 80, 220, ${0.32 * k})`);
+      ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
     }
     if (fx.flash > 0) {
@@ -410,9 +416,8 @@ export class Renderer {
     const n = this.bucketN;
     n.fill(0);
     const tick = s.tick;
-    // Gel : les ennemis deviennent blancs (pâles) le temps de l'effet.
-    const frozen = s.freezeUntil > tick;
     let boss: Enemy | null = null;
+    let frozenCount = 0;
     for (let i = 0; i < s.enemyCount; i++) {
       const e = s.enemies[i];
       if (!e.alive) continue;
@@ -423,6 +428,7 @@ export class Renderer {
         boss = e;
         continue;
       }
+      if (e.frozenUntil > tick) frozenCount++;
       this.buckets[e.type][n[e.type]++] = i;
     }
     // Sprites, groupés par type puis par variante (normal / flash) pour limiter les changements de texture.
@@ -436,7 +442,7 @@ export class Renderer {
         if (!rotates) this.worldTransform();
         for (let k = 0; k < cnt; k++) {
           const e = s.enemies[list[k]];
-          const flash = frozen || tick - e.hitTick < 5 || (t === ENEMY_KAMIKAZE && e.ai === 1 && ((tick >> 2) & 1) === 1);
+          const flash = e.frozenUntil > tick || tick - e.hitTick < 5 || (t === ENEMY_KAMIKAZE && e.ai === 1 && ((tick >> 2) & 1) === 1);
           if (flash !== (pass === 1)) continue;
           const x = lerp(e.px, e.x, alpha);
           const y = lerp(e.py, e.y, alpha);
@@ -446,6 +452,22 @@ export class Renderer {
       }
     }
     this.worldTransform();
+
+    // Gelés : une coque de glace autour du sprite blanc, qui clignote juste avant de fondre.
+    if (frozenCount > 0) {
+      ctx.beginPath();
+      for (let i = 0; i < s.enemyCount; i++) {
+        const e = s.enemies[i];
+        if (!e.alive || e.frozenUntil <= tick || (e.frozenUntil - tick < 40 && (tick >> 2) & 1)) continue;
+        if (!this.visible(e.x, e.y, e.r * 1.5)) continue;
+        const r = e.r * 1.3;
+        ctx.moveTo(e.x + r, e.y);
+        for (let k = 1; k <= 6; k++) ctx.lineTo(e.x + Math.cos((k * Math.PI) / 3) * r, e.y + Math.sin((k * Math.PI) / 3) * r);
+      }
+      ctx.globalAlpha = 0.8;
+      this.glow('#9feaff', 1.6);
+      ctx.globalAlpha = 1;
+    }
 
     // Zone d'explosion des bulles prêtes à éclater
     if (ENEMY_KAMIKAZE >= 0 && n[ENEMY_KAMIKAZE] > 0) {
@@ -559,14 +581,15 @@ export class Renderer {
       if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !this.visible(b.x, b.y, 20)) continue;
       this.spriteAt(sp.mineLight, b.x, b.y);
     }
-    // Balles ennemies : pleines, rouges à cœur blanc (distinctes de tout le reste).
+    // Balles ennemies : pleines, rouges à cœur blanc (distinctes de tout le reste). Celles des Tireurs,
+    // cassables, sont violettes cerclées de pointillés.
     for (let i = 0; i < s.projCount; i++) {
       const b = s.projectiles[i];
-      if (b.kind !== PJ_EBULLET) continue;
+      if (b.kind !== PJ_EBULLET || b.life <= 0) continue;
       const x = lerp(b.px, b.x, alpha);
       const y = lerp(b.py, b.y, alpha);
       if (!this.visible(x, y, 10)) continue;
-      this.spriteAt(sp.enemyBullet, x, y);
+      this.spriteAt(b.a === 1 ? sp.breakableBullet : sp.enemyBullet, x, y);
     }
 
     // Ondes (klaxon) : peu nombreuses, vectorielles
@@ -583,9 +606,11 @@ export class Renderer {
   }
 
   private drawWeaponFx(s: GameState, alpha: number, under: boolean): void {
+    for (const p of s.players) if (p.alive) this.drawPlayerWeaponFx(s, p, alpha, under);
+  }
+
+  private drawPlayerWeaponFx(s: GameState, p: Player, alpha: number, under: boolean): void {
     const ctx = this.ctx;
-    const p = s.players[0];
-    if (!p.alive) return;
     const x = lerp(p.px, p.x, alpha);
     const y = lerp(p.py, p.y, alpha);
     for (const w of p.weapons) {
@@ -669,6 +694,10 @@ export class Renderer {
       if (!p.alive) continue;
       const x = lerp(p.px, p.x, alpha);
       const y = lerp(p.py, p.y, alpha);
+      if (p.master >= 0) {
+        this.drawClone(s, p, x, y, time);
+        continue;
+      }
       const hurt = s.tick - p.hurtTick < 12;
       const inv = s.tick < p.invulnUntil && (s.tick >> 1) & 1;
       const r = p.r * 1.15;
@@ -726,6 +755,36 @@ export class Renderer {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+  }
+
+  /** Clone : silhouette du héros en hologramme turquoise, qui grésille avant de disparaître. */
+  private drawClone(s: GameState, p: Player, x: number, y: number, time: number): void {
+    const ctx = this.ctx;
+    const left = p.expires - s.tick;
+    if (left < 120 && Math.floor(time * (left < 50 ? 16 : 8)) % 2) return;
+    const r = p.r * 1.15;
+    ctx.beginPath();
+    for (let k = 0; k < 8; k++) {
+      const a = Math.PI / 8 + (k * Math.PI) / 4;
+      if (k === 0) ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      else ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 0.7;
+    neon(ctx, '#5cf2d6', 2.6);
+    // lignes de balayage d'hologramme
+    ctx.beginPath();
+    const off = (time * 30) % 6;
+    for (let yy = -r + off; yy < r; yy += 6) {
+      const w = Math.sqrt(Math.max(0, r * r - yy * yy)) * 0.9;
+      ctx.moveTo(x - w, y + yy);
+      ctx.lineTo(x + w, y + yy);
+    }
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = '#5cf2d6';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   private drawFx(fx: Effects): void {

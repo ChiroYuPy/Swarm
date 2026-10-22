@@ -9,7 +9,7 @@ import {
   weaponLevel,
   spawnRate,
   INPUT_USE,
-  PK_FREEZE,
+  PK_CLOCK,
   PK_RAGE,
   PK_SHIELD,
   EV_NEW_ENEMY,
@@ -101,13 +101,13 @@ describe('contenu', () => {
       codes.push(c);
       step(s, [c]);
     }
-    s.players[0].activable = PK_FREEZE;
+    s.players[0].activable = PK_CLOCK;
     const tick = s.tick;
     codes.push(INPUT_USE);
     step(s, [INPUT_USE]);
     expect(s.tick).toBe(tick);
     expect(s.players[0].activable).toBe(-1);
-    expect(s.freezeUntil).toBeGreaterThan(tick);
+    expect(s.clockUntil).toBeGreaterThan(tick);
     // La relecture doit refaire exactement la même chose... à condition d'avoir le même objet en réserve :
     // on rejoue donc une partie où l'objet a été obtenu en jeu (le bot s'en sert tout seul).
     const g = createGame({ seed: 'ACTIVABLE-2' });

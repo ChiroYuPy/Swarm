@@ -45,7 +45,7 @@ export function hashState(s: GameState): string {
   h.int(s.version);
   h.int(s.seed);
   h.int(s.difficulty);
-  h.int(s.freezeUntil);
+  h.int(s.clockUntil);
   h.int(s.tick);
   h.int(s.over ? 1 : 0);
   h.int(s.rngWaves.s);
@@ -140,7 +140,7 @@ export function serializeState(s: GameState): string {
       bossId: s.bossId,
       chestCount: s.chestCount,
       totalKills: s.totalKills,
-      freezeUntil: s.freezeUntil,
+      clockUntil: s.clockUntil,
     },
     players: s.players.map((p) => ({
       ...pick(p, PLAYER_SCALAR_KEYS),
@@ -178,7 +178,7 @@ export function deserializeState(json: string): GameState {
   s.bossId = c.bossId as number;
   s.chestCount = c.chestCount as number;
   s.totalKills = c.totalKills as number;
-  s.freezeUntil = c.freezeUntil as number;
+  s.clockUntil = c.clockUntil as number;
   s.sandbox = snap.sandbox ?? null;
   snap.players.forEach((pd, i) => {
     const p = s.players[i];

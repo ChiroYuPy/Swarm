@@ -155,6 +155,8 @@ export class SpriteBank {
   /** balle du joueur par arme, dessinée pour un rayon 6 (mise à l'échelle) */
   readonly bullet: Sprite[] = [];
   readonly enemyBullet: Sprite;
+  /** balle de Tireur, cassable */
+  readonly breakableBullet: Sprite;
   readonly mine: Sprite;
   readonly miniMine: Sprite;
   readonly mineLight: Sprite;
@@ -220,6 +222,23 @@ export class SpriteBank {
     this.pickup = PICKUPS.map((d) => {
       const size = d.kind === 'chest' ? 38 : 30;
       return make(size * 0.9, (ctx) => drawPickupIcon(ctx, d.id as PickupIcon, 0, 0, size));
+    });
+    this.breakableBullet = make(14, (ctx) => {
+      ctx.beginPath();
+      ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c46bff';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, 0, 8.5, 0, Math.PI * 2);
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#e2b8ff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
     });
     this.enemyBullet = make(12, (ctx) => {
       ctx.beginPath();

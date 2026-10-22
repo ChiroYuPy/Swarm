@@ -47,10 +47,10 @@ export function spawnRate(tick: number, difficulty = 1): { rate: number; phase: 
 function targetPlayer(s: GameState): number {
   const n = s.players.length;
   if (n === 1) return 0;
-  // Multi : on répartit les apparitions entre joueurs vivants, de façon déterministe.
+  // Multi : on répartit les apparitions entre joueurs vivants, de façon déterministe (jamais sur un clone).
   for (let k = 0; k < n; k++) {
     const i = (s.tick + k) % n;
-    if (s.players[i].alive) return i;
+    if (s.players[i].alive && s.players[i].master < 0) return i;
   }
   return 0;
 }

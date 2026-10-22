@@ -22,6 +22,8 @@ const THROTTLE: Partial<Record<SfxName | 'ui', number>> = {
   fuse: 0.1,
   heal: 0.3,
   alert: 0.5,
+  shotDown: 0.05,
+  shatter: 0.04,
 };
 
 // La mineur : Am – F – C – G
@@ -266,6 +268,28 @@ export class AudioEngine {
       case 'alert':
         this.tone('triangle', 660, 660, 0.1, 0.05);
         this.tone('triangle', 440, 440, 0.12, 0.05, 0.12);
+        break;
+      case 'shotDown':
+        this.tone('square', 1500, 700, 0.04, 0.02, 0, this.sfxBus, { type: 'lowpass', freq: 3500 });
+        break;
+      case 'shatter':
+        // Verre qui se brise : souffle aigu et deux tintements
+        this.noiseHit(0.12, 0.06, 'highpass', 5000);
+        this.tone('sine', 2600, 2400, 0.08, 0.03);
+        this.tone('sine', 3400, 3100, 0.06, 0.02, 0.03);
+        break;
+      case 'clock':
+        // Tic-tac qui ralentit, sur une note grave qui descend
+        [0, 0.22, 0.5, 0.86].forEach((t, i) => this.tone('square', i % 2 ? 1250 : 1650, i % 2 ? 1200 : 1600, 0.03, 0.04, t, this.sfxBus, { type: 'lowpass', freq: 4000 }));
+        this.tone('sine', 220, 110, 1.1, 0.08);
+        break;
+      case 'clone':
+        this.tone('sine', 440, 660, 0.25, 0.05);
+        this.tone('sine', 446, 666, 0.25, 0.05, 0.05);
+        break;
+      case 'revive':
+        this.noiseHit(0.5, 0.12, 'lowpass', 2000, 120);
+        [392, 494, 587, 784, 988].forEach((f, i) => this.tone('triangle', f, f, 0.5, 0.06, 0.1 + i * 0.07));
         break;
       case 'ui':
         this.tone('square', 660, 990, 0.06, 0.04, 0, this.sfxBus, { type: 'lowpass', freq: 3000 });

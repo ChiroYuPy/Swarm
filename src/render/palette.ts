@@ -43,6 +43,10 @@ export const FX_COLORS = [
   '#ffb347', // 13
   '#a43cff', // 14
   '#f4f4ff', // 15
+  '#9feaff', // 16 glace
+  '#5cf2d6', // 17 clone
+  '#7f9cff', // 18 horloge
+  '#b8ff3d', // 19 fièvre
 ];
 
 export function fxColorIndex(hex: string): number {

@@ -7,15 +7,19 @@
 import { BOSS } from '../data/enemies';
 import { HERO } from '../data/hero';
 import { PASSIVES } from '../data/passives';
-import { PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS } from '../data/loot';
 import { WAVES } from '../data/waves';
 import type { DifficultyDef } from '../data/difficulty';
 import {
   MAX_PASSIVE_SLOTS,
   MAX_WEAPON_SLOTS,
+  PK_CLOCK,
+  PK_CLONE,
+  PK_FEVER,
   PK_FRENZY,
   PK_RAGE,
   PK_SHIELD,
+  PK_TOTEM,
   PK_TURBO,
   TICK_RATE,
   computeScore,
@@ -199,6 +203,7 @@ export function statDetails(p: Player, tick: number): StatDetail[] {
     if (d.key === 'might' && p.rageUntil > tick) sources.push(`Rage : ×2 (${secs(p.rageUntil)})`);
     if (d.key === 'cooldown' && p.frenzyUntil > tick) sources.push(`Frénésie : ×0,5 (${secs(p.frenzyUntil)})`);
     if (d.key === 'speed' && p.turboUntil > tick) sources.push(`Turbo : ×1,5 (${secs(p.turboUntil)})`);
+    if (d.key === 'magnet' && p.feverUntil > tick) sources.push(`Fièvre d’XP : ×${LOOT.feverMagnet} (${secs(p.feverUntil)})`);
     if (d.key === 'cooldown' && p.base.cooldownMul <= 0.35) sources.push('Plafond atteint (−65 %)');
     if (d.key === 'armor' && p.base.armor >= 0.6) sources.push('Plafond atteint (60 %)');
     if (!sources.length) sources.push('Aucun bonus');
@@ -206,12 +211,27 @@ export function statDetails(p: Player, tick: number): StatDetail[] {
   });
 }
 
-const BUFFS: { kind: number; field: 'rageUntil' | 'frenzyUntil' | 'turboUntil' | 'shieldUntil' }[] = [
+const BUFFS: { kind: number; field: 'rageUntil' | 'frenzyUntil' | 'turboUntil' | 'shieldUntil' | 'feverUntil' }[] = [
   { kind: PK_RAGE, field: 'rageUntil' },
   { kind: PK_FRENZY, field: 'frenzyUntil' },
   { kind: PK_TURBO, field: 'turboUntil' },
   { kind: PK_SHIELD, field: 'shieldUntil' },
+  { kind: PK_FEVER, field: 'feverUntil' },
 ];
+
+/** Effets en cours affichés au-dessus de la barre : bonus du joueur, Horloge, clone, Totem en réserve. */
+function activeEffects(s: GameState, p: Player): { kind: number; left: number; total: number }[] {
+  const out = BUFFS.filter((b) => p[b.field] > s.tick).map((b) => ({
+    kind: b.kind,
+    left: p[b.field] - s.tick,
+    total: (PICKUPS[b.kind].duration ?? 5) * TICK_RATE,
+  }));
+  if (s.clockUntil > s.tick) out.push({ kind: PK_CLOCK, left: s.clockUntil - s.tick, total: LOOT.clockSeconds * TICK_RATE });
+  const clone = s.players.find((c) => c.alive && c.master === p.index);
+  if (clone) out.push({ kind: PK_CLONE, left: clone.expires - s.tick, total: LOOT.cloneSeconds * TICK_RATE });
+  if (p.totem > 0) out.push({ kind: PK_TOTEM, left: -1, total: 1 });
+  return out;
+}
 
 export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOptions): void {
   const p = s.players[0];
@@ -319,24 +339,22 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   }
 
   // ---------- Bonus temporaires actifs : juste au-dessus de la barre ----------
-  const active = BUFFS.filter((b) => p[b.field] > s.tick);
+  const active = activeEffects(s, p);
   const bs = 40;
   let bx = W / 2 - (active.length * (bs + 8) - 8) / 2;
   const by = top - bs - 14;
   for (const b of active) {
-    const left = p[b.field] - s.tick;
     const def = PICKUPS[b.kind];
     slot(ctx, bx, by, bs, def.color);
     ctx.drawImage(icon('pickup', def.id), bx + 3, by + 3, bs - 6, bs - 6);
-    const total = (def.duration ?? 5) * TICK_RATE;
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.fillRect(bx, by + bs + 4, bs, 4);
     ctx.fillStyle = def.color;
-    ctx.fillRect(bx, by + bs + 4, bs * Math.min(1, left / total), 4);
+    ctx.fillRect(bx, by + bs + 4, b.left < 0 ? bs : bs * Math.min(1, b.left / b.total), 4);
     ctx.font = TEXT;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${Math.ceil(left / TICK_RATE)} s`, bx + bs / 2, by - 10);
+    ctx.fillStyle = b.left < 0 ? def.color : '#ffffff';
+    ctx.fillText(b.left < 0 ? 'Prêt' : `${Math.ceil(b.left / TICK_RATE)} s`, bx + bs / 2, by - 10);
     bx += bs + 8;
   }
 

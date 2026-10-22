@@ -8,6 +8,7 @@ import { MAX_WEAPON_SLOTS, TICK_RATE, DT } from './constants';
 import { TWO_PI, dcos, datan2, dsin } from './dmath';
 import { spawnProjectile } from './entities';
 import { damageEnemy, healPlayer } from './combat';
+import { clearShotsIn, clearShotsOnLine } from './shots';
 import { weaponDef, weaponLevel } from './registry';
 import {
   EF_BOSS,
@@ -202,6 +203,7 @@ function orbit(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLe
     const a = w.angle + (k * TWO_PI) / n;
     const ox = p.x + dcos(a) * R;
     const oy = p.y + dsin(a) * R;
+    clearShotsIn(s, ox, oy, orbR);
     if (pull > 0) {
       const m = g.query(enemies, ox, oy, pullR);
       for (let q = 0; q < m; q++) {
@@ -243,6 +245,7 @@ function aura(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   w.tickTimer += Math.max(1, Math.round((L.tick ?? 0.5) * TICK_RATE));
   const dmg = L.damage * p.stats.might;
   const slow = L.slow ?? 0;
+  clearShotsIn(s, p.x, p.y, R);
   const g = s.grid;
   const n = g.query(s.enemies, p.x, p.y, R);
   let heal = 0;
@@ -284,6 +287,7 @@ function beam(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
       for (let b = 0; b < n; b++) {
         const ux = dcos(w.angles[b]);
         const uy = dsin(w.angles[b]);
+        clearShotsOnLine(s, p.x, p.y, ux, uy, len, width);
         const m = g.query(s.enemies, p.x + (ux * len) / 2, p.y + (uy * len) / 2, len / 2 + width);
         for (let q = 0; q < m; q++) {
           const idx = g.out[q];

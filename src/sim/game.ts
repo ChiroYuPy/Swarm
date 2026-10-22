@@ -14,11 +14,12 @@ import { WorldMap } from './map';
 import { Rng, STREAM, deriveSeed, hashString } from './rng';
 import { SpatialGrid } from './grid';
 import { NavField } from './navfield';
-import { Player, makePools, EF_BOSS, type GameState } from './state';
+import { Player, makePools, emit, EF_BOSS, EV_CLONE_END, type GameState } from './state';
 import { computeStats, updatePlayer, useActivable } from './player';
 import { addWeapon, applyChoice, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
 import { updateContacts, updateEnemies } from './enemies';
+import { processShatters } from './combat';
 import { updateWeapons } from './weapons';
 import { updateProjectiles } from './projectiles';
 import { updateGems, updatePickups } from './pickups';
@@ -74,10 +75,11 @@ export function createGame(cfg: GameConfig): GameState {
     bossId: -1,
     chestCount: 0,
     totalKills: 0,
-    freezeUntil: 0,
+    clockUntil: 0,
     sandbox: null,
     grid: new SpatialGrid(),
     nav: new NavField(),
+    shatters: [],
     events: pools.events,
     eventCount: 0,
   };
@@ -132,6 +134,7 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
       if (p.alive && p.pendingLevels === 0) {
         s.grid.build(s.enemies, s.enemyCount, anchor(s).x, anchor(s).y);
         useActivable(s, p);
+        processShatters(s);
         compactEnemies(s);
       }
       consumed = true;
@@ -144,6 +147,14 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
 
 function tick(s: GameState, inputs: ArrayLike<number>): void {
   s.tick++;
+  // Clones : ils disparaissent à l'heure, ou avec leur modèle.
+  for (const c of s.players) {
+    if (c.master < 0 || !c.alive) continue;
+    if (s.tick >= c.expires || !s.players[c.master].alive) {
+      c.alive = false;
+      emit(s, EV_CLONE_END, c.x, c.y, 0, 0, 0, 0, c.index);
+    }
+  }
   for (let i = 0; i < s.players.length; i++) updatePlayer(s, s.players[i], inputs[i] ?? 0);
   const a = anchor(s);
   updateSpawner(s);
@@ -153,12 +164,13 @@ function tick(s: GameState, inputs: ArrayLike<number>): void {
   for (const p of s.players) if (p.alive) updateWeapons(s, p);
   updateProjectiles(s);
   updateContacts(s);
+  processShatters(s);
   compactEnemies(s);
   updateGems(s);
   updatePickups(s);
   let anyAlive = false;
   for (const p of s.players) {
-    if (!p.alive) continue;
+    if (!p.alive || p.master >= 0) continue;
     anyAlive = true;
     if (p.pendingLevels > 0 && p.offers.length === 0) rollOffers(s, p);
   }
