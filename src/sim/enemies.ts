@@ -640,6 +640,7 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
 
 /** Reine : pond un œuf (trois de temps en temps) là où elle est. */
 function layEggs(s: GameState, e: Enemy): void {
+  if (s.sandbox && !s.sandbox.summons) return;
   let eggs = 0;
   for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === EGG_TYPE) eggs++;
   // ay = pontes déjà faites (aux sert à la spirale de dards)
@@ -669,7 +670,7 @@ function hatch(s: GameState, egg: Enemy): void {
 /** Renforts : un gros paquet d'un seul type, sauf s'il y a déjà du monde (il faut pouvoir taper le boss). */
 function summon(s: GameState, boss: Enemy, p: Player): void {
   const sm = BOSS_SUMMONS[boss.type];
-  if (!sm) return;
+  if (!sm || (s.sandbox && !s.sandbox.summons)) return;
   let alive = 0;
   for (let i = 0; i < s.enemyCount; i++) {
     const o = s.enemies[i];

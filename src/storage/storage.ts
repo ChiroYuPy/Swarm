@@ -50,10 +50,13 @@ export function defaultSandbox(): SandboxSetup {
     rules: {
       invincible: true,
       level: 1,
-      startMinute: 0,
+      startWave: 1,
       enemyMul: 1,
       enemies: null,
       bosses: true,
+      duel: null,
+      duelMark: 1,
+      summons: true,
       might: 1,
       xp: 1,
       weapons: [{ id: HERO.startWeapon, level: 1 }],
@@ -123,8 +126,8 @@ function readSandbox(raw: unknown): SandboxSetup {
     const v = rules[k];
     const d = def.rules[k];
     const ok =
-      k === 'enemies' || k === 'item'
-        ? v === null || (k === 'item' ? typeof v === 'string' : Array.isArray(v))
+      k === 'enemies' || k === 'item' || k === 'duel'
+        ? v === null || (k === 'enemies' ? Array.isArray(v) : typeof v === 'string')
         : k === 'weapons' || k === 'passives'
           ? Array.isArray(v)
           : typeof v === typeof d;

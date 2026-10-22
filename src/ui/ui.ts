@@ -6,7 +6,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { BOSS_ORDER, ENEMIES } from '../data/enemies';
+import { BOSS_ORDER, ENEMIES, bossName } from '../data/enemies';
 import { PICKUPS } from '../data/loot';
 import { DIFFICULTIES } from '../data/difficulty';
 import { WAVES } from '../data/waves';
@@ -18,6 +18,8 @@ import {
   GAME_VERSION,
   MAX_PASSIVE_SLOTS,
   MAX_WEAPON_SLOTS,
+  MAX_DUEL_MARK,
+  MAX_START_WAVE,
   OFFER_FUSION,
   OFFER_PASSIVE,
   OFFER_SWAP,
@@ -129,11 +131,26 @@ const SETTINGS_UI: { title: string; items: SettingDef[] }[] = [
   },
 ];
 
-type SandboxKey = 'difficulty' | 'startMinute' | 'invincible' | 'level' | 'might' | 'xp' | 'item' | 'enemyMul' | 'bosses' | 'custom';
+type SandboxKey =
+  | 'difficulty'
+  | 'startWave'
+  | 'invincible'
+  | 'level'
+  | 'might'
+  | 'xp'
+  | 'item'
+  | 'enemyMul'
+  | 'custom'
+  | 'duel'
+  | 'duelMark'
+  | 'summons'
+  | 'bosses';
 type SandboxValue = number | boolean | string | null;
 type SandboxDef = { key: SandboxKey; label: string; hint?: string } & ({ kind: 'toggle' } | { kind: 'choice'; options: [SandboxValue, string][] });
 
 const times = (v: number) => `×${String(v).replace('.', ',')}`;
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+const enemyName = (id: string) => ENEMIES.find((e) => e.id === id)!.name;
 
 /** Écran Sandbox : réglages de la partie, dans l'ordre d'affichage. */
 const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
@@ -142,11 +159,12 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
     items: [
       { key: 'difficulty', kind: 'choice', label: 'Difficulté de base', options: DIFFICULTIES.map((d, i) => [i, d.name]) },
       {
-        key: 'startMinute',
+        key: 'startWave',
         kind: 'choice',
         label: 'Commencer à',
-        hint: 'Ennemis aussi forts qu’à ce moment de la partie.',
-        options: [0, 1, 2, 3, 5, 8, 10, 15, 20, 30].map((m) => [m, m ? formatTime(m * 60) : 'Début']),
+        // texte mis à jour selon la vague (voir paintSandbox)
+        hint: ' ',
+        options: Array.from({ length: MAX_START_WAVE }, (_, i): [number, string] => [i + 1, `Vague ${i + 1}`]),
       },
     ],
   },
@@ -169,8 +187,28 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
     title: 'Ennemis',
     items: [
       { key: 'enemyMul', kind: 'choice', label: 'Quantité', options: [0, 0.25, 0.5, 1, 2, 3, 5].map((v) => [v, v ? times(v) : 'Aucun']) },
-      { key: 'bosses', kind: 'toggle', label: `Boss toutes les ${WAVES.wavesPerBoss} vagues` },
       { key: 'custom', kind: 'choice', label: 'Types', options: [[false, 'Progression normale'], [true, 'Sur mesure']] },
+    ],
+  },
+  {
+    title: 'Boss',
+    items: [
+      {
+        key: 'duel',
+        kind: 'choice',
+        label: 'Duel',
+        hint: ' ',
+        options: [[null, 'Non'], ...BOSS_ORDER.map((id): [string, string] => [id, enemyName(id)])],
+      },
+      {
+        key: 'duelMark',
+        kind: 'choice',
+        label: 'Force du boss',
+        hint: 'Mk II : comme à son deuxième passage.',
+        options: Array.from({ length: MAX_DUEL_MARK }, (_, i): [number, string] => [i + 1, `Mk ${ROMAN[i]}`]),
+      },
+      { key: 'summons', kind: 'toggle', label: 'Renforts des boss', hint: 'Non : rien que ses attaques, pour s’entraîner.' },
+      { key: 'bosses', kind: 'toggle', label: `Boss toutes les ${WAVES.wavesPerBoss} vagues` },
     ],
   },
 ];
@@ -233,6 +271,18 @@ const fusionPartner = (i: number) => PASSIVES.find((x) => x.id === FUSIONS[i].wi
 function evolutionHint(weaponId: string): string {
   const names = FUSIONS.filter((f) => f.weapon === weaponId).map((f) => PASSIVES.find((x) => x.id === f.with)!.name);
   return names.length ? `Niveau max : évolue avec ${names.join(' ou ')} au niveau 5.` : '';
+}
+
+/** « Ennemis de la vague 9 · prochain boss : Étoile ricochet, après la vague 12 » */
+function waveHint(wave: number, bosses: boolean): string {
+  const per = WAVES.wavesPerBoss;
+  const k = Math.floor((wave - 1) / per);
+  return bosses ? `Ennemis de cette vague · prochain boss : ${bossName(k)}, après la vague ${per * (k + 1)}` : 'Ennemis aussi forts et variés qu’à cette vague.';
+}
+
+function duelHint(duel: string | null, mark: number): string {
+  if (!duel) return 'Un boss au choix, dès le début.';
+  return `${bossName((mark - 1) * BOSS_ORDER.length + BOSS_ORDER.indexOf(duel))} arrive dès le début, seul ; la partie reprend ensuite.`;
 }
 
 // ---------- Codex : données ----------
@@ -1361,10 +1411,15 @@ export class UI {
     const el = this.screenEl;
     if (this.current !== 'sandbox' || !el) return;
     const r = this.app.save.sandbox.rules;
-    el.querySelectorAll<HTMLElement>('.set').forEach((row) => {
+    el.querySelectorAll<HTMLButtonElement>('.set').forEach((row) => {
       const def = sandboxDef(row);
       const v = this.sandboxValue(def.key);
       const ctl = row.querySelector<HTMLElement>('.ctl')!;
+      const hint = row.querySelector<HTMLElement>('.set-label small');
+      if (def.key === 'startWave' && hint) hint.textContent = waveHint(r.startWave, r.bosses);
+      if (def.key === 'duel' && hint) hint.textContent = duelHint(r.duel, r.duelMark);
+      // La force ne compte que pour un duel.
+      if (def.key === 'duelMark') row.disabled = !r.duel;
       if (def.kind === 'toggle') {
         ctl.innerHTML = `<span class="switch"><i></i></span><b class="val">${v ? 'Oui' : 'Non'}</b>`;
         row.classList.toggle('on', !!v);

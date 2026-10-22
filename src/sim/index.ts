@@ -14,7 +14,7 @@ export {
   type ScoreRecord,
   type ScoreResult,
 } from './game';
-export { compileSandbox, type SandboxConfig } from './sandbox';
+export { compileSandbox, sandboxStartTick, MAX_DUEL_MARK, MAX_START_WAVE, type SandboxConfig } from './sandbox';
 export { hashState, serializeState, deserializeState } from './serialize';
 export { encodeMove, aimDir, aimCode, choiceCode, swapCode, isChoiceCode, isZeroTimeCode, encodeLog, decodeLog, InputLog } from './inputcodec';
 export { replayToEnd, ReplayCursor } from './replay';

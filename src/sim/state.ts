@@ -343,6 +343,10 @@ export interface SandboxRules {
   /** types d'ennemis autorisés (index), null = progression normale */
   enemies: number[] | null;
   bosses: boolean;
+  /** les boss appellent-ils leurs renforts (et la Reine pond-elle) ? */
+  summons: boolean;
+  /** duel : rang du boss à faire venir au premier pas (comme le k-ième boss d'une partie), -1 = aucun */
+  duel: number;
   /** multiplicateur de l'XP ramassée */
   xp: number;
 }

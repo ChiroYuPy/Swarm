@@ -208,9 +208,11 @@ function updateMapItems(s: GameState): void {
   }
 }
 
-/** Le boss arrive : les ennemis normaux s'enfuient, il ne reste que lui (et ce qu'il fait venir). */
-function spawnBoss(s: GameState): void {
-  const k = s.bossSpawned;
+/**
+ * Le boss arrive : les ennemis normaux s'enfuient, il ne reste que lui (et ce qu'il fait venir).
+ * `k` = son rang dans la partie (0 = le premier) : il fixe le boss, sa force et son nom (Mk II…).
+ */
+function spawnBoss(s: GameState, k = s.bossSpawned): void {
   const type = BOSS_TYPES[k % BOSS_TYPES.length];
   const a = s.rngWaves.next() * TWO_PI;
   for (let i = 0; i < s.enemyCount; i++) {
@@ -253,10 +255,18 @@ export function waveInfo(clock: number) {
 export function updateSpawner(s: GameState): void {
   updateProps(s);
   updateMapItems(s);
+  const sb = s.sandbox;
+  // Bac à sable, duel : le boss choisi arrive au premier pas, hors du compte des boss de la partie.
+  if (sb && sb.duel >= 0) {
+    const next = s.bossSpawned;
+    spawnBoss(s, sb.duel);
+    s.bossSpawned = next;
+    sb.duel = -1;
+    return;
+  }
   // Boss en vie, ou calme qui suit sa mort : ni vague ni horloge.
   if (s.bossId >= 0 || s.tick < s.calmUntil) return;
   const c = ++s.clock;
-  const sb = s.sandbox;
   // Boss : à la toute fin de la pause de la dernière vague du cycle.
   if (c % BOSS_TICKS === 0 && (!sb || sb.bosses)) {
     spawnBoss(s);

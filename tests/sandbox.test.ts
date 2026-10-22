@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, step, hashState, weaponDef, isAwaitingChoice, choiceCode, TICK_RATE, EF_PROP, type SandboxConfig } from '../src/sim';
-import { ENEMIES } from '../src/data/enemies';
+import { createGame, step, hashState, weaponDef, isAwaitingChoice, choiceCode, TICK_RATE, MIX_TICKS, EF_BOSS, EF_PROP, type SandboxConfig } from '../src/sim';
+import { BOSS_ORDER, ENEMIES } from '../src/data/enemies';
 import { PASSIVES } from '../src/data/passives';
 import { defaultSandbox } from '../src/storage/storage';
 
@@ -20,7 +20,7 @@ describe('bac à sable', () => {
       seed: 'SB',
       sandbox: rules({
         level: 12,
-        startMinute: 4,
+        startWave: 6,
         weapons: [
           { id: 'laser', level: 3 },
           { id: 'cotillons', level: 1 },
@@ -38,13 +38,13 @@ describe('bac à sable', () => {
     expect(PASSIVES[p.passives[0].def].id).toBe('biceps');
     expect(p.level).toBe(12);
     expect(p.activable).toBeGreaterThanOrEqual(0);
-    expect(s.tick).toBe(4 * 60 * TICK_RATE);
+    expect(s.tick).toBe(5 * MIX_TICKS);
     expect(p.stats.might).toBeCloseTo((1 + PASSIVES[p.passives[0].def].perLevel.might! * 5) * 3);
     expect(p.hp).toBe(p.stats.maxHp);
   });
 
   it('invincible : ne meurt jamais, même en Difficile sans bouger', () => {
-    const s = run({ seed: 'SB-INV', difficulty: 2, sandbox: rules({ invincible: true, startMinute: 8, weapons: [] }) }, 120);
+    const s = run({ seed: 'SB-INV', difficulty: 2, sandbox: rules({ invincible: true, startWave: 11, weapons: [] }) }, 120);
     expect(s.over).toBe(false);
     expect(s.players[0].hp).toBe(s.players[0].stats.maxHp);
   });
@@ -69,5 +69,23 @@ describe('bac à sable', () => {
     expect(weaponDef(a.players[0].weapons[0].def).id).toBe('aura');
     expect(a.players[0].weapons[0].level).toBe(5);
     expect(hashState(a)).toBe(hashState(b));
+  });
+  it('duel : le boss choisi arrive tout de suite, seul, avec la force de son rang', () => {
+    const s = run({ seed: 'SB-DUEL', sandbox: rules({ startWave: 3, duel: 'etoile', duelMark: 2, weapons: [] }) }, 1);
+    const bosses = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.flags & EF_BOSS);
+    expect(bosses.map((e) => ENEMIES[e.type].id)).toEqual(['etoile']);
+    // Mk II : son deuxième passage dans une partie.
+    expect(bosses[0].aux2).toBe(BOSS_ORDER.length + BOSS_ORDER.indexOf('etoile'));
+    // Hors du compte : le boss de la vague 4 reste le Trapèze.
+    expect(s.bossSpawned).toBe(0);
+  });
+
+  it('renforts des boss : coupés, le boss reste seul', () => {
+    const minions = (summons: boolean) => {
+      const s = run({ seed: 'SB-SEUL', sandbox: rules({ duel: 'boss', summons, enemyMul: 0, weapons: [] }) }, 20);
+      return s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && !(e.flags & (EF_BOSS | EF_PROP))).length;
+    };
+    expect(minions(true)).toBeGreaterThan(0);
+    expect(minions(false)).toBe(0);
   });
 });

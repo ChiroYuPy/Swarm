@@ -157,6 +157,23 @@ describe('vagues et boss', () => {
     expect(p.hp).toBeLessThan(hp0);
   });
 
+  it('Étoile : chaque ruée rebondit plusieurs fois dans sa boîte', () => {
+    const s = createGame({ seed: 'BOSS', sandbox: { ...defaultSandbox().rules, invincible: true, enemyMul: 0, bosses: false, weapons: [] } });
+    const e = boss(s, 'etoile', 300, 0, 'aim');
+    const pat = BOSS_PATTERNS[e.type];
+    // Visée, puis toute la première ruée : chaque rebond change son cap.
+    for (let i = 0; i < 2 * TICK_RATE && pat[e.ai].kind !== 'dash'; i++) step(s, [0]);
+    expect(pat[e.ai].kind).toBe('dash');
+    let bounces = 0;
+    let a = e.aux;
+    for (let i = 0; i < 5 * TICK_RATE && pat[e.ai].kind === 'dash'; i++) {
+      step(s, [0]);
+      if (e.aux !== a) bounces++;
+      a = e.aux;
+    }
+    expect(bounces).toBeGreaterThanOrEqual(3);
+  });
+
   it('Œil : le rayon balaie le cône et touche ; hors de portée, rien', () => {
     const s = arena();
     const p = s.players[0];

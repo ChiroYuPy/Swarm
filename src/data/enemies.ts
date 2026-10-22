@@ -145,7 +145,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 2100, speed: 54, damage: 22, radius: 44, xp: 0, kbResist: 1,
   },
   {
-    id: 'etoile', name: 'Étoile ricochet', desc: 'Boss : vise, puis fonce en rebondissant et laisse une traînée de feu. Ne reste pas dans les flammes.',
+    id: 'etoile', name: 'Étoile ricochet', desc: 'Boss : vise, puis fonce en rebondissant plusieurs fois contre les bords de sa zone, et laisse une traînée de feu. Ne reste pas dans les flammes.',
     behavior: 'boss', shape: 'star', color: '#ffd23a',
     hp: 1900, speed: 74, damage: 24, radius: 40, xp: 0, kbResist: 1,
   },
@@ -283,15 +283,16 @@ export const ETOILE = {
   pattern: [
     { kind: 'chase', duration: 1.4 },
     { kind: 'aim', duration: 0.9 },
-    { kind: 'dash', duration: 2.4 },
+    { kind: 'dash', duration: 4.2 },
     { kind: 'aim', duration: 0.7 },
-    { kind: 'dash', duration: 2.0 },
+    { kind: 'dash', duration: 3.4 },
     { kind: 'burst', duration: 1.4 },
     { kind: 'summon', duration: 0.8 },
   ] as BossPhase[],
-  dashSpeed: 520,
+  /** vitesse et durée des ruées : 3 à 4 rebonds par ruée dans la boîte */
+  dashSpeed: 620,
   /** demi-côté de la boîte de rebond, centrée là où était le joueur quand elle a visé */
-  box: 380,
+  box: 340,
   /** dégâts de contact × dashDamage pendant qu'elle fonce */
   dashDamage: 1.6,
   /** une flamme toutes les `fireEvery` images */

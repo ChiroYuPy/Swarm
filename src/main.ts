@@ -25,6 +25,7 @@ import {
   OFFER_PASSIVE,
   INPUT_USE,
   TICK_RATE,
+  sandboxStartTick,
   type GameConfig,
   type GameState,
   type SandboxConfig,
@@ -60,10 +61,13 @@ const params = new URLSearchParams(location.search);
 const DEMO_SANDBOX: SandboxConfig = {
   invincible: true,
   level: 14,
-  startMinute: 6,
+  startWave: 9,
   enemyMul: 1.5,
   enemies: null,
   bosses: false,
+  duel: null,
+  duelMark: 1,
+  summons: true,
   might: 1,
   xp: 1,
   weapons: [
@@ -580,7 +584,7 @@ class App implements AppApi {
    */
   private prepareDemo(): void {
     const cur = this.demoState;
-    if (!this.demoNext && cur.tick - DEMO_SANDBOX.startMinute * 60 * TICK_RATE > DEMO_LIFETIME + DEMO_WARMUP)
+    if (!this.demoNext && cur.tick - sandboxStartTick(DEMO_SANDBOX) > DEMO_LIFETIME + DEMO_WARMUP)
       this.demoNext = { state: newDemo(`DEMO-${Math.floor(this.time)}`), left: DEMO_WARMUP };
     const next = this.demoNext;
     if (!next || this.demoSwapping) return;

@@ -154,7 +154,7 @@ describe('ennemis semés et plafond', () => {
   });
 
   it('les vagues ne dépassent jamais le plafond, même avec beaucoup d’ennemis demandés', () => {
-    const s = createGame({ seed: 'PLAFOND', sandbox: { ...defaultSandbox().rules, startMinute: 8, enemyMul: 10, bosses: false, weapons: [] } });
+    const s = createGame({ seed: 'PLAFOND', sandbox: { ...defaultSandbox().rules, startWave: 11, enemyMul: 10, bosses: false, weapons: [] } });
     let max = 0;
     for (let i = 0; i < 90 * TICK_RATE; i++) {
       step(s, [0]);

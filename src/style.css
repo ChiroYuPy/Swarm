@@ -1401,6 +1401,10 @@ table.scores tbody tr:last-child td {
   border-color: var(--line-strong);
   background: rgba(56, 246, 255, 0.05);
 }
+.set:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .set:focus-visible,
 .set.drag {
   border-color: var(--accent);

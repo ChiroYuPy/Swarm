@@ -27,7 +27,7 @@ const DAMAGING = ['fouet', 'flammes', 'tourelle', 'drone', 'ricochet', 'mortier'
 /** Une partie avec une seule arme, un héros immortel et des ennemis tout autour. */
 function arena(id: string, level: number, hp = 50, type = 'carre'): GameState {
   const s = createGame({ seed: 'ARMES' });
-  s.sandbox = { invincible: true, enemyMul: 0, enemies: null, bosses: false, xp: 1 };
+  s.sandbox = { invincible: true, enemyMul: 0, enemies: null, bosses: false, summons: true, duel: -1, xp: 1 };
   const p = s.players[0];
   p.weapons.length = 0;
   addWeapon(p, weaponId(id)).level = level;
