@@ -5,13 +5,15 @@
  *   0         immobile
  *   1..64     déplacement plein régime dans la direction (code-1) × 360°/64
  *   65..128   déplacement à mi-régime (stick analogique peu incliné)
+ *   130       revenir à la visée automatique (pas « zéro »)
+ *   131..194  viser dans la direction (code-131) × 360°/64 (pas « zéro », enregistré quand la visée change)
  *   200..202  choix de la proposition 0, 1 ou 2 au level-up (pas « zéro », le temps n'avance pas)
  *   210       utiliser l'objet activable (pas « zéro »)
  *
  * Journal : RLE (octet valeur + longueur en varint LEB128), puis base64, préfixé par la version du format.
  * Une partie de 10 minutes au clavier tient en quelques Ko.
  */
-import { INPUT_CHOICE_BASE, INPUT_DIRS } from './constants';
+import { INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS } from './constants';
 import { TWO_PI, datan2 } from './dmath';
 
 export const LOG_FORMAT = 'N1';
@@ -26,6 +28,17 @@ export function encodeMove(x: number, y: number): number {
   return m2 < 0.36 ? INPUT_DIRS + 1 + d : 1 + d;
 }
 
+/** Direction de visée (0..63) la plus proche de l'angle `a` (radians). */
+export function aimDir(a: number): number {
+  const d = Math.round((a / TWO_PI) * INPUT_DIRS) % INPUT_DIRS;
+  return d < 0 ? d + INPUT_DIRS : d;
+}
+
+/** Code de visée : direction 0..63, ou -1 pour la visée automatique. */
+export function aimCode(dir: number): number {
+  return dir < 0 ? INPUT_AIM_AUTO : INPUT_AIM_BASE + dir;
+}
+
 export function choiceCode(i: number): number {
   return INPUT_CHOICE_BASE + i;
 }
@@ -34,9 +47,9 @@ export function isChoiceCode(c: number): boolean {
   return c >= INPUT_CHOICE_BASE && c < INPUT_CHOICE_BASE + 3;
 }
 
-/** Pas « zéro » : ne fait pas avancer le temps (choix de level-up, objet activable). */
+/** Pas « zéro » : ne fait pas avancer le temps (visée, choix de level-up, objet activable). */
 export function isZeroTimeCode(c: number): boolean {
-  return c >= INPUT_CHOICE_BASE;
+  return c >= INPUT_AIM_AUTO;
 }
 
 /** Journal d'entrées extensible (un octet par pas). */

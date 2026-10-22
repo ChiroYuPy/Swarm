@@ -1,8 +1,13 @@
 /**
  * Entrées clavier + manette. Produit un code d'entrée de sim (voir sim/inputcodec.ts).
  * On utilise `KeyboardEvent.code` (position physique) : WASD sur QWERTY = ZQSD sur AZERTY.
+ * Visée manuelle (facultative) : clic gauche maintenu sur le jeu, ou stick droit de la manette ;
+ * sinon les armes visent toutes seules.
  */
-import { encodeMove } from '../sim';
+import { aimDir, encodeMove } from '../sim';
+
+/** Curseur trop près du héros (px) : on garde la dernière direction visée. */
+const AIM_DEADZONE = 14;
 
 export type UiAction = 'pause' | 'mute' | 'use' | 'confirm' | 'back' | 'left' | 'right' | 'up' | 'down' | 'choice1' | 'choice2' | 'choice3' | 'fps' | 'speed1' | 'speed2' | 'speed4';
 
@@ -16,6 +21,12 @@ export class InputManager {
   private padX = 0;
   private padY = 0;
   private padButtons: boolean[] = [];
+  private padAim = -1;
+  /** clic gauche maintenu sur le jeu : surface visée et position du pointeur */
+  private aimSurface: Element | null = null;
+  private pointerX = 0;
+  private pointerY = 0;
+  private lastAim = 0;
   private listeners: ((a: UiAction) => void)[] = [];
 
   constructor(target: Window) {
@@ -34,7 +45,20 @@ export class InputManager {
       this.keys.add(e.code);
     });
     target.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    target.addEventListener('blur', () => this.keys.clear());
+    target.addEventListener('blur', () => this.clear());
+    target.addEventListener('pointerdown', (e) => {
+      this.pointerX = e.clientX;
+      this.pointerY = e.clientY;
+      if (e.button === 0 && e.target instanceof HTMLCanvasElement) this.aimSurface = e.target;
+    });
+    target.addEventListener('pointermove', (e) => {
+      this.pointerX = e.clientX;
+      this.pointerY = e.clientY;
+    });
+    target.addEventListener('pointerup', (e) => {
+      if (e.button === 0) this.aimSurface = null;
+    });
+    target.addEventListener('pointercancel', () => (this.aimSurface = null));
   }
 
   onAction(fn: (a: UiAction) => void): void {
@@ -108,6 +132,9 @@ export class InputManager {
       this.padX = ax;
       this.padY = ay;
     }
+    const rx = pad.axes[2] ?? 0;
+    const ry = pad.axes[3] ?? 0;
+    this.padAim = rx * rx + ry * ry > 0.35 * 0.35 ? aimDir(Math.atan2(ry, rx)) : -1;
     const b = pad.buttons.map((x) => x.pressed);
     const pressed = (i: number) => b[i] && !this.padButtons[i];
     if (b[12]) this.padY = -1;
@@ -142,6 +169,20 @@ export class InputManager {
     return { x: this.padX, y: this.padY };
   }
 
+  /**
+   * Direction visée (0..63, voir sim/inputcodec.ts), ou -1 pour laisser les armes viser seules.
+   * La caméra suit le héros : il est au centre du canvas, on vise du centre vers le curseur.
+   */
+  aim(): number {
+    if (this.padAim >= 0) return this.padAim;
+    if (!this.aimSurface) return -1;
+    const r = this.aimSurface.getBoundingClientRect();
+    const dx = this.pointerX - (r.left + r.width / 2);
+    const dy = this.pointerY - (r.top + r.height / 2);
+    if (dx * dx + dy * dy >= AIM_DEADZONE * AIM_DEADZONE) this.lastAim = aimDir(Math.atan2(dy, dx));
+    return this.lastAim;
+  }
+
   /** Code d'entrée de sim pour ce pas. */
   sampleCode(): number {
     const v = this.vector();
@@ -150,5 +191,6 @@ export class InputManager {
 
   clear(): void {
     this.keys.clear();
+    this.aimSurface = null;
   }
 }

@@ -233,6 +233,8 @@ export class Player {
   expires = 0;
   /** objet activable en réserve (code PK_*, -1 = aucun) */
   activable = -1;
+  /** visée manuelle : direction 0..63 (voir INPUT_AIM_BASE), -1 = visée automatique */
+  aim = -1;
   /** dernière direction regardée */
   faceX = 1;
   faceY = 0;

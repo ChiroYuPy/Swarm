@@ -4,7 +4,7 @@
  * ou ajouter un cas dans le switch de `updateWeapons`.
  */
 import type { WeaponLevel } from '../data/weapons';
-import { MAX_WEAPON_SLOTS, TICK_RATE, DT } from './constants';
+import { INPUT_DIRS, MAX_WEAPON_SLOTS, TICK_RATE, DT } from './constants';
 import { TWO_PI, dcos, datan2, dsin } from './dmath';
 import { spawnProjectile } from './entities';
 import { damageEnemy, healPlayer } from './combat';
@@ -41,8 +41,15 @@ function target(s: GameState, x: number, y: number, range: number): number {
 /** Angle vers la dernière cible trouvée par `aim`. */
 let AIM = 0;
 
-/** Vise l'ennemi le plus proche à portée. Renvoie false s'il n'y a personne (l'arme ne tire pas). */
+/**
+ * Visée manuelle : la direction choisie, que des ennemis y soient ou non.
+ * Sinon, vise l'ennemi le plus proche à portée. Renvoie false s'il n'y a personne (l'arme ne tire pas).
+ */
 function aim(s: GameState, p: Player, range: number): boolean {
+  if (p.aim >= 0) {
+    AIM = (p.aim * TWO_PI) / INPUT_DIRS;
+    return true;
+  }
   const ti = target(s, p.x, p.y, range);
   if (ti < 0) return false;
   const e = s.enemies[ti];

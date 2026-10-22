@@ -9,7 +9,7 @@
  */
 import { HERO, SCORE, xpForLevel } from '../data/hero';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
-import { DT, GAME_VERSION, INPUT_CHOICE_BASE, INPUT_USE, MAX_PLAYERS, SIM_VERSION } from './constants';
+import { DT, GAME_VERSION, INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_USE, MAX_PLAYERS, SIM_VERSION } from './constants';
 import { WorldMap } from './map';
 import { Rng, STREAM, deriveSeed, hashString } from './rng';
 import { SpatialGrid } from './grid';
@@ -118,7 +118,7 @@ export function isAwaitingChoice(s: GameState, player = 0): boolean {
  * Avance la simulation d'un pas. `inputs[i]` = code d'entrée du joueur i.
  * Si un joueur doit choisir une amélioration, le monde est figé : le pas ne fait qu'appliquer
  * un éventuel code de choix (200..202) sans faire avancer le temps.
- * Le code 210 (utiliser l'objet activable) est lui aussi un pas « zéro ».
+ * Le code 210 (utiliser l'objet activable) et les codes de visée (130..194) sont eux aussi des pas « zéro ».
  */
 export function step(s: GameState, inputs: ArrayLike<number>): void {
   s.eventCount = 0;
@@ -131,6 +131,9 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
     const code = inputs[i] ?? 0;
     if (p.alive && p.pendingLevels > 0 && p.offers.length > 0 && code >= INPUT_CHOICE_BASE && code < INPUT_CHOICE_BASE + 3) {
       applyChoice(s, p, code - INPUT_CHOICE_BASE);
+      consumed = true;
+    } else if (code >= INPUT_AIM_AUTO && code < INPUT_AIM_BASE + INPUT_DIRS) {
+      p.aim = code - INPUT_AIM_BASE;
       consumed = true;
     } else if (code === INPUT_USE) {
       if (p.alive && p.pendingLevels === 0) {

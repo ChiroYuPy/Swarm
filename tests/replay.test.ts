@@ -11,6 +11,9 @@ import {
   serializeState,
   deserializeState,
   encodeMove,
+  aimCode,
+  isZeroTimeCode,
+  PJ_BULLET,
   TICK_RATE,
 } from '../src/sim';
 import { playWithBot } from './helpers';
@@ -30,6 +33,35 @@ describe('journal d’entrées et relecture', () => {
     const codes = new Uint8Array(10 * 60 * TICK_RATE);
     for (let i = 0; i < codes.length; i++) codes[i] = 1 + ((Math.floor(i / 40) * 8) % 64);
     expect(encodeLog(codes).length).toBeLessThan(5000);
+  });
+
+  it('visée manuelle : pas « zéro », tirs dans la direction choisie, relecture exacte', () => {
+    const s = createGame({ seed: 'VISEE' });
+    const codes: number[] = [];
+    const play = (c: number) => {
+      codes.push(c);
+      step(s, [c]);
+    };
+    // Vers le bas (direction 16/64 = 90°), puis retour à la visée automatique.
+    play(aimCode(16));
+    expect(isZeroTimeCode(aimCode(16)) && s.tick === 0 && s.players[0].aim === 16).toBe(true);
+    let fired = false;
+    for (let i = 0; i < 2 * TICK_RATE && !fired; i++) {
+      play(0);
+      for (let k = 0; k < s.projCount; k++) {
+        const b = s.projectiles[k];
+        if (b.kind !== PJ_BULLET || b.owner !== 0) continue;
+        fired = true;
+        expect(b.vy).toBeGreaterThan(0);
+        expect(Math.abs(b.vx)).toBeLessThan(1e-6 * b.vy);
+      }
+    }
+    expect(fired).toBe(true);
+    play(aimCode(-1));
+    expect(s.players[0].aim).toBe(-1);
+    for (let i = 0; i < 5 * TICK_RATE; i++) play(encodeMove(1, 0));
+    const replayed = replayToEnd({ seed: 'VISEE' }, decodeLog(encodeLog(Uint8Array.from(codes))));
+    expect(hashState(replayed)).toBe(hashState(s));
   });
 
   it('rejouer seed + journal redonne exactement la même partie', () => {

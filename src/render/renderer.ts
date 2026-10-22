@@ -13,6 +13,7 @@ import { PICKUPS } from '../data/loot';
 import {
   CHUNK,
   DT,
+  INPUT_DIRS,
   OB_CIRCLE,
   OB_HEX,
   EF_BOSS,
@@ -1010,10 +1011,11 @@ export class Renderer {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = inv ? 0.45 : 1;
       neon(ctx, hurt ? '#ff3d6e' : p.rageUntil > s.tick ? '#ff6a3d' : COLORS.player, 3.2);
-      // Yeux qui regardent où l'on va
+      // Yeux qui regardent où l'on vise (visée manuelle), sinon où l'on va
       ctx.beginPath();
-      const ex = p.faceX * r * 0.22;
-      const ey = p.faceY * r * 0.22 - r * 0.2;
+      const aimA = (p.aim * Math.PI * 2) / INPUT_DIRS;
+      const ex = (p.aim >= 0 ? Math.cos(aimA) : p.faceX) * r * 0.22;
+      const ey = (p.aim >= 0 ? Math.sin(aimA) : p.faceY) * r * 0.22 - r * 0.2;
       ctx.moveTo(x - r * 0.3 + ex + 3, y + ey);
       ctx.arc(x - r * 0.3 + ex, y + ey, 3, 0, Math.PI * 2);
       ctx.moveTo(x + r * 0.3 + ex + 3, y + ey);

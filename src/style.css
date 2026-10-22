@@ -2183,3 +2183,10 @@ h2.go {
 #cursor[data-state='hover'] path {
   fill: color-mix(in srgb, var(--accent) 55%, rgba(7, 6, 15, 0.85));
 }
+/* Viser (clic maintenu en partie) : le point s'ouvre en anneau, centré sur le même point. */
+#cursor[data-state='aim'] path {
+  d: path('M 5 -4 C 9.42 -4 13 -0.42 13 4 C 13 8.42 9.42 12 5 12 C 0.58 12 -3 8.42 -3 4 C -3 -0.42 0.58 -4 5 -4 Z');
+  fill: rgba(56, 246, 255, 0.12);
+  stroke: var(--accent);
+  stroke-width: 2;
+}

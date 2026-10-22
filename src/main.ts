@@ -14,6 +14,7 @@ import {
   computeScore,
   choiceCode,
   isZeroTimeCode,
+  aimCode,
   InputLog,
   ReplayCursor,
   weaponDef,
@@ -443,6 +444,15 @@ class App implements AppApi {
         this.log.push(INPUT_USE);
         step(s, [INPUT_USE]);
         this.fx.consume(s);
+      }
+    }
+    // Visée manuelle : un pas « zéro » enregistré seulement quand la direction visée change.
+    if (!this.botMode) {
+      const aim = this.input.aim();
+      if (aim !== s.players[0].aim) {
+        const c = aimCode(aim);
+        this.log.push(c);
+        step(s, [c]);
       }
     }
     const code = this.botMode ? botInput(s, 0) : this.input.sampleCode();

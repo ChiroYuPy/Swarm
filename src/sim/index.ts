@@ -16,7 +16,7 @@ export {
 } from './game';
 export { compileSandbox, type SandboxConfig } from './sandbox';
 export { hashState, serializeState, deserializeState } from './serialize';
-export { encodeMove, choiceCode, isChoiceCode, isZeroTimeCode, encodeLog, decodeLog, InputLog } from './inputcodec';
+export { encodeMove, aimDir, aimCode, choiceCode, isChoiceCode, isZeroTimeCode, encodeLog, decodeLog, InputLog } from './inputcodec';
 export { replayToEnd, ReplayCursor } from './replay';
 export { availableFusions, offerOrder } from './levelup';
 export { WorldMap, generateChunk, circleHitsObstacle, OB_CIRCLE, OB_HEX, OB_RECT, type Obstacle } from './map';
