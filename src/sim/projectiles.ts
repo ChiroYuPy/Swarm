@@ -241,7 +241,7 @@ function ricochet(s: GameState, b: Projectile): boolean {
     b.c = g0.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
     if (b.c >= 0) b.ty = s.enemies[b.c].id;
   }
-  if (b.c >= 0) steer(b, s.enemies[b.c].x, s.enemies[b.c].y, 0.2);
+  if (b.c >= 0) steer(b, s.enemies[b.c].x, s.enemies[b.c].y, RICOCHET_STEER);
   const nx = b.x + b.vx * DT;
   const ny = b.y + b.vy * DT;
   if (pointInObstacle(s.map, nx, ny)) {
@@ -270,23 +270,21 @@ function ricochet(s: GameState, b: Projectile): boolean {
     const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
     damageEnemy(s, idx, b.damage, b.owner, (b.vx / sp) * b.knock, (b.vy / sp) * b.knock);
     if (--b.a < 0) return true;
-    // Rebond net vers l'ennemi le plus proche pas encore touché.
+    // Rebond dévié vers l'ennemi le plus proche pas encore touché (à moitié seulement : il peut le rater).
     const t = g.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
     b.c = t;
     if (t >= 0) {
-      const o = s.enemies[t];
-      b.ty = o.id;
-      const ox = o.x - b.x;
-      const oy = o.y - b.y;
-      const d = Math.sqrt(ox * ox + oy * oy) || 1;
-      b.vx = (ox / d) * sp;
-      b.vy = (oy / d) * sp;
+      b.ty = s.enemies[t].id;
+      steer(b, s.enemies[t].x, s.enemies[t].y, RICOCHET_BOUNCE);
     }
     break;
   }
   return false;
 }
-const RICOCHET_SEEK = 280;
+/** portée de la tête chercheuse, part de virage par pas en vol, et déviation au rebond sur un ennemi */
+const RICOCHET_SEEK = 190;
+const RICOCHET_STEER = 0.06;
+const RICOCHET_BOUNCE = 0.55;
 
 /** La cible suivie (index `c`, id `ty`) est-elle toujours la même et en vie ? */
 function validTarget(s: GameState, b: Projectile): boolean {

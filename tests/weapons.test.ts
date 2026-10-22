@@ -127,8 +127,8 @@ describe('nouvelles armes', () => {
     expect(s.players[0].damageDealt).toBeGreaterThan(before);
   });
 
-  it('un disque ricochet touche plusieurs ennemis', () => {
-    const s = arena('ricochet', 1);
+  it('un disque ricochet touche plusieurs ennemis (niveau max)', () => {
+    const s = arena('ricochet', 5);
     let maxHits = 0;
     run(s, 3, (st) => {
       for (const b of projs(st, PJ_RICOCHET)) maxHits = Math.max(maxHits, b.hitCount);
