@@ -1,9 +1,9 @@
 import { MAP_GEN } from '../data/map';
 
 /** Version de la simulation : à incrémenter dès qu'un changement casse la compatibilité des replays. */
-export const SIM_VERSION = 8;
+export const SIM_VERSION = 9;
 /** Version affichée du jeu, stockée dans les scores. */
-export const GAME_VERSION = '0.4.6';
+export const GAME_VERSION = '0.5.0';
 
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;
@@ -34,7 +34,7 @@ export const NORMAL_MAX_RADIUS = 24;
 /**
  * Code d'entrée : 0 = immobile, 1..64 = direction pleine vitesse, 65..128 = demi-vitesse,
  * 130 = visée automatique, 131..194 = viser dans la direction (code-131) × 360°/64,
- * 200..202 = choix de level-up, 210 = utiliser l'objet activable. Les codes ≥ 130 sont des pas « zéro ».
+ * 200..202 = choix de level-up, 210 = utiliser l'objet activable, 220..224 / 229 = échange d'arme. Les codes ≥ 130 sont des pas « zéro ».
  */
 export const INPUT_IDLE = 0;
 export const INPUT_DIRS = 64;
@@ -42,6 +42,9 @@ export const INPUT_AIM_AUTO = 130;
 export const INPUT_AIM_BASE = 131;
 export const INPUT_CHOICE_BASE = 200;
 export const INPUT_USE = 210;
+/** 220..224 = échanger l'arme de l'emplacement (code-220) au level-up, 229 = annuler l'échange (pas « zéro ») */
+export const INPUT_SWAP_BASE = 220;
+export const INPUT_SWAP_CANCEL = 229;
 
 /** Durée de vie d'un objet au sol (ticks). */
 export const PICKUP_LIFE = 45 * 60;

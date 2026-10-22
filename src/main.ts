@@ -13,6 +13,9 @@ import {
   makeScoreRecord,
   computeScore,
   choiceCode,
+  swapCode,
+  canSwap,
+  INPUT_SWAP_CANCEL,
   isZeroTimeCode,
   aimCode,
   InputLog,
@@ -365,6 +368,7 @@ class App implements AppApi {
         else if (a === 'left' || a === 'up') this.ui.moveCard(-1);
         else if (a === 'right' || a === 'down') this.ui.moveCard(1);
         else if (a === 'confirm') this.ui.confirmCard();
+        else if (a === 'back') this.cancelSwap();
         break;
       case 'paused':
         if (a === 'pause' || a === 'back') {
@@ -425,7 +429,30 @@ class App implements AppApi {
       if (o.kind === OFFER_PASSIVE) return p.passives.find((x) => x.def === o.id)?.level ?? 0;
       return 0;
     };
-    this.ui.showLevelUp(p.offerLevel, p.offers, owned, { weapons: p.weapons.length, passives: p.passives.length });
+    const swap = {
+      charges: p.swaps,
+      slot: p.swapSlot,
+      weapons: p.weapons.map((w, k) => {
+        const d = weaponDef(w.def);
+        return { id: d.id, name: d.name, color: d.color, can: canSwap(p, k) };
+      }),
+    };
+    this.ui.showLevelUp(p.offerLevel, p.offers, owned, { weapons: p.weapons.length, passives: p.passives.length }, swap);
+  }
+
+  /** Échange d'arme : un pas « zéro » enregistré, puis on réaffiche les propositions. */
+  startSwap(slot: number): void {
+    this.swapStep(swapCode(slot));
+  }
+  cancelSwap(): void {
+    if (this.state.players[0].swapSlot >= 0) this.swapStep(INPUT_SWAP_CANCEL);
+  }
+  private swapStep(code: number): void {
+    if (this.mode !== 'levelup') return;
+    this.log.push(code);
+    step(this.state, [code]);
+    this.fx.consume(this.state);
+    this.showLevelUp();
   }
 
   private buildInfo(): BuildInfo {
@@ -666,6 +693,8 @@ class App implements AppApi {
         break;
     }
 
+    // Résolution dynamique : seulement quand la partie tourne vraiment (pas en pause ni au menu).
+    if (this.mode === 'playing' && this.dropAt < 0) this.renderer.adaptResolution(dtMs);
     // Les effets cosmétiques continuent de s'estomper même en pause (la sim, elle, est figée).
     this.fx.update(this.mode === 'dying' ? dt * 0.4 : dt);
     // Chute : on voit toute la zone de haut, puis la caméra plonge de plus en plus vite sur le héros.
@@ -679,6 +708,7 @@ class App implements AppApi {
       drop: drop >= 0 ? drop : undefined,
       showFps: this.save.settings.showFps && !this.demo,
       fps: this.fps,
+      resolution: this.renderer.resolution,
       replay: this.replay ? { speed: this.replay.speed, progress: this.replay.cursor.progress } : null,
       best: this.bestAtStart,
       sandbox: this.state.sandbox,

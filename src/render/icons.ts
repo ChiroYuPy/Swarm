@@ -11,16 +11,18 @@ type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
 
 /** Trace le chemin courant façon tube néon. `fill` : opacité du remplissage coloré (0 = aucun). */
-export function neon(ctx: Ctx, color: string, lw: number, fill = 0): void {
+export function neon(ctx: Ctx, color: string, lw: number, fill = 0, halo = true): void {
   if (fill > 0) {
     ctx.fillStyle = color;
     ctx.globalAlpha = fill;
     ctx.fill();
   }
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.28;
-  ctx.lineWidth = lw * 3;
-  ctx.stroke();
+  if (halo) {
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = lw * 3;
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
   ctx.lineWidth = lw;
   ctx.stroke();

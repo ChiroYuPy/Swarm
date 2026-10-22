@@ -185,6 +185,8 @@ export const OFFER_WEAPON = 0;
 export const OFFER_PASSIVE = 1;
 export const OFFER_FUSION = 2;
 export const OFFER_PIZZA = 3;
+/** échange de l'arme en cours d'échange (Player.swapSlot) contre l'arme `id`, au niveau `toLevel` */
+export const OFFER_SWAP = 4;
 
 export interface Offer {
   kind: number;
@@ -216,6 +218,10 @@ export class Player {
   pendingLevels = 0;
   offers: Offer[] = [];
   offerLevel = 0;
+  /** charges d'échange d'arme (une de plus par boss vaincu) */
+  swaps = 0;
+  /** emplacement d'arme en cours d'échange au level-up (-1 = aucun) */
+  swapSlot = -1;
   /** stats issues des bonus passifs */
   base: PlayerStats = baseStats();
   /** stats effectives (passifs + bonus temporaires), recalculées à chaque pas */
@@ -297,6 +303,8 @@ export const EV_HATCH = 35;
 export const EV_LASER = 36;
 /** l'Hexagone bâtisseur pose sa cage : x, y = centre, v = rayon */
 export const EV_CAGE = 37;
+/** un objet apparaît seul dans l'arène : x, y, k = code PK_* */
+export const EV_MAP_ITEM = 38;
 
 /** Événement émis par la sim pour le rendu et l'audio. Purement informatif : la sim ne les relit jamais. */
 export class SimEvent {

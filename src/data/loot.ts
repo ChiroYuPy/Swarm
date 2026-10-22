@@ -29,7 +29,7 @@ export const PICKUPS: PickupDef[] = [
   { id: 'shield', name: 'Bouclier', kind: 'timed', duration: 5, desc: 'Invulnérable pendant 5 s.', color: '#a0b4ff', weight: 1 },
   { id: 'fever', name: 'Fièvre d’XP', kind: 'timed', duration: 15, desc: 'XP doublée et rayon de collecte doublé pendant 15 s.', color: '#b8ff3d', weight: 1.5 },
   { id: 'totem', name: 'Totem', kind: 'relic', desc: 'Très rare. La prochaine fois que tu tombes à 0 PV, tu reviens avec la moitié de tes PV et une onde repousse tout autour de toi.', color: '#ffb347', weight: 0.25 },
-  { id: 'vacuum', name: 'Aspirateur', kind: 'active', desc: 'Attire toute l’XP et tous les objets au sol.', color: '#ff5a5a', weight: 4 },
+  { id: 'vacuum', name: 'Aspirateur', kind: 'active', desc: 'Attire toute l’XP et tous les objets au sol.', color: '#ff5a5a', weight: 8 },
   { id: 'freeze', name: 'Gel', kind: 'active', desc: 'Fige les ennemis autour de toi pendant 5 s. Gelés, ils prennent +50 % de dégâts et éclatent en blessant leurs voisins : de quoi briser un groupe entier.', color: '#9feaff', weight: 3 },
   { id: 'bomb', name: 'Bombe', kind: 'active', desc: 'Grosse explosion autour de toi (300 dégâts).', color: '#ffd23a', weight: 3 },
   { id: 'clock', name: 'Horloge', kind: 'active', desc: 'Ralentit tout le reste du monde pendant 8 s : ennemis, boss et tirs vont 3× moins vite. Toi, non.', color: '#7f9cff', weight: 2 },
@@ -71,6 +71,13 @@ export const LOOT = {
   feverMagnet: 2,
   /** part des PV max retirée au boss par l'Éradication */
   eradicateBoss: 0.2,
+  /**
+   * Objets qui apparaissent seuls dans l'arène, près du joueur (toutes les `every` s, même pendant un boss) :
+   * le plus souvent un Aspirateur, sinon un activable ou un bonus au hasard. Au plus `maxVacuums` Aspirateurs au sol.
+   */
+  mapItems: { every: 28, minDist: 320, maxDist: 620, vacuumChance: 0.6, activeChance: 0.5, maxVacuums: 2 },
+  /** Échange d'arme au level-up : charges au départ, gagnées par boss vaincu, maximum */
+  swaps: { start: 1, perBoss: 1, max: 3 },
   /** caisse bonus : probabilité d'un activable (sinon un bonus) */
   propActiveChance: 0.4,
   /** coffre de boss : fusion si possible, sinon N améliorations + soin */

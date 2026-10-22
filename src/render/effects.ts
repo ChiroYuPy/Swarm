@@ -20,6 +20,7 @@ import {
   EV_ENEMY_SHOT,
   EV_EXPLOSION,
   EV_FUSE,
+  EV_MAP_ITEM,
   EV_FUSION,
   EV_GEM,
   EV_HEAL,
@@ -121,6 +122,7 @@ const PICKUP_TOASTS = PICKUPS.map((d) =>
 
 const ENEMY_COL = ENEMIES.map((e) => fxColorIndex(e.color));
 const WEAPON_COL = ALL_WEAPONS.map((w) => fxColorIndex(w.color));
+const PICKUP_COL = PICKUPS.map((p) => fxColorIndex(p.color));
 
 export class Effects {
   // Particules (structure de tableaux)
@@ -358,6 +360,9 @@ export class Effects {
         case EV_PICKUP:
           h.sfx('pickup');
           if (e.k !== PK_CHEST) h.toast(PICKUP_TOASTS[e.k] ?? '', PICKUPS[e.k]?.color ?? '#ffffff');
+          break;
+        case EV_MAP_ITEM:
+          this.ring(e.x, e.y, 70, PICKUP_COL[e.k], 0.6);
           break;
         case EV_NEW_ENEMY:
           h.toast(`Nouvel ennemi : ${ENEMIES[e.k].name}`, ENEMIES[e.k].color);

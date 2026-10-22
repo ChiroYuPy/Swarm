@@ -24,6 +24,7 @@ import {
   PJ_RING,
   PJ_FIRE,
   PK_CHEST,
+  PK_VACUUM,
   BOSS_PATTERNS,
   WALL_TYPE,
   EGG_TYPE,
@@ -66,6 +67,12 @@ const BLINK_FUSE = Math.round((BLINK_DEF?.fuse ?? 1) * TICK_RATE);
 const LEADER_DEF = ENEMIES[ENEMY_LEADER];
 const HEX_COLOR = ENEMIES.find((e) => e.id === 'hexagone')!.color;
 
+/** Résolution dynamique : plancher, pas, et seuils (ms par image, moyenne glissante). */
+const RES_MIN = 0.55;
+const RES_STEP = 0.15;
+const RES_SLOW_MS = 20;
+const RES_FAST_MS = 17.5;
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -89,6 +96,12 @@ export class Renderer {
   private viewY0 = 0;
   private viewY1 = 0;
   private readonly sprites = new SpriteBank();
+  private resScale = 1;
+  private frameAvg = 1000 / 60;
+  private slowMs = 0;
+  private fastMs = 0;
+  /** temps fluide requis avant de remonter la résolution (doublé à chaque rechute) */
+  private raiseAfterMs = 4000;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -124,12 +137,50 @@ export class Renderer {
 
   setQuality(q: 'high' | 'low'): void {
     this.quality = q;
+    this.sprites.setEnemyHalo(q === 'high');
+    this.resize();
+  }
+
+  /** Part de la résolution native utilisée (résolution dynamique), entre RES_MIN et 1. */
+  get resolution(): number {
+    return this.resScale;
+  }
+
+  /**
+   * Résolution dynamique : quand les images ralentissent pendant une seconde (souvent la carte graphique,
+   * débordée par les centaines d'ennemis à mélanger), on dessine en un peu moins de pixels ; on remonte
+   * quand tout est redevenu fluide, de plus en plus prudemment si ça rechute.
+   */
+  adaptResolution(dtMs: number): void {
+    if (dtMs <= 0 || dtMs > 100) return; // pause, onglet caché, saccade isolée : on ignore
+    this.frameAvg += (dtMs - this.frameAvg) * 0.1;
+    if (this.frameAvg > RES_SLOW_MS) {
+      this.slowMs += dtMs;
+      this.fastMs = 0;
+    } else if (this.frameAvg < RES_FAST_MS) {
+      this.fastMs += dtMs;
+      this.slowMs = 0;
+    } else {
+      this.slowMs = this.fastMs = 0;
+    }
+    if (this.slowMs > 1000 && this.resScale > RES_MIN) {
+      this.setResScale(this.resScale - RES_STEP);
+      this.raiseAfterMs = Math.min(60000, this.raiseAfterMs * 2);
+    } else if (this.fastMs > this.raiseAfterMs && this.resScale < 1) {
+      this.setResScale(this.resScale + RES_STEP);
+    }
+  }
+
+  private setResScale(k: number): void {
+    this.resScale = Math.max(RES_MIN, Math.min(1, Math.round(k * 100) / 100));
+    this.slowMs = this.fastMs = 0;
+    this.frameAvg = 1000 / 60;
     this.resize();
   }
 
   resize(): void {
     const maxDpr = this.quality === 'low' ? 1 : 2;
-    this.dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
+    this.dpr = Math.min(maxDpr, window.devicePixelRatio || 1) * this.resScale;
     const w = Math.max(1, window.innerWidth);
     const h = Math.max(1, window.innerHeight);
     this.cw = Math.floor(w * this.dpr);
@@ -1227,6 +1278,7 @@ export class Renderer {
     for (let i = 0; i < s.pickupCount; i++) {
       const it = s.pickups[i];
       if (it.kind === PK_CHEST) targets.push([it.x, it.y, COLORS.gold]);
+      else if (it.kind === PK_VACUUM) targets.push([it.x, it.y, PICKUPS[PK_VACUUM].color]);
     }
     for (let i = 0; i < s.enemyCount; i++) {
       const e = s.enemies[i];

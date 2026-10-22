@@ -816,6 +816,60 @@ button:focus {
   text-align: center;
   color: var(--muted);
 }
+/* Échange d'arme, sous les cartes du level-up */
+.swapbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.swap-label {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.swap-label b {
+  color: var(--text);
+}
+.swap-btn {
+  --c: #fff;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: var(--radius);
+  background: var(--panel);
+  transition: border-color 0.1s, transform 0.1s, background 0.1s;
+}
+.swap-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.swap-btn.focus,
+:where(body:not(.kbd)) .swap-btn.pick:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 10%, rgba(12, 10, 26, 0.95));
+  transform: translateY(-2px);
+}
+.swap-cancel {
+  padding: 10px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+.swap-cancel.focus,
+:where(body:not(.kbd)) .swap-cancel:hover {
+  border-color: var(--text);
+}
 .card .icon {
   width: 68px;
   height: 68px;

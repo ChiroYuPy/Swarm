@@ -19,6 +19,7 @@ import {
   MAX_WEAPON_SLOTS,
   OFFER_FUSION,
   OFFER_PASSIVE,
+  OFFER_SWAP,
   OFFER_WEAPON,
   weaponDef,
   weaponLevel,
@@ -33,12 +34,22 @@ import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
 import { DEFAULT_SETTINGS, TOP_PER_DIFFICULTY, bestScore, defaultSandbox, topScores } from '../storage/storage';
 import { initCursor } from './cursor';
 
+/** Échange d'arme au level-up : charges, emplacement en cours d'échange (-1), armes du joueur. */
+export interface LevelUpSwap {
+  charges: number;
+  slot: number;
+  weapons: { id: string; name: string; color: string; can: boolean }[];
+}
+
 export interface AppApi {
   save: SaveData;
   play(difficulty: number): void;
   playSandbox(setup: SandboxSetup): void;
   retry(): void;
   pickOffer(i: number): void;
+  /** échange d'arme au level-up : ouvrir pour l'emplacement `slot`, ou annuler */
+  startSwap(slot: number): void;
+  cancelSwap(): void;
   resume(): void;
   quit(): void;
   toMenu(screen?: 'menu' | 'sandbox'): void;
@@ -565,7 +576,7 @@ export class UI {
     if (!el || this.attract) return;
     const t = target instanceof Element ? target : null;
     if (this.current === 'levelup') {
-      const card = t?.closest<HTMLElement>('.card');
+      const card = t?.closest<HTMLElement>('.pick');
       this.focusCard(card && el.contains(card) ? Number(card.dataset.i) : -1);
       return;
     }
@@ -1582,7 +1593,14 @@ export class UI {
   }
 
   // ---------- Level-up ----------
-  showLevelUp(level: number, offers: Offer[], ownedLevels: (o: Offer) => number, slots: { weapons: number; passives: number }): void {
+  showLevelUp(
+    level: number,
+    offers: Offer[],
+    ownedLevels: (o: Offer) => number,
+    slots: { weapons: number; passives: number },
+    swap: LevelUpSwap,
+  ): void {
+    const swapping = swap.slot >= 0 ? swap.weapons[swap.slot] : null;
     const cards = offers
       .map((o, i) => {
         let tag = '';
@@ -1614,6 +1632,15 @@ export class UI {
           kind = 'passive';
           iconId = d.id;
           pips = this.pips(o.toLevel, 5);
+        } else if (o.kind === OFFER_SWAP) {
+          const d = ALL_WEAPONS[o.id];
+          tag = d.fusion ? 'Échange · fusion' : `Échange · niveau ${o.toLevel}`;
+          name = d.name;
+          line = d.fusion ? d.levelText[0] : d.levelText[Math.max(0, o.toLevel - 1)];
+          sub = swapping ? `Remplace ${swapping.name}` : '';
+          color = d.color;
+          iconId = d.id;
+          if (!d.fusion) pips = this.pips(o.toLevel, 5);
         } else if (o.kind === OFFER_FUSION) {
           const f = FUSION_TABLE[o.id];
           const r = weaponDef(f.result);
@@ -1631,7 +1658,7 @@ export class UI {
           kind = 'pickup';
           iconId = 'heal';
         }
-        return `<button class="card offer ${o.kind === OFFER_FUSION ? 'fusion' : ''}" data-i="${i}" style="--c:${color}">
+        return `<button class="card offer pick ${o.kind === OFFER_FUSION ? 'fusion' : ''}" data-i="${i}" data-offer="${i}" style="--c:${color}">
           <span class="key">${i + 1}</span>
           <span class="icon" data-kind="${kind}" data-id="${iconId}"></span>
           <span class="card-tag">${esc(tag)}</span>
@@ -1642,19 +1669,40 @@ export class UI {
         </button>`;
       })
       .join('');
-    const el = this.mount(
-      'levelup',
-      `<header class="head"><h2>Niveau ${level}</h2><p class="sub">Choisis une amélioration : <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, flèches + <kbd>Entrée</kbd> ou clic</p></header>
-       <div class="cards">${cards}</div>`,
-      true,
-    );
+    let n = offers.length;
+    let bar = '';
+    if (swapping) {
+      bar = `<div class="swapbar"><button class="swap-cancel pick" data-i="${n++}">Annuler l’échange</button></div>`;
+    } else if (swap.weapons.length > 0) {
+      const btns = swap.weapons
+        .map((w, k) => {
+          const ok = swap.charges > 0 && w.can;
+          return `<button class="swap-btn ${ok ? 'pick' : ''}" ${ok ? `data-i="${n++}"` : 'disabled'} data-slot="${k}" style="--c:${w.color}" title="${esc(w.name)}">
+            <span class="icon" data-kind="weapon" data-id="${w.id}"></span></button>`;
+        })
+        .join('');
+      const label =
+        swap.charges > 0
+          ? `Échanger une arme · <b>${swap.charges}</b> charge${swap.charges > 1 ? 's' : ''}`
+          : 'Échanger une arme · bats un boss pour gagner une charge';
+      bar = `<div class="swapbar ${swap.charges > 0 ? '' : 'empty'}"><span class="swap-label">${label}</span>${btns}</div>`;
+    }
+    const head = swapping
+      ? `<h2>Échanger ${esc(swapping.name)}</h2><p class="sub">Choisis l’arme qui la remplace, au même niveau</p>`
+      : `<h2>Niveau ${level}</h2><p class="sub">Choisis une amélioration : <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, flèches + <kbd>Entrée</kbd> ou clic</p>`;
+    const el = this.mount('levelup', `<header class="head">${head}</header><div class="cards">${cards}</div>${bar}`, true);
     el.querySelectorAll<HTMLElement>('.icon').forEach((s) => {
-      if (s.dataset.id) s.appendChild(iconCanvas(s.dataset.kind as 'weapon' | 'passive' | 'pickup', s.dataset.id, 60));
+      const px = s.closest('.swap-btn') ? 34 : 60;
+      if (s.dataset.id) s.appendChild(iconCanvas(s.dataset.kind as 'weapon' | 'passive' | 'pickup', s.dataset.id, px));
     });
     el.querySelectorAll<HTMLButtonElement>('.card').forEach((b) => {
-      b.addEventListener('click', () => this.app.pickOffer(Number(b.dataset.i)));
+      b.addEventListener('click', () => this.app.pickOffer(Number(b.dataset.offer)));
     });
-    this.levelCount = offers.length;
+    el.querySelectorAll<HTMLButtonElement>('.swap-btn.pick').forEach((b) => {
+      b.addEventListener('click', () => this.app.startSwap(Number(b.dataset.slot)));
+    });
+    el.querySelector<HTMLButtonElement>('.swap-cancel')?.addEventListener('click', () => this.app.cancelSwap());
+    this.levelCount = n;
     this.levelOpenedAt = performance.now();
     if (this.kbd) this.focusCard(0);
     else this.syncPointer(document.elementFromPoint(this.pointer.x, this.pointer.y));
@@ -1670,7 +1718,7 @@ export class UI {
   focusCard(i: number): void {
     if (this.current !== 'levelup') return;
     this.levelFocus = i < 0 ? -1 : (i + this.levelCount) % this.levelCount;
-    this.screenEl?.querySelectorAll<HTMLElement>('.card').forEach((c, k) => c.classList.toggle('focus', k === this.levelFocus));
+    this.screenEl?.querySelectorAll<HTMLElement>('.pick').forEach((c, k) => c.classList.toggle('focus', k === this.levelFocus));
   }
   moveCard(d: number): void {
     this.setKbd(true);
@@ -1687,7 +1735,8 @@ export class UI {
       return;
     }
     // Garde-fou : une touche tenue au moment où l'écran s'ouvre ne choisit pas à la place du joueur.
-    if (performance.now() - this.levelOpenedAt > 350) this.app.pickOffer(this.levelFocus);
+    if (performance.now() - this.levelOpenedAt <= 350) return;
+    this.screenEl?.querySelectorAll<HTMLButtonElement>('.pick')[this.levelFocus]?.click();
   }
 
   private buildHtml(b: BuildInfo, detailed: boolean): string {

@@ -6,10 +6,10 @@
  * on garde ensuite les 3 premières offres valides pour le build du joueur. Deux joueurs au même build
  * voient donc exactement les mêmes propositions.
  */
-import { BASE_WEAPONS } from '../data/weapons';
+import { ALL_WEAPONS, BASE_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { LOOT } from '../data/loot';
-import { MAX_ITEM_LEVEL, MAX_PASSIVE_SLOTS, MAX_WEAPON_SLOTS } from './constants';
+import { INPUT_SWAP_BASE, INPUT_SWAP_CANCEL, MAX_ITEM_LEVEL, MAX_PASSIVE_SLOTS, MAX_WEAPON_SLOTS } from './constants';
 import { Rng, STREAM, deriveSeed } from './rng';
 import { FUSION_TABLE, weaponMaxLevel } from './registry';
 import { computeStats } from './player';
@@ -21,6 +21,7 @@ import {
   OFFER_FUSION,
   OFFER_PASSIVE,
   OFFER_PIZZA,
+  OFFER_SWAP,
   OFFER_WEAPON,
   PassiveInst,
   WeaponInst,
@@ -105,6 +106,7 @@ export function availableFusions(p: Player): number[] {
 }
 
 export function rollOffers(s: GameState, p: Player): void {
+  p.swapSlot = -1;
   const level = p.level - p.pendingLevels + 1;
   p.offerLevel = level;
   const offers: Offer[] = [];
@@ -179,9 +181,88 @@ function applyOfferEffect(s: GameState, p: Player, o: Offer): void {
   computeStats(p);
 }
 
+// ---------- Échange d'arme ----------
+
+/** Armes contre lesquelles l'arme de l'emplacement `slot` peut s'échanger (base ↔ base, fusion ↔ fusion). */
+function swapCandidates(p: Player, slot: number): number[] {
+  const w = p.weapons[slot];
+  if (!w) return [];
+  const out: number[] = [];
+  if (!ALL_WEAPONS[w.def].fusion) {
+    for (let id = 0; id < BASE_WEAPONS.length; id++) if (!findWeapon(p, id) && !p.banned.includes(id)) out.push(id);
+  } else {
+    for (const f of FUSION_TABLE) {
+      // Une fusion dont on tient encore une arme d'origine ferait doublon : exclue.
+      if (findWeapon(p, f.result) || findWeapon(p, f.weapon) || (!f.withPassive && findWeapon(p, f.with))) continue;
+      if (!out.includes(f.result)) out.push(f.result);
+    }
+  }
+  return out;
+}
+
+/** Le joueur peut-il échanger l'arme de cet emplacement maintenant ? */
+export function canSwap(p: Player, slot: number): boolean {
+  return p.alive && p.pendingLevels > 0 && p.swaps > 0 && swapCandidates(p, slot).length > 0;
+}
+
+/** Ouvre l'échange : les propositions deviennent 3 armes du même niveau (ordre fixé par seed, niveau, emplacement). */
+function startSwap(s: GameState, p: Player, slot: number): void {
+  if (!canSwap(p, slot)) return;
+  const cands = swapCandidates(p, slot);
+  const rng = new Rng(deriveSeed(s.seed, STREAM.LEVELUP, 0x5000 + p.offerLevel * 8 + slot));
+  for (let i = cands.length - 1; i > 0; i--) {
+    const j = rng.int(i + 1);
+    const t = cands[i];
+    cands[i] = cands[j];
+    cands[j] = t;
+  }
+  const level = p.weapons[slot].level;
+  p.swapSlot = slot;
+  p.offers = cands.slice(0, 3).map((id) => ({ kind: OFFER_SWAP, id, toLevel: Math.min(level, weaponMaxLevel(id)) }));
+}
+
+function applySwap(s: GameState, p: Player, o: Offer): void {
+  const w = p.weapons[p.swapSlot];
+  p.swapSlot = -1;
+  if (!w) return;
+  // L'arme rendue ne revient plus ; les armes d'origine d'une fusion reçue non plus.
+  p.banned.push(w.def);
+  for (const f of FUSION_TABLE) {
+    if (f.result !== o.id) continue;
+    p.banned.push(f.weapon);
+    if (!f.withPassive) p.banned.push(f.with);
+  }
+  w.def = o.id;
+  w.level = o.toLevel;
+  w.timer = 30;
+  w.shots = 0;
+  w.burstLeft = 0;
+  w.activeTicks = 0;
+  w.tickTimer = 0;
+  p.swaps--;
+  computeStats(p);
+  emit(s, EV_CHOICE, p.x, p.y, o.id, o.kind, o.toLevel, 0, p.index);
+}
+
+/** Code d'échange reçu au level-up : ouvrir (220..224) ou annuler (229). */
+export function handleSwapCode(s: GameState, p: Player, code: number): void {
+  if (!p.alive || p.pendingLevels === 0) return;
+  if (code === INPUT_SWAP_CANCEL) {
+    if (p.swapSlot >= 0) rollOffers(s, p);
+    return;
+  }
+  if (p.swapSlot < 0) startSwap(s, p, code - INPUT_SWAP_BASE);
+}
+
 export function applyChoice(s: GameState, p: Player, choice: number): void {
   if (p.offers.length === 0) return;
   const o = p.offers[Math.max(0, Math.min(choice, p.offers.length - 1))];
+  if (o.kind === OFFER_SWAP) {
+    // L'échange ne consomme pas le niveau : on revient aux propositions de ce niveau.
+    applySwap(s, p, o);
+    rollOffers(s, p);
+    return;
+  }
   applyOfferEffect(s, p, o);
   emit(s, EV_CHOICE, p.x, p.y, o.id, o.kind, o.toLevel, 0, p.index);
   p.offers = [];

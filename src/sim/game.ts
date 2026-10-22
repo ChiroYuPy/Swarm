@@ -9,14 +9,15 @@
  */
 import { HERO, SCORE, xpForLevel } from '../data/hero';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
-import { DT, GAME_VERSION, INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_USE, MAX_PLAYERS, SIM_VERSION } from './constants';
+import { DT, GAME_VERSION, INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_SWAP_BASE, INPUT_SWAP_CANCEL, INPUT_USE, MAX_PLAYERS, SIM_VERSION } from './constants';
 import { WorldMap } from './map';
 import { Rng, STREAM, deriveSeed, hashString } from './rng';
 import { SpatialGrid } from './grid';
 import { NavField } from './navfield';
 import { Player, makePools, emit, EF_BOSS, EV_CLONE_END, type GameState } from './state';
 import { computeStats, updatePlayer, useActivable } from './player';
-import { addWeapon, applyChoice, rollOffers } from './levelup';
+import { LOOT } from '../data/loot';
+import { addWeapon, applyChoice, handleSwapCode, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
 import { pushOutOfWalls, updateContacts, updateEnemies } from './enemies';
 import { processShatters } from './combat';
@@ -95,6 +96,7 @@ export function createGame(cfg: GameConfig): GameState {
     computeStats(p);
     p.hp = p.stats.maxHp;
     p.xpNext = xpForLevel(1);
+    p.swaps = LOOT.swaps.start;
     addWeapon(p, weaponId(HERO.startWeapon));
     s.players.push(p);
   }
@@ -134,6 +136,9 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
       consumed = true;
     } else if (code >= INPUT_AIM_AUTO && code < INPUT_AIM_BASE + INPUT_DIRS) {
       p.aim = code - INPUT_AIM_BASE;
+      consumed = true;
+    } else if (code >= INPUT_SWAP_BASE && code <= INPUT_SWAP_CANCEL) {
+      handleSwapCode(s, p, code);
       consumed = true;
     } else if (code === INPUT_USE) {
       if (p.alive && p.pendingLevels === 0) {

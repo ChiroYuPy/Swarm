@@ -52,6 +52,8 @@ const TEXT = `600 13px ${FONT}`;
 export interface HudOptions {
   showFps: boolean;
   fps: number;
+  /** part de la résolution native (résolution dynamique) */
+  resolution?: number;
   replay: { speed: number; progress: number } | null;
   /** meilleur score enregistré dans cette difficulté (0 si aucun) */
   best: number;
@@ -565,6 +567,6 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.textAlign = 'right';
     ctx.font = '12px monospace';
     ctx.fillStyle = opt.fps >= 55 ? '#39ff7a' : opt.fps >= 40 ? '#ffe14d' : '#ff3d6e';
-    ctx.fillText(`${opt.fps.toFixed(0)} fps · ${s.enemyCount} ennemis · ${s.projCount} proj · ${s.gemCount} gemmes`, W - 16, H - 12);
+    ctx.fillText(`${opt.fps.toFixed(0)} fps · rés. ${Math.round((opt.resolution ?? 1) * 100)} % · ${s.enemyCount} ennemis · ${s.projCount} proj · ${s.gemCount} gemmes`, W - 16, H - 12);
   }
 }

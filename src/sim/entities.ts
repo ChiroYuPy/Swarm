@@ -101,7 +101,23 @@ export function gemTier(v: number): number {
   return v < 3 ? 0 : v < 10 ? 1 : v < 40 ? 2 : 3;
 }
 
+/** Au-delà de GEM_MERGE_AT gemmes au sol, une nouvelle gemme rejoint une gemme immobile toute proche. */
+const GEM_MERGE_AT = 200;
+const GEM_MERGE_R2 = 64 * 64;
+
 export function spawnGem(s: GameState, x: number, y: number, value: number): void {
+  if (s.gemCount >= GEM_MERGE_AT) {
+    for (let i = 0; i < s.gemCount; i++) {
+      const g = s.gems[i];
+      if (g.magnet) continue;
+      const dx = g.x - x;
+      const dy = g.y - y;
+      if (dx * dx + dy * dy > GEM_MERGE_R2) continue;
+      g.value += value;
+      g.tier = gemTier(g.value);
+      return;
+    }
+  }
   if (s.gemCount >= MAX_GEMS) {
     // Trop de gemmes : on fusionne la valeur dans une gemme existante (choix déterministe).
     const g = s.gems[s.gemMergeCursor % s.gemCount];

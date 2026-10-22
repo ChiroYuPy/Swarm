@@ -22,6 +22,7 @@ import {
   EF_BOSS,
   EF_PROP,
   PK_CHEST,
+  PK_VACUUM,
   emit,
   type GameState,
   type Player,
@@ -84,6 +85,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
   s.totalKills++;
   if (beh === BEHAVIOR.BOSS) {
     if (owner >= 0) s.players[owner].bossKills++;
+    for (const p of s.players) if (p.master < 0) p.swaps = Math.min(LOOT.swaps.max, p.swaps + LOOT.swaps.perBoss);
     if (s.bossId === e.id) {
       s.bossId = -1;
       // Un peu de calme pour ramasser le coffre avant que les vagues reprennent.
@@ -167,6 +169,13 @@ function dropPropLoot(s: GameState, x: number, y: number): void {
   const r = s.rngLoot.next();
   const pick = s.rngLoot.next();
   spawnPickup(s, r < LOOT.propActiveChance ? pickFrom(ACTIVE_KINDS, ACTIVE_W, pick) : pickFrom(BONUS_KINDS, BONUS_W, pick), x, y);
+}
+
+/** Objet posé par l'arène : surtout des Aspirateurs (`u1` choisit la famille, `u2` l'objet). */
+export function rollMapItem(u1: number, u2: number, vacuumAllowed: boolean): number {
+  const m = LOOT.mapItems;
+  if (vacuumAllowed && u1 < m.vacuumChance) return PK_VACUUM;
+  return u2 < m.activeChance ? pickFrom(ACTIVE_KINDS, ACTIVE_W, u2 / m.activeChance) : pickFrom(BONUS_KINDS, BONUS_W, (u2 - m.activeChance) / (1 - m.activeChance));
 }
 
 /** Objet activable tiré au sort (récompense de boss). */

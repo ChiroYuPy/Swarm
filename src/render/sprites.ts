@@ -30,19 +30,39 @@ function glowStroke(ctx: CanvasRenderingContext2D, color: string, width: number)
   ctx.stroke();
 }
 
-/** Crée un sprite centré de demi-taille `half` (unités monde). */
+/**
+ * Crée un sprite centré de demi-taille `half` (unités monde), puis le rogne à ses pixels visibles
+ * (en restant centré, pour que la rotation tombe juste) : moins de pixels à mélanger pour le GPU.
+ */
 function make(half: number, paint: Painter): Sprite {
   const size = Math.ceil(half * 2 * SPRITE_RES);
-  const cv = document.createElement('canvas');
+  let cv = document.createElement('canvas');
   cv.width = size;
   cv.height = size;
-  const ctx = cv.getContext('2d')!;
+  const ctx = cv.getContext('2d', { willReadFrequently: true })!;
   ctx.scale(SPRITE_RES, SPRITE_RES);
   ctx.translate(half, half);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   paint(ctx);
-  const sp: Sprite = { img: cv, w: half * 2, h: half * 2 };
+  let hx = half;
+  let hy = half;
+  const trim = visibleHalfExtents(ctx, size);
+  if (trim) {
+    // +1 px de marge pour le filtrage bilinéaire
+    const px = Math.min(size / 2, trim[0] + 1);
+    const py = Math.min(size / 2, trim[1] + 1);
+    if (px < size / 2 || py < size / 2) {
+      const out = document.createElement('canvas');
+      out.width = Math.ceil(px * 2);
+      out.height = Math.ceil(py * 2);
+      out.getContext('2d')!.drawImage(cv, out.width / 2 - size / 2, out.height / 2 - size / 2);
+      cv = out;
+      hx = out.width / 2 / SPRITE_RES;
+      hy = out.height / 2 / SPRITE_RES;
+    }
+  }
+  const sp: Sprite = { img: cv, w: hx * 2, h: hy * 2 };
   // Conversion asynchrone en ImageBitmap (texture immuable, la plus rapide à dessiner).
   if (typeof createImageBitmap === 'function') {
     createImageBitmap(cv).then(
@@ -51,6 +71,29 @@ function make(half: number, paint: Painter): Sprite {
     );
   }
   return sp;
+}
+
+/** Demi-largeur et demi-hauteur (pixels, depuis le centre) de ce qui est réellement visible. */
+function visibleHalfExtents(ctx: CanvasRenderingContext2D, size: number): [number, number] | null {
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, size, size).data;
+  } catch {
+    return null;
+  }
+  const c = size / 2;
+  let mx = 0;
+  let my = 0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (data[(y * size + x) * 4 + 3] < 3) continue;
+      const dx = Math.abs(x + 0.5 - c);
+      const dy = Math.abs(y + 0.5 - c);
+      if (dx > mx) mx = dx;
+      if (dy > my) my = dy;
+    }
+  }
+  return mx > 0 || my > 0 ? [Math.ceil(mx + 0.5), Math.ceil(my + 0.5)] : null;
 }
 
 /** Forme d'ennemi orientée vers +x (rotation appliquée au dessin). */
@@ -196,12 +239,12 @@ export function queenPath(ctx: CanvasRenderingContext2D, x: number, y: number, r
 const UPRIGHT = (d: EnemyDef) => d.behavior === 'prop' || d.behavior === 'wall' || d.behavior === 'egg' || d.shape === 'queen';
 
 /** Dessine un ennemi (orienté vers +x) au style tube néon. */
-export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: string): void {
+export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: string, halo = true): void {
   const r = d.radius;
   const lw = d.radius > 15 ? 2.6 : 2;
   {
     enemyShape(ctx, d);
-    neon(ctx, color, lw, d.shape === 'dot' ? 0.45 : 0.14);
+    neon(ctx, color, lw, d.shape === 'dot' ? 0.45 : 0.14, halo);
     if (d.behavior === 'prop') {
       // Caisse bonus : point d'interrogation façon bloc d'arcade
       ctx.beginPath();
@@ -209,7 +252,7 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
       ctx.quadraticCurveTo(0, r * 0.05, 0, r * 0.25);
       ctx.moveTo(0, r * 0.55);
       ctx.lineTo(0, r * 0.56);
-      neon(ctx, color === '#ffffff' ? color : '#ffd23a', 2.4);
+      neon(ctx, color === '#ffffff' ? color : '#ffd23a', 2.4, 0, halo);
     }
     // Yeux, tournés vers l'avant
     if (r >= 9 && !UPRIGHT(d) && d.shape !== 'eye') {
@@ -226,8 +269,8 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
   }
 }
 
-function enemySprite(d: EnemyDef, color: string): Sprite {
-  return make(d.radius * 1.5 + 8, (ctx) => paintEnemy(ctx, d, color));
+function enemySprite(d: EnemyDef, color: string, halo: boolean): Sprite {
+  return make(d.radius * 1.5 + 8, (ctx) => paintEnemy(ctx, d, color, halo));
 }
 
 /** Petit canvas d'aperçu d'un ennemi pour l'interface (aide, codex). */
@@ -245,8 +288,8 @@ export function enemyPreview(id: string, size: number): HTMLCanvasElement {
 }
 
 export class SpriteBank {
-  readonly enemy: Sprite[] = [];
-  readonly enemyFlash: Sprite[] = [];
+  enemy: Sprite[] = [];
+  enemyFlash: Sprite[] = [];
   readonly gem: Sprite[] = [];
   /** balle du joueur par arme, dessinée pour un rayon 6 (mise à l'échelle) */
   readonly bullet: Sprite[] = [];
@@ -262,11 +305,10 @@ export class SpriteBank {
   /** particule ronde par couleur de FX_COLORS */
   readonly particle: Sprite[] = [];
 
+  private enemyHalo = true;
+
   constructor() {
-    for (const d of ENEMIES) {
-      this.enemy.push(enemySprite(d, d.color));
-      this.enemyFlash.push(enemySprite(d, '#ffffff'));
-    }
+    this.buildEnemies();
     const sizes = [4.5, 5.5, 7, 9];
     for (let t = 0; t < 4; t++) {
       const r = sizes[t];
@@ -379,5 +421,17 @@ export class SpriteBank {
         }),
       );
     }
+  }
+
+  /** Sans halo (qualité basse) : les ennemis, très nombreux, coûtent bien moins de pixels. */
+  setEnemyHalo(halo: boolean): void {
+    if (halo === this.enemyHalo) return;
+    this.enemyHalo = halo;
+    this.buildEnemies();
+  }
+
+  private buildEnemies(): void {
+    this.enemy = ENEMIES.map((d) => enemySprite(d, d.color, this.enemyHalo));
+    this.enemyFlash = ENEMIES.map((d) => enemySprite(d, '#ffffff', this.enemyHalo));
   }
 }

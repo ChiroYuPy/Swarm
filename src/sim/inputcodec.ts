@@ -9,11 +9,12 @@
  *   131..194  viser dans la direction (code-131) × 360°/64 (pas « zéro », enregistré quand la visée change)
  *   200..202  choix de la proposition 0, 1 ou 2 au level-up (pas « zéro », le temps n'avance pas)
  *   210       utiliser l'objet activable (pas « zéro »)
+ *   220..224  au level-up, échanger l'arme de l'emplacement (code-220) ; 229 annuler (pas « zéro »)
  *
  * Journal : RLE (octet valeur + longueur en varint LEB128), puis base64, préfixé par la version du format.
  * Une partie de 10 minutes au clavier tient en quelques Ko.
  */
-import { INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS } from './constants';
+import { INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_SWAP_BASE } from './constants';
 import { TWO_PI, datan2 } from './dmath';
 
 export const LOG_FORMAT = 'N1';
@@ -41,6 +42,10 @@ export function aimCode(dir: number): number {
 
 export function choiceCode(i: number): number {
   return INPUT_CHOICE_BASE + i;
+}
+
+export function swapCode(slot: number): number {
+  return INPUT_SWAP_BASE + slot;
 }
 
 export function isChoiceCode(c: number): boolean {

@@ -14,7 +14,9 @@ import { DIFFICULTIES } from '../data/difficulty';
 import { DT, TICK_RATE } from './constants';
 import { TWO_PI, dcos, dsin } from './dmath';
 import { circleHitsObstacle } from './map';
-import { spawnEnemy } from './entities';
+import { spawnEnemy, spawnPickup } from './entities';
+import { rollMapItem } from './combat';
+import { LOOT } from '../data/loot';
 import {
   BOSS_PATTERNS,
   BOSS_TICKS,
@@ -37,11 +39,13 @@ import {
   EF_PROP,
   EV_BOSS_SPAWN,
   EV_FLEE,
+  EV_MAP_ITEM,
   EV_NEW_ENEMY,
   EV_PROP,
   EV_RING_WAVE,
   EV_SWARM,
   EV_WAVE,
+  PK_VACUUM,
   emit,
   type Enemy,
   type GameState,
@@ -182,6 +186,28 @@ function updateProps(s: GameState): void {
   }
 }
 
+/** Objets de l'arène (surtout des Aspirateurs) : même principe que les caisses, sans état (seed + tick). */
+function updateMapItems(s: GameState): void {
+  const m = LOOT.mapItems;
+  if (s.tick % Math.round(m.every * TICK_RATE) !== 0) return;
+  const p = s.players[targetPlayer(s)];
+  let vacuums = 0;
+  for (let i = 0; i < s.pickupCount; i++) if (s.pickups[i].kind === PK_VACUUM) vacuums++;
+  const u = (salt: number) => deriveSeed(s.seed, salt, s.tick) / 4294967296;
+  const kind = rollMapItem(u(0x6d617031), u(0x6d617032), vacuums < m.maxVacuums);
+  const a0 = u(0x6d617033) * TWO_PI;
+  const d = m.minDist + u(0x6d617034) * (m.maxDist - m.minDist);
+  for (let k = 0; k < 12; k++) {
+    const a = a0 + (k & 1 ? 1 : -1) * ((k + 1) >> 1) * 0.35;
+    const x = p.x + dcos(a) * d;
+    const y = p.y + dsin(a) * d;
+    if (circleHitsObstacle(s.map, x, y, 24)) continue;
+    spawnPickup(s, kind, x, y);
+    emit(s, EV_MAP_ITEM, x, y, 0, kind);
+    return;
+  }
+}
+
 /** Le boss arrive : les ennemis normaux s'enfuient, il ne reste que lui (et ce qu'il fait venir). */
 function spawnBoss(s: GameState): void {
   const k = s.bossSpawned;
@@ -226,6 +252,7 @@ export function waveInfo(clock: number) {
 
 export function updateSpawner(s: GameState): void {
   updateProps(s);
+  updateMapItems(s);
   // Boss en vie, ou calme qui suit sa mort : ni vague ni horloge.
   if (s.bossId >= 0 || s.tick < s.calmUntil) return;
   const c = ++s.clock;
