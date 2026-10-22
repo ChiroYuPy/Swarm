@@ -133,7 +133,7 @@ describe('nouvelles armes', () => {
     run(s, 3, (st) => {
       for (const b of projs(st, PJ_RICOCHET)) maxHits = Math.max(maxHits, b.hitCount);
     });
-    expect(maxHits).toBeGreaterThan(2);
+    expect(maxHits).toBeGreaterThan(1);
   });
 
   it('les drones partent chasser, et reviennent près du joueur quand ils sont abattus', () => {

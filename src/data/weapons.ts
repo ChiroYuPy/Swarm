@@ -340,18 +340,18 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'ricochet',
     color: '#ff4f9a',
     levelText: [
-      '1 disque chercheur, 4 rebonds.',
+      '1 disque chercheur, 2 rebonds.',
       '2 disques',
-      '3 disques, 6 rebonds, dégâts +15 %',
+      '3 disques, 3 rebonds, dégâts +15 %',
       '4 disques',
-      '5 disques, 8 rebonds, plus gros, dégâts +15 %',
+      '5 disques, 4 rebonds, plus gros, dégâts +15 %',
     ],
     levels: prog(
-      { damage: 18, cooldown: 1.5, speed: 440, bounces: 4, count: 1, size: 10, life: 3, range: 520 },
+      { damage: 18, cooldown: 1.5, speed: 440, bounces: 2, count: 1, size: 10, life: 3, range: 520 },
       { count: 2 },
-      { count: 3, bounces: 6, damage: 21 },
+      { count: 3, bounces: 3, damage: 21 },
       { count: 4 },
-      { count: 5, bounces: 8, size: 12, damage: 24 },
+      { count: 5, bounces: 4, size: 12, damage: 24 },
     ),
   },
   {
@@ -502,11 +502,11 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'drone',
     color: '#ff9ccd',
     fusion: true,
-    levelText: ['Quatre drones tournent autour de leur cible, à distance, et lancent de gros disques ricochets aux nombreux rebonds. Abattus, ils reviennent presque aussitôt.'],
+    levelText: ['Quatre drones tournent autour de leur cible, à distance, et lancent de gros disques ricochets (5 rebonds). Abattus, ils reviennent presque aussitôt.'],
     levels: [
       {
         damage: 30, cooldown: 0.9, count: 4, speed: 300, range: 600, hp: 140, respawn: 0.4, attackRange: 280,
-        shotSpeed: 480, size: 12, bounces: 12, life: 4.5, turn: 3.4, orbit: 1,
+        shotSpeed: 480, size: 12, bounces: 5, life: 4.5, turn: 3.4, orbit: 1,
       },
     ],
   },
