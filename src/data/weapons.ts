@@ -146,11 +146,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
     color: '#9dff6a',
     levelText: ['1 orbe tourne autour de toi.', '2 orbes', '3 orbes, orbite plus large', '4 orbes, dégâts +20 %', '5 orbes, orbes plus gros'],
     levels: prog(
-      { damage: 9, count: 1, radius: 72, rotSpeed: 3.0, size: 10, hitCd: 0.45, knockback: 70 },
+      { damage: 14, count: 1, radius: 85, rotSpeed: 3.0, size: 15, hitCd: 0.35, knockback: 80 },
       { count: 2 },
-      { count: 3, radius: 82 },
-      { count: 4, damage: 11 },
-      { count: 5, radius: 90, size: 13 },
+      { count: 3, radius: 96 },
+      { count: 4, damage: 17 },
+      { count: 5, radius: 106, size: 19 },
     ),
   },
   {
