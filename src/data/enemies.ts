@@ -167,7 +167,7 @@ export const ENEMIES: EnemyDef[] = [
   {
     id: 'oeuf', name: 'Œuf', desc: 'Pondu par la Reine : éclot en Essaim.',
     behavior: 'egg', shape: 'egg', color: '#ff9ecf', hidden: true,
-    hp: 16, speed: 0, damage: 0, radius: 11, xp: 1, kbResist: 1,
+    hp: 10, speed: 0, damage: 0, radius: 11, xp: 1, kbResist: 1,
   },
 ];
 
@@ -349,8 +349,8 @@ export const REINE = {
   hatchAfter: 2.6,
   hatchCount: 7,
   maxEggs: 14,
-  /** PV de l'Essaim qui éclot (× les PV normaux) : une zone ne suffit plus à tout raser */
-  broodHp: 4,
+  /** PV de l'Essaim qui éclot (× les PV normaux) : un peu plus solide qu'un Essaim ordinaire */
+  broodHp: 1.5,
   /** gerbe de dards en spirale */
   spiralEvery: 0.12,
   spiralArms: 3,
@@ -360,5 +360,5 @@ export const REINE = {
   volleySpread: 0.22,
   bulletSpeed: 190,
   bulletDamage: 10,
-  summon: { type: 'points', count: 18, perBoss: 4, around: 'self', radius: 70, maxAlive: 70, hp: 4 } as BossSummon,
+  summon: { type: 'points', count: 18, perBoss: 4, around: 'self', radius: 70, maxAlive: 70, hp: 1.5 } as BossSummon,
 };

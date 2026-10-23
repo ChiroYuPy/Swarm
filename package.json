@@ -1,7 +1,7 @@
 {
   "name": "swarm",
   "private": true,
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "SWARM: a deterministic neon survivor-like (TypeScript + Vite).",
   "type": "module",
   "scripts": {

@@ -6,7 +6,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { BOSS_ORDER, ENEMIES, bossName } from '../data/enemies';
+import { BOSS_ORDER, ENEMIES } from '../data/enemies';
 import { PICKUPS } from '../data/loot';
 import { DIFFICULTIES } from '../data/difficulty';
 import { WAVES } from '../data/waves';
@@ -141,7 +141,6 @@ type SandboxKey =
   | 'item'
   | 'enemyMul'
   | 'custom'
-  | 'duel'
   | 'duelMark'
   | 'summons'
   | 'bosses';
@@ -150,7 +149,9 @@ type SandboxDef = { key: SandboxKey; label: string; hint?: string } & ({ kind: '
 
 const times = (v: number) => `×${String(v).replace('.', ',')}`;
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-const enemyName = (id: string) => ENEMIES.find((e) => e.id === id)!.name;
+const enemyDef = (id: string) => ENEMIES.find((e) => e.id === id)!;
+/** « Étoile » pour « Étoile ricochet » : assez court pour une tuile ou une ligne d'aide */
+const shortName = (id: string) => enemyDef(id).name.split(' ')[0];
 
 /** Écran Sandbox : réglages de la partie, dans l'ordre d'affichage. */
 const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
@@ -162,7 +163,7 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
         key: 'startWave',
         kind: 'choice',
         label: 'Commencer à',
-        // texte mis à jour selon la vague (voir paintSandbox)
+        // texte mis à jour selon la vague et le duel (voir paintSandbox) ; les boss suivent, en tuiles
         hint: ' ',
         options: Array.from({ length: MAX_START_WAVE }, (_, i): [number, string] => [i + 1, `Vague ${i + 1}`]),
       },
@@ -194,17 +195,10 @@ const SANDBOX_UI: { title: string; items: SandboxDef[] }[] = [
     title: 'Boss',
     items: [
       {
-        key: 'duel',
-        kind: 'choice',
-        label: 'Duel',
-        hint: ' ',
-        options: [[null, 'Non'], ...BOSS_ORDER.map((id): [string, string] => [id, enemyName(id)])],
-      },
-      {
         key: 'duelMark',
         kind: 'choice',
         label: 'Force du boss',
-        hint: 'Mk II : comme à son deuxième passage.',
+        hint: 'Du boss choisi au départ. Mk II : son 2e passage.',
         options: Array.from({ length: MAX_DUEL_MARK }, (_, i): [number, string] => [i + 1, `Mk ${ROMAN[i]}`]),
       },
       { key: 'summons', kind: 'toggle', label: 'Renforts des boss', hint: 'Non : rien que ses attaques, pour s’entraîner.' },
@@ -273,16 +267,12 @@ function evolutionHint(weaponId: string): string {
   return names.length ? `Niveau max : évolue avec ${names.join(' ou ')} au niveau 5.` : '';
 }
 
-/** « Ennemis de la vague 9 · prochain boss : Étoile ricochet, après la vague 12 » */
-function waveHint(wave: number, bosses: boolean): string {
+/** Une ligne courte sous « Commencer à » : le duel choisi, ou le prochain boss de la partie. */
+function waveHint(wave: number, bosses: boolean, duel: string | null): string {
+  if (duel) return `${shortName(duel)} d’abord, seul, puis cette vague.`;
   const per = WAVES.wavesPerBoss;
   const k = Math.floor((wave - 1) / per);
-  return bosses ? `Ennemis de cette vague · prochain boss : ${bossName(k)}, après la vague ${per * (k + 1)}` : 'Ennemis aussi forts et variés qu’à cette vague.';
-}
-
-function duelHint(duel: string | null, mark: number): string {
-  if (!duel) return 'Un boss au choix, dès le début.';
-  return `${bossName((mark - 1) * BOSS_ORDER.length + BOSS_ORDER.indexOf(duel))} arrive dès le début, seul ; la partie reprend ensuite.`;
+  return bosses ? `Prochain boss : ${shortName(BOSS_ORDER[k % BOSS_ORDER.length])} (après la vague ${per * (k + 1)}).` : 'Ennemis de cette vague.';
 }
 
 // ---------- Codex : données ----------
@@ -1277,18 +1267,23 @@ export class UI {
    * départ à droite (chaque tuile monte d'un niveau par clic). Rien n'est enregistré dans les records.
    */
   showSandbox(): void {
+    // Commencer face à un boss : un clic le choisit (il arrive dès le début, seul), un autre l'enlève.
+    const duelTiles = `<div class="tiles duels">${BOSS_ORDER.map((id) => {
+      const d = enemyDef(id);
+      return `<button class="tile duel nav" data-duel="${id}" style="--c:${d.color}" title="Commencer face à : ${esc(d.name)}"><span class="ico" data-icon="enemy:${id}" data-size="34"></span><span class="nm">${esc(shortName(id))}</span></button>`;
+    }).join('')}</div>`;
+    const foes = `<div class="tiles foes">${SANDBOX_FOES.map(
+      (e) =>
+        `<button class="tile foe nav" data-foe="${e.id}" style="--c:${e.color}" title="${esc(e.name)}"><span class="ico" data-icon="enemy:${e.id}" data-size="34"></span><span class="nm">${esc(e.name)}</span></button>`,
+    ).join('')}</div>`;
     const rowsHtml = SANDBOX_UI.map(
       (g) =>
         `<h3 class="rule">${g.title}</h3>${g.items
           .map(
             (it) =>
-              `<button class="set nav" data-sb="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><span class="ctl"></span></button>`,
+              `<button class="set nav" data-sb="${it.key}" data-kind="${it.kind}"><span class="set-label">${esc(it.label)}${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><span class="ctl"></span></button>${it.key === 'startWave' ? duelTiles : it.key === 'custom' ? foes : ''}`,
           )
           .join('')}`,
-    ).join('');
-    const foes = SANDBOX_FOES.map(
-      (e) =>
-        `<button class="tile foe nav" data-foe="${e.id}" style="--c:${e.color}" title="${esc(e.name)}"><span class="ico" data-icon="enemy:${e.id}" data-size="34"></span><span class="nm">${esc(e.name)}</span></button>`,
     ).join('');
     const kit = (kind: 'w' | 'p', id: string, name: string, color: string, icon: string) =>
       `<button class="tile kit nav" data-kit="${kind}:${id}" style="--c:${color}" title="${esc(name)}"><span class="ico" data-icon="${icon}" data-size="40"></span><span class="nm">${esc(name)}</span><span class="lv"></span></button>`;
@@ -1297,7 +1292,7 @@ export class UI {
       `
       ${heading('Sandbox', SCREEN_COLOR.sandbox, 'Compose ta partie et teste ce que tu veux. Rien n’est enregistré dans les records.')}
       <div class="sandbox-grid ${cascade(1)}">
-        <div class="panel form">${rowsHtml}<div class="tiles foes">${foes}</div></div>
+        <div class="panel form">${rowsHtml}</div>
         <div class="panel loadout">
           <h3 class="rule">Armes <small class="slots" data-slots="w"></small></h3>
           <div class="tiles">${BASE_WEAPONS.map((w) => kit('w', w.id, w.name, w.color, `weapon:${w.id}`)).join('')}</div>
@@ -1328,6 +1323,7 @@ export class UI {
       });
     });
     el.querySelectorAll<HTMLButtonElement>('.foe').forEach((t) => t.addEventListener('click', () => this.toggleFoe(t)));
+    el.querySelectorAll<HTMLButtonElement>('.duel').forEach((t) => t.addEventListener('click', () => this.toggleDuel(t)));
     el.querySelector('#start')!.addEventListener('click', () => this.app.playSandbox(this.app.save.sandbox));
     el.querySelector('#reset')!.addEventListener('click', () => {
       this.app.save.sandbox = defaultSandbox();
@@ -1395,12 +1391,19 @@ export class UI {
     this.paintSandbox();
   }
 
+  private toggleDuel(tile: HTMLElement): void {
+    const r = this.app.save.sandbox.rules;
+    r.duel = r.duel === tile.dataset.duel ? null : tile.dataset.duel!;
+    this.paintSandbox();
+  }
+
   private adjustSandbox(delta: number): boolean {
     const el = document.activeElement as HTMLElement | null;
     if (!el || !this.screenEl?.contains(el)) return false;
     if (el.classList.contains('set')) this.stepSandbox(el, delta);
     else if (el.classList.contains('kit')) this.stepKit(el, delta);
     else if (el.classList.contains('foe')) this.toggleFoe(el);
+    else if (el.classList.contains('duel')) this.toggleDuel(el);
     else return false;
     this.app.uiSound('uiMove');
     return true;
@@ -1416,8 +1419,7 @@ export class UI {
       const v = this.sandboxValue(def.key);
       const ctl = row.querySelector<HTMLElement>('.ctl')!;
       const hint = row.querySelector<HTMLElement>('.set-label small');
-      if (def.key === 'startWave' && hint) hint.textContent = waveHint(r.startWave, r.bosses);
-      if (def.key === 'duel' && hint) hint.textContent = duelHint(r.duel, r.duelMark);
+      if (def.key === 'startWave' && hint) hint.textContent = waveHint(r.startWave, r.bosses, r.duel);
       // La force ne compte que pour un duel.
       if (def.key === 'duelMark') row.disabled = !r.duel;
       if (def.kind === 'toggle') {
@@ -1431,6 +1433,7 @@ export class UI {
       }
     });
     el.querySelector('.foes')!.classList.toggle('off', !r.enemies);
+    el.querySelectorAll<HTMLElement>('.duel').forEach((t) => t.classList.toggle('on', t.dataset.duel === r.duel));
     el.querySelectorAll<HTMLButtonElement>('.foe').forEach((t) => {
       t.disabled = !r.enemies;
       t.classList.toggle('on', !!r.enemies?.includes(t.dataset.foe!));

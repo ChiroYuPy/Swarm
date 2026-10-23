@@ -1626,6 +1626,11 @@ table.scores tbody tr:last-child td {
 .foes {
   margin: 6px 0 2px;
 }
+/* boss à affronter d'emblée, sous « Commencer à » */
+.tiles.duels {
+  grid-template-columns: repeat(5, 1fr);
+  margin: 4px 0 8px;
+}
 .foes.off {
   opacity: 0.35;
 }
