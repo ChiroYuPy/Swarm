@@ -445,8 +445,8 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'pulse',
     color: '#fffaa0',
     fusion: true,
-    levelText: ['Triple onde géante qui fissure le sol et ralentit fortement les ennemis.'],
-    levels: [{ damage: 16, cooldown: 1.5, radius: 265, duration: 0.45, knockback: 300, count: 3, delay: 0.18, slow: 0.6, slowTime: 2.5 }],
+    levelText: ['Triple onde géante qui fissure le sol et ralentit fortement les ennemis, sans les repousser.'],
+    levels: [{ damage: 16, cooldown: 1.5, radius: 265, duration: 0.45, knockback: 0, count: 3, delay: 0.18, slow: 0.6, slowTime: 2.5 }],
   },
   {
     id: 'faux',
