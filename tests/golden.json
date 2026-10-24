@@ -1,0 +1,130 @@
+{
+  "bot-0": [
+    "ea8779ebdfb3276b",
+    "2c201412302b6590",
+    "d670ddb655d67a5c",
+    "3fa3ece9981e89d0",
+    "4d67a62d0f3fbd75",
+    "abb1b6eb5104bb9e",
+    "8f141dc6653c44f8",
+    "87a91628b7798d33",
+    "88c7c8400cea107c",
+    "00592625ae6902f7",
+    "end@9000:00592625ae6902f7"
+  ],
+  "bot-1": [
+    "9fabe3ce28b041a3",
+    "8a59419d73fd430d",
+    "3cbbc81d4d20beb1",
+    "74e2d119ba2fb2cf",
+    "c72b88040aaf9e32",
+    "cab46732bf23005f",
+    "8ffe6e2692927abf",
+    "437447a737d96ba3",
+    "f8f7b732d04394c7",
+    "81ce8e6673c06ade",
+    "79b85e75cb321a75",
+    "ae3b52af46c1364f",
+    "5c300d9ced7a1722",
+    "5ed6c6d0521b0d7b",
+    "afcbf2be14fe02c9",
+    "3211e554efe18123",
+    "91f76758fa908836",
+    "c366ee7f800a6967",
+    "17c3209e7185415d",
+    "ea35ebe30ed0f4c5",
+    "end@18000:ea35ebe30ed0f4c5"
+  ],
+  "bot-2": [
+    "b621b73ae2e021bb",
+    "1e0bdada254b2378",
+    "6945d6a6fb453d6a",
+    "ab3d56a41597a792",
+    "cbdeee3a3a8a8a99",
+    "9ba58ecef429be33",
+    "7e49a80b42fdd15b",
+    "354d7769068d2c56",
+    "ca26438f094c634d",
+    "78a89607af64925a",
+    "end@9000:78a89607af64925a"
+  ],
+  "weapons-0": [
+    "bc484bc406f43f5b",
+    "e391d3a3a51ac41a",
+    "end@26700:dad8bcf5c1ac91bb"
+  ],
+  "weapons-1": [
+    "408134eba5f8cfb0",
+    "65b86ad0183ac029",
+    "end@26700:7053695e1f80094d"
+  ],
+  "weapons-2": [
+    "4d5d64bc729acc89",
+    "8fbce28533a9d17d",
+    "end@26700:5b37d3714db1213b"
+  ],
+  "weapons-3": [
+    "7431e43b887594f0",
+    "9af73597aee1dd6a",
+    "end@26700:dbbf0fc8a94cea52"
+  ],
+  "weapons-4": [
+    "693fa5150451538c",
+    "095ca09e176811e1",
+    "end@26700:3f100f54eff20ddd"
+  ],
+  "weapons-5": [
+    "d3e283779f12b2b8",
+    "e3d18f3f7628611b",
+    "end@26700:cad7bcb4f5554a84"
+  ],
+  "boss-0": [
+    "2f92d038a2caad89",
+    "888f6e5f157b5059",
+    "end@26700:81a623a53f7c0e3e"
+  ],
+  "boss-1": [
+    "e7643ac0a247657b",
+    "05d1ef4028ecdf09",
+    "end@26700:39c0d5e766e24849"
+  ],
+  "boss-2": [
+    "312932d8ebc01d1b",
+    "c0e1a62d3b11112d",
+    "end@26700:6345a7b977376f65"
+  ],
+  "boss-3": [
+    "f6f18eb07d2834a6",
+    "201dcea1205381b2",
+    "end@26700:968cfdb10ac589ac"
+  ],
+  "boss-4": [
+    "d1a12a6a6f427af6",
+    "f63d081dc9bbc601",
+    "end@26700:2b7a36d51a07b6ba"
+  ],
+  "item-7": [
+    "8a4e7d387d498a60",
+    "end@25500:5b2ef5a078ae0506"
+  ],
+  "item-8": [
+    "e8e2b300d1ddb87f",
+    "end@25500:e4b4f971ee7dd339"
+  ],
+  "item-9": [
+    "b457525d31fabf2e",
+    "end@25500:6555391a5d5ae3e5"
+  ],
+  "item-10": [
+    "cb68f7225d0fad08",
+    "end@25500:6bba3002a04aa102"
+  ],
+  "item-11": [
+    "14ec3efc5ee229f3",
+    "end@25500:19366795123e2a86"
+  ],
+  "item-12": [
+    "8c7d929832f83b28",
+    "end@25500:eca13e3a403bace0"
+  ]
+}

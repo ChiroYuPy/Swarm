@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.sim.json --noEmit",
     "test": "vitest run",
-    "balance": "tsx scripts/balance.ts"
+    "balance": "tsx scripts/balance.ts",
+    "golden:update": "tsx scripts/update-golden.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.0",
