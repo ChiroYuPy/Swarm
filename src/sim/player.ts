@@ -1,7 +1,7 @@
 /** Hero: stats, timed buffs, active item, movement, regeneration, XP. */
 import { HERO, xpForLevel } from '../data/hero';
 import { PASSIVES } from '../data/passives';
-import { LOOT } from '../data/loot';
+import { LOOT, PICKUPS, type PickupIdOf } from '../data/loot';
 import { DT, INPUT_DIRS, TICK_RATE } from './constants';
 import { DIR_X, DIR_Y } from './dmath';
 import { moveCircle } from './map';
@@ -11,12 +11,6 @@ import {
   EF_PROP,
   EV_ACTIVATE,
   EV_LEVELUP,
-  PK_BOMB,
-  PK_CLOCK,
-  PK_CLONE,
-  PK_ERADICATE,
-  PK_FREEZE,
-  PK_VACUUM,
   PassiveInst,
   Player,
   WeaponInst,
@@ -115,50 +109,52 @@ export function updatePlayer(s: GameState, p: Player, code: number): void {
   if (p.stats.regen > 0) healPlayer(s, p, p.stats.regen * DT, false);
 }
 
+type ActiveEffect = (s: GameState, p: Player) => void;
+
+/** Effect of each active item, by id. Typed from the data: a new active item fails to typecheck until it has its entry. */
+const ACTIVE_EFFECTS: Record<PickupIdOf<'active'>, ActiveEffect> = {
+  vacuum: (s) => {
+    for (let i = 0; i < s.gemCount; i++) s.gems[i].magnet = true;
+    for (let i = 0; i < s.pickupCount; i++) s.pickups[i].magnet = true;
+  },
+  freeze: (s, p) => {
+    // Freeze: only around the player, and never the boss.
+    const until = s.tick + Math.round(LOOT.freezeSeconds * TICK_RATE);
+    const R = LOOT.freezeRadius;
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.flags & (EF_BOSS | EF_PROP)) continue;
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      if (dx * dx + dy * dy > (R + e.r) * (R + e.r)) continue;
+      e.frozenUntil = until;
+      e.kbx = e.kby = 0;
+    }
+  },
+  bomb: (s, p) => explode(s, p.x, p.y, LOOT.bombRadius, LOOT.bombDamage * p.stats.might, p.index, 300),
+  clock: (s) => {
+    s.clockUntil = Math.max(s.clockUntil, s.tick) + Math.round(LOOT.clockSeconds * TICK_RATE);
+  },
+  clone: (s, p) => spawnClone(s, p),
+  eradicate: (s, p) => {
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.flags & EF_PROP) continue;
+      if (e.flags & EF_BOSS) damageEnemy(s, i, e.maxHp * LOOT.eradicateBoss, p.index, 0, 0);
+      else damageEnemy(s, i, e.hp + 1, p.index, 0, 0);
+    }
+  },
+};
+/** ACTIVE_EFFECTS by pickup code (null for the other pickups). */
+const ACTIVE_BY_CODE: (ActiveEffect | null)[] = PICKUPS.map((d) => (d.kind === 'active' ? ACTIVE_EFFECTS[d.id as PickupIdOf<'active'>] : null));
+
 /** Triggers the held active item ("zero-time" step, input code 210). */
 export function useActivable(s: GameState, p: Player): void {
   const kind = p.activeItem;
   if (kind < 0) return;
   p.activeItem = -1;
   emit(s, EV_ACTIVATE, p.x, p.y, 0, kind, 0, 0, p.index);
-  switch (kind) {
-    case PK_VACUUM:
-      for (let i = 0; i < s.gemCount; i++) s.gems[i].magnet = true;
-      for (let i = 0; i < s.pickupCount; i++) s.pickups[i].magnet = true;
-      break;
-    case PK_FREEZE: {
-      // Freeze: only around the player, and never the boss.
-      const until = s.tick + Math.round(LOOT.freezeSeconds * TICK_RATE);
-      const R = LOOT.freezeRadius;
-      for (let i = 0; i < s.enemyCount; i++) {
-        const e = s.enemies[i];
-        if (!e.alive || e.flags & (EF_BOSS | EF_PROP)) continue;
-        const dx = e.x - p.x;
-        const dy = e.y - p.y;
-        if (dx * dx + dy * dy > (R + e.r) * (R + e.r)) continue;
-        e.frozenUntil = until;
-        e.kbx = e.kby = 0;
-      }
-      break;
-    }
-    case PK_CLOCK:
-      s.clockUntil = Math.max(s.clockUntil, s.tick) + Math.round(LOOT.clockSeconds * TICK_RATE);
-      break;
-    case PK_CLONE:
-      spawnClone(s, p);
-      break;
-    case PK_BOMB:
-      explode(s, p.x, p.y, LOOT.bombRadius, LOOT.bombDamage * p.stats.might, p.index, 300);
-      break;
-    case PK_ERADICATE:
-      for (let i = 0; i < s.enemyCount; i++) {
-        const e = s.enemies[i];
-        if (!e.alive || e.flags & EF_PROP) continue;
-        if (e.flags & EF_BOSS) damageEnemy(s, i, e.maxHp * LOOT.eradicateBoss, p.index, 0, 0);
-        else damageEnemy(s, i, e.hp + 1, p.index, 0, 0);
-      }
-      break;
-  }
+  ACTIVE_BY_CODE[kind]?.(s, p);
 }
 
 /**

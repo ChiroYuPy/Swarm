@@ -8,7 +8,7 @@
 import { ENEMIES } from '../data/enemies';
 import { HERO } from '../data/hero';
 import { PASSIVES } from '../data/passives';
-import { LOOT, PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS, type PickupIdOf } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DIFFICULTIES, type DifficultyDef } from '../data/difficulty';
 import {
@@ -19,7 +19,6 @@ import {
   PK_FEVER,
   PK_FRENZY,
   PK_RAGE,
-  PK_SHIELD,
   PK_TOTEM,
   PK_TURBO,
   TICK_RATE,
@@ -437,13 +436,19 @@ export function statDetails(p: Player, tick: number): StatDetail[] {
   });
 }
 
-const BUFFS: { kind: number; field: 'rageUntil' | 'frenzyUntil' | 'turboUntil' | 'shieldUntil' | 'feverUntil' }[] = [
-  { kind: PK_RAGE, field: 'rageUntil' },
-  { kind: PK_FRENZY, field: 'frenzyUntil' },
-  { kind: PK_TURBO, field: 'turboUntil' },
-  { kind: PK_SHIELD, field: 'shieldUntil' },
-  { kind: PK_FEVER, field: 'feverUntil' },
-];
+type BuffField = Extract<keyof Player, `${string}Until`>;
+/** End-time field of each timed bonus (typed from the data: a new timed pickup fails to typecheck until it has its entry). */
+const BUFF_FIELDS: Record<PickupIdOf<'timed'>, BuffField> = {
+  rage: 'rageUntil',
+  frenzy: 'frenzyUntil',
+  turbo: 'turboUntil',
+  shield: 'shieldUntil',
+  fever: 'feverUntil',
+};
+/** Timed bonuses shown above the bar, in PICKUPS order. */
+const BUFFS: { kind: number; field: BuffField }[] = PICKUPS.flatMap((d, kind) =>
+  d.kind === 'timed' ? [{ kind, field: BUFF_FIELDS[d.id as PickupIdOf<'timed'>] }] : [],
+);
 
 /** Ongoing effects shown above the bar: player buffs, Clock, clone, stored Totem. */
 function activeEffects(s: GameState, p: Player): { kind: number; left: number; total: number }[] {

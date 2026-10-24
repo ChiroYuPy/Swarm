@@ -6,7 +6,7 @@ Guide for anyone (human or AI agent) changing the game. Read [ARCHITECTURE.md](A
 
 - **Language.** Code, ids, comments, test names and commit messages are in English. Player-facing text lives only in `src/i18n/locales/`: write `fr.ts` first (source of truth), then `en.ts`. Both are required; `en.ts` is typed `LocaleShape`, so a missing or extra key fails `npm run typecheck`. `tests/english-code.test.ts` rejects French text anywhere else.
 - **Ids.** A content id is the plain English translation of its French display name (`Fouet` → `whip`, `Propulseurs` → `thrusters`, `Étoile ricochet` → `ricochet_star`). Keep the French display names; no creative renames. Renaming a shipped id needs an entry in `src/storage/legacy-ids.ts` and a save migration, because sandbox setups store ids.
-- **Order.** Never reorder the content arrays (`BASE_WEAPONS`, `FUSED_WEAPONS`, `FUSIONS`, `PASSIVES`, `PICKUPS`, `ENEMIES`, `BOSS_ORDER`, `DIFFICULTIES`, `WAVES.mixes`) unless you mean to change gameplay. Indices drive the sim, the offer draw, replays, saved scores (difficulty index) and the golden test. Add new content at the end of its array (exception: active items, see the item recipe).
+- **Order.** Never reorder the content arrays (`BASE_WEAPONS`, `FUSED_WEAPONS`, `FUSIONS`, `PASSIVES`, `PICKUPS`, `ENEMIES`, `BOSS_ORDER`, `DIFFICULTIES`, `WAVES.mixes`) unless you mean to change gameplay. Indices drive the sim, the offer draw, replays, saved scores (difficulty index) and the golden test. Add new content at the end of its array.
 - **Determinism.** Nothing in `src/sim` or `src/data` may use `Math.random`, `Date`, `performance`, `Math.sin/cos/atan2/pow/...`, the DOM or `localStorage`. Use `src/sim/dmath.ts` (`dsin`, `dcos`, `datan2`) and the seeded streams of `src/sim/rng.ts`. `src/sim` and `src/data` never import `i18n`, `render`, `ui` or `app`. Enforced by `tsconfig.sim.json`, `tests/purity.test.ts`, `tests/i18n.test.ts`.
 - **Check before you stop.** Always run `npm run typecheck && npm test`. For UI, render or CSS changes also run `npm run build`, and look at the result in `npm run dev`.
 - **Golden test.** A pure refactor keeps `tests/golden.test.ts` green without touching `tests/golden.json`. An intended gameplay change (numbers, behaviour, new content) regenerates it with `npm run golden:update`, and the commit message says so. If the golden test breaks on a change you thought was a refactor, find out why before regenerating.
@@ -40,17 +40,16 @@ Each recipe lists the files to touch, in order. Every recipe that changes gamepl
    Optional `weight` changes how often it is offered (default 1).
 2. `src/i18n/locales/fr.ts` then `en.ts`: `weapons.<id>` with `name`, `desc`, `levels` (5 lines, index 0 = when obtained).
 3. `src/render/icons.ts`: a painter in `WEAPON_PAINTERS` keyed by the id.
-4. Tests: add the id to `DAMAGING` in `tests/weapons.test.ts`; if `count` equals the level, add it to the list in the first test of `tests/content.test.ts`.
-5. Optional: an evolution (next recipe).
+4. Optional: an evolution (next recipe).
 
-Caught automatically: missing text or level lines (`i18n.test.ts`), missing icon (`icons.test.ts`), not 5 levels (`content.test.ts`), unknown behaviour (typecheck). Projectile drawing, shot sound and level-up / codex / HUD / sandbox entries come from the behaviour and the data.
+Caught automatically: missing text or level lines (`i18n.test.ts`), missing icon (`icons.test.ts`), not 5 levels (`content.test.ts`), unknown behaviour (typecheck), no damage at level 1 or max (`weapons.test.ts` runs every weapon of the data: no list to update). Projectile drawing, shot sound and level-up / codex / HUD / sandbox entries come from the behaviour and the data.
 
 ### A new weapon behaviour
 
 1. `src/data/weapons.ts`: add the name to the `Behavior` union; add any new `WeaponLevel` fields with a doc comment.
 2. `src/sim/weapons/<name>.ts`: export an updater `(s, p, w, slot, L) => void`. Reuse `src/sim/weapons/common.ts` (`cdTicks`, `aim` / `AIM`, `target`, `inCone`, `facing`, `ticks`, `RETRY_TICKS`), deal damage through `src/sim/combat.ts`, emit `EV_SHOOT` when it fires (drives the sound). Keep state in the `WeaponInst` (`timer`, `activeTicks`, `angles`, `vN`, `vLen`, `vW`...) or in projectiles.
 3. `src/sim/weapons/index.ts`: import it and add it to `UPDATER_BY_BEHAVIOR` (typecheck fails until you do).
-4. If it spawns its own kind of projectile: a new `PJ_*` constant in `src/sim/state.ts`, a `case` in `updateProjectiles` (`src/sim/projectiles.ts`) and drawing in `src/render/draw-projectiles.ts`. These are not checked by the compiler: an unhandled kind silently does nothing.
+4. If it spawns its own kind of projectile: a new `PJ_*` constant in `src/sim/state.ts`, added to the `ProjectileKind` union next to it (`Projectile.kind` has that type, so spawning it fails to typecheck until you do). Typecheck then fails until it has a `case` in `updateProjectiles` (`src/sim/projectiles.ts`) and a draw pass in `PASSES` (`src/render/draw-projectiles.ts`, back-to-front order).
 5. Visuals around the player (lashes, jets, beams): `src/render/draw-weapon-fx.ts`, keyed on `def.behavior`.
 6. `src/render/effects.ts`: an entry in `SHOT_SFX` (typecheck fails until you do).
 7. Then the weapon itself: previous recipe. Add a behaviour test in `tests/weapons.test.ts` (see the `arena()` helper there).
@@ -63,9 +62,7 @@ An evolution is a max-level base weapon plus a max-level passive. It replaces th
 2. `src/data/fusions.ts`: append `{ result, weapon, with }`. List order is the priority when several evolutions are possible.
 3. Locales: `evolutions.<id>` with `name`, `desc`, `levels` (1 line), in `fr.ts` then `en.ts`.
 4. `src/render/icons.ts`: a painter in `WEAPON_PAINTERS`.
-5. Tests: add the id to `DAMAGING` in `tests/weapons.test.ts`.
-
-Caught: `fusion.test.ts` (recipe uses a base weapon and an existing passive, every evolution has a recipe, it deals damage), `i18n.test.ts`, `icons.test.ts`. The golden `weapons-N` scenarios include it automatically.
+Caught: `fusion.test.ts` (recipe uses a base weapon and an existing passive, every evolution has a recipe, it deals damage), `weapons.test.ts` (every evolution of the data deals damage and is offered once its weapon and passive are maxed), `i18n.test.ts`, `icons.test.ts`. The golden `weapons-N` scenarios include it automatically.
 
 ### A passive
 
@@ -80,19 +77,16 @@ A **new stat** touches more: `PassiveDef.perLevel` (`src/data/passives.ts`), `Pl
 
 Kinds (`PickupKind` in `src/data/loot.ts`): `instant` (heal), `timed` (rage, frenzy, turbo, shield, fever), `active` (stored, used with Space: vacuum, freeze, bomb, clock, clone, eradicate), `relic` (totem), `chest` (boss reward). Instant, timed and relic drop in the "bonus" family, actives in the "active" family; `weight` is the draw weight within the family.
 
-1. `src/data/loot.ts`: add to `PICKUPS`; tuning values go in `LOOT`.
-   - Timed, instant or relic: append at the end.
-   - Active: insert right after `eradicate` (before `chest`). Actives must stay contiguous, so `chest` moves down by one.
-2. `src/sim/state.ts`: a `PK_<ID>` constant equal to its index (renumber `PK_CHEST` if it moved; for an active, set `PK_LAST_ACTIVE` to the new one).
-3. Effect:
-   - Active: a `case` in `useActivable()` (`src/sim/player.ts`).
-   - Timed: a `<name>Until` field on `Player` (`src/sim/state.ts`), a `case` in `applyPickup()` (`src/sim/pickups.ts`), its effect in `applyBuffs()` (`src/sim/player.ts`) or where it applies, and an entry in `BUFFS` (plus `statDetails()` if it changes a stat) in `src/render/hud.ts`.
-   - Instant or relic: a `case` in `applyPickup()`.
+1. `src/data/loot.ts`: append to `PICKUPS`, whatever its kind; tuning values go in `LOOT`. A pickup's code is its index and the sim reads the kind per code (`PICKUP_KIND`, `isActiveItem()`, `ACTIVE_PICKUPS` in `src/sim/state.ts`), so nothing needs renumbering.
+2. Effect. These tables are keyed by the ids typed from `PICKUPS` (`PickupId`, `PickupIdOf<kind>`): typecheck fails until the new id has its entry.
+   - Active: an entry in `ACTIVE_EFFECTS` (`src/sim/player.ts`), and its activation visuals and sound in `ACTIVATE_FX` (`src/render/effects.ts`).
+   - Timed: a `<name>Until` field on `Player` (`src/sim/state.ts`), an entry in `PICKUP_EFFECTS` (`src/sim/pickups.ts`) that extends it with `buffUntil()`, its effect in `applyBuffs()` (`src/sim/player.ts`) or where it applies, and an entry in `BUFF_FIELDS` in `src/render/hud.ts` (plus `statDetails()` there if it changes a stat).
+   - Instant or relic: an entry in `PICKUP_EFFECTS` (`src/sim/pickups.ts`).
+3. `src/sim/state.ts`: only if engine code needs the item by name, a `PK_<ID> = pickupCode('<id>')` constant (`pickupCode` only accepts existing ids).
 4. Locales: `pickups.<id>` with `name`, `desc`.
-5. `src/render/icons.ts`: add the id to the `PickupIcon` union and a painter in `PICKUP_PAINTERS`.
-6. Feedback: activation visuals and sound in the `EV_ACTIVATE` branch of `Effects.consume` (`src/render/effects.ts`); pickup toasts are automatic.
+5. `src/render/icons.ts`: a painter in `PICKUP_PAINTERS` (typecheck fails until it exists). Pickup toasts are automatic.
 
-Caught: `registry.test.ts` (`PK_*` values and the active range), `icons.test.ts`, `i18n.test.ts`. A new active item also gets its own golden scenario (`item-N`) and appears in the Sandbox "item" choice.
+Caught: typecheck (effect, activation visuals, HUD buff field, icon), `registry.test.ts` (every `PK_*` name matches its id, kind tables match the data), `icons.test.ts`, `i18n.test.ts`. A new active item also gets its own golden scenario (`item-N`) and appears in the Sandbox "item" choice.
 
 ### An enemy with an existing behaviour
 
@@ -167,7 +161,8 @@ Caught: typecheck (unknown key, `en.ts` mismatch), `i18n.test.ts` (empty strings
 
 - Icons (HUD bar, level-up cards, codex, sandbox): `src/render/icons.ts`, painters keyed by id in `WEAPON_PAINTERS`, `PASSIVE_PAINTERS`, `PICKUP_PAINTERS`. A painter gets the context with the path already begun and the origin at the icon center, builds its path, then strokes it with `neon(ctx, c, lw)`. A missing painter shows a placeholder (or just the frame, for pickups) at runtime. `tests/icons.test.ts` requires exactly one painter per id.
 - Enemy sprites and previews: generated from `shape` and `color` (`src/render/sprites.ts`); bosses are drawn as paths in `src/render/draw-bosses.ts`.
-- Sounds: synthesized in `AudioEngine.play()` (`src/audio/audio.ts`). A new sound needs a name in `SfxName` (`src/render/effects.ts`) and a `case` in `play()`; that switch is not exhaustive, so a missing case is silent. Effects trigger sounds from sim events in `Effects.consume`.
+- Sounds: synthesized in `AudioEngine.play()` (`src/audio/audio.ts`). A new sound needs a name in `SfxName` (`src/render/effects.ts`) and a `case` in `play()`; the switch is exhaustive, so a name without its sound fails typecheck. Effects trigger sounds from sim events in `Effects.consume`.
+- Sim events: a new `EV_*` constant in `src/sim/state.ts` goes into the `EventType` union next to it (`emit()` only takes those); `Effects.consume` (`src/render/effects.ts`) then fails to typecheck until it has a `case` for it (or lists it with the ignored ones).
 
 ### A sandbox option
 

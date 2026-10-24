@@ -3,6 +3,7 @@
  * Active arrays are compact: living entities occupy [0, count).
  */
 import { HERO } from '../data/hero';
+import { PICKUPS, type PickupId, type PickupKind } from '../data/loot';
 import {
   IMMUNE_SLOTS,
   MAX_ENEMIES,
@@ -81,9 +82,27 @@ export const PJ_DRONE = 9;
 export const PJ_SHELL = 10;
 /** Phoenix: flies straight, (vx, vy) = unit heading */
 export const PJ_PHOENIX = 11;
+/**
+ * Every projectile kind. `Projectile.kind` has this type, so a new PJ_* constant cannot be spawned until it
+ * is listed here, and then `updateProjectiles` (sim/projectiles.ts) and `drawProjectiles`
+ * (render/draw-projectiles.ts) fail to typecheck until they handle it.
+ */
+export type ProjectileKind =
+  | typeof PJ_BULLET
+  | typeof PJ_EBULLET
+  | typeof PJ_MINE
+  | typeof PJ_BOOMERANG
+  | typeof PJ_RING
+  | typeof PJ_FIRE
+  | typeof PJ_TURRET
+  | typeof PJ_RICOCHET
+  | typeof PJ_BLAZE
+  | typeof PJ_DRONE
+  | typeof PJ_SHELL
+  | typeof PJ_PHOENIX;
 
 export class Projectile {
-  kind = 0;
+  kind: ProjectileKind = PJ_BULLET;
   owner = 0;
   slot = 0;
   /** weapon definition index (colour when rendering) */
@@ -127,23 +146,37 @@ export class Gem {
   speed = 0;
 }
 
-/** Pickup codes: index into data/loot.ts PICKUPS. */
-export const PK_HEAL = 0;
-export const PK_RAGE = 1;
-export const PK_FRENZY = 2;
-export const PK_TURBO = 3;
-export const PK_SHIELD = 4;
-export const PK_FEVER = 5;
-export const PK_TOTEM = 6;
-export const PK_VACUUM = 7;
-export const PK_FREEZE = 8;
-export const PK_BOMB = 9;
-export const PK_CLOCK = 10;
-export const PK_CLONE = 11;
-export const PK_ERADICATE = 12;
-export const PK_CHEST = 13;
-export const PK_FIRST_ACTIVE = PK_VACUUM;
-export const PK_LAST_ACTIVE = PK_ERADICATE;
+/** Pickup code of a pickup id: its index in data/loot.ts PICKUPS. */
+export function pickupCode(id: PickupId): number {
+  const i = PICKUPS.findIndex((d) => d.id === id);
+  if (i < 0) throw new Error(`unknown pickup: ${id}`);
+  return i;
+}
+
+/** Pickup codes the engine refers to by name (derived from the ids, so they cannot drift from PICKUPS). */
+export const PK_HEAL = pickupCode('heal');
+export const PK_RAGE = pickupCode('rage');
+export const PK_FRENZY = pickupCode('frenzy');
+export const PK_TURBO = pickupCode('turbo');
+export const PK_SHIELD = pickupCode('shield');
+export const PK_FEVER = pickupCode('fever');
+export const PK_TOTEM = pickupCode('totem');
+export const PK_VACUUM = pickupCode('vacuum');
+export const PK_FREEZE = pickupCode('freeze');
+export const PK_BOMB = pickupCode('bomb');
+export const PK_CLOCK = pickupCode('clock');
+export const PK_CLONE = pickupCode('clone');
+export const PK_ERADICATE = pickupCode('eradicate');
+export const PK_CHEST = pickupCode('chest');
+
+/** Kind of each pickup code. */
+export const PICKUP_KIND: readonly PickupKind[] = PICKUPS.map((d) => d.kind);
+/** Active item codes, in PICKUPS order. */
+export const ACTIVE_PICKUPS: readonly number[] = PICKUPS.flatMap((d, i) => (d.kind === 'active' ? [i] : []));
+/** Is this pickup code an active item (stored, used with Space)? */
+export function isActiveItem(code: number): boolean {
+  return PICKUP_KIND[code] === 'active';
+}
 
 export class Pickup {
   x = 0;
@@ -215,9 +248,10 @@ export const OFFER_FUSION = 2;
 export const OFFER_HEAL = 3;
 /** swaps the weapon being swapped (Player.swapSlot) for weapon `id`, at level `toLevel` */
 export const OFFER_SWAP = 4;
+export type OfferKind = typeof OFFER_WEAPON | typeof OFFER_PASSIVE | typeof OFFER_FUSION | typeof OFFER_HEAL | typeof OFFER_SWAP;
 
 export interface Offer {
-  kind: number;
+  kind: OfferKind;
   /** weapon / passive / evolution index */
   id: number;
   /** level reached if this offer is picked (0 = new item at level 1) */
@@ -333,10 +367,54 @@ export const EV_LASER = 36;
 export const EV_CAGE = 37;
 /** an item appears on its own in the arena: x, y, k = PK_* code */
 export const EV_MAP_ITEM = 38;
+/**
+ * Every event code. `emit()` only takes these, so a new EV_* constant must be listed here, and then
+ * `Effects.consume` (render/effects.ts) fails to typecheck until it handles it (or lists it as ignored).
+ */
+export type EventType =
+  | typeof EV_HIT
+  | typeof EV_KILL
+  | typeof EV_GEM
+  | typeof EV_HURT
+  | typeof EV_LEVELUP
+  | typeof EV_SHOOT
+  | typeof EV_EXPLOSION
+  | typeof EV_LINE
+  | typeof EV_RING
+  | typeof EV_BOSS_SPAWN
+  | typeof EV_BOSS_DEAD
+  | typeof EV_CHEST
+  | typeof EV_HEAL
+  | typeof EV_PICKUP
+  | typeof EV_DEATH
+  | typeof EV_ENEMY_SHOT
+  | typeof EV_FUSION
+  | typeof EV_CHOICE
+  | typeof EV_BOMB
+  | typeof EV_MAGNET
+  | typeof EV_WALL_HIT
+  | typeof EV_SWARM
+  | typeof EV_RING_WAVE
+  | typeof EV_FUSE
+  | typeof EV_NEW_ENEMY
+  | typeof EV_ACTIVATE
+  | typeof EV_PROP
+  | typeof EV_SHOT_DOWN
+  | typeof EV_SHATTER
+  | typeof EV_REVIVE
+  | typeof EV_CLONE_END
+  | typeof EV_BLINK
+  | typeof EV_FLEE
+  | typeof EV_WAVE
+  | typeof EV_HATCH
+  | typeof EV_LASER
+  | typeof EV_CAGE
+  | typeof EV_MAP_ITEM;
 
 /** Event emitted by the sim for rendering and audio. Purely informative: the sim never reads them back. */
 export class SimEvent {
-  type = 0;
+  /** EV_* code, set by emit() (the pool's initial value is never read) */
+  type: EventType = EV_HIT;
   x = 0;
   y = 0;
   x2 = 0;
@@ -424,7 +502,7 @@ export function makePools() {
 
 export function emit(
   s: GameState,
-  type: number,
+  type: EventType,
   x: number,
   y: number,
   v = 0,

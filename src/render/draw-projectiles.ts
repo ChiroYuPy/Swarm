@@ -19,6 +19,7 @@ import {
   SQUADRON_WEAPON,
   KAMIKAZE_DRONES_WEAPON,
   type GameState,
+  type ProjectileKind,
 } from '../sim';
 import { drawPhoenix, drawShockwave } from './draw-weapon-fx';
 import { hash01, lerp, type RenderView } from './view';
@@ -26,10 +27,9 @@ import { hash01, lerp, type RenderView } from './view';
 /** scratch: weapons that have at least one bullet in flight this frame */
 const weaponSeen = new Uint8Array(ALL_WEAPONS.length);
 
-export function drawProjectiles(view: RenderView, s: GameState, alpha: number): void {
-  const ctx = view.ctx;
+/** Player bullets: batched by weapon (one texture per weapon). */
+function drawBullets(view: RenderView, s: GameState, alpha: number): void {
   const sp = view.sprites;
-  // Player bullets: batched by weapon (one texture per weapon).
   const seen = weaponSeen;
   seen.fill(0);
   for (let i = 0; i < s.projCount; i++) {
@@ -49,7 +49,12 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
       view.sprite(img, x, y, b.vx / v, b.vy / v, Math.max(0.8, b.r / 6));
     }
   }
-  // Boomerangs (continuous spin)
+  view.worldTransform(); // view.sprite() leaves its own transform behind
+}
+
+/** Boomerangs (continuous spin) */
+function drawBoomerangs(view: RenderView, s: GameState, alpha: number): void {
+  const sp = view.sprites;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_BOOMERANG) continue;
@@ -59,8 +64,12 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     const a = (b.age + alpha) * 0.45;
     view.sprite(sp.boomerang[b.weapon], x, y, Math.cos(a), Math.sin(a), b.r / 10);
   }
-  view.worldTransform();
-  // Mines + indicator light once armed
+  view.worldTransform(); // view.sprite() leaves its own transform behind
+}
+
+/** Mines + indicator light once armed */
+function drawMines(view: RenderView, s: GameState): void {
+  const sp = view.sprites;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_MINE || !view.visible(b.x, b.y, 20)) continue;
@@ -71,7 +80,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !view.visible(b.x, b.y, 20)) continue;
     view.spriteAt(sp.mineLight, b.x, b.y);
   }
-  // Star's flames: flickering orange discs that die out.
+}
+
+/** Star's flames: flickering orange discs that die out. */
+function drawFires(view: RenderView, s: GameState): void {
+  const ctx = view.ctx;
   let fires = false;
   ctx.beginPath();
   for (let i = 0; i < s.projCount; i++) {
@@ -93,8 +106,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  // Player ground fire: Meteors craters (dashed ring, which tells it apart from the solid enemy fire)
-  // and the Phoenix trail (simple flamelets), with rising embers.
+}
+
+/** Player ground fire: Meteors craters (dashed ring, which tells it apart from the solid enemy fire) and the Phoenix trail (simple flamelets), with rising embers. */
+function drawBlazes(view: RenderView, s: GameState): void {
+  const ctx = view.ctx;
   const flameCore = view.softPuff('#ffe9a8');
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
@@ -147,7 +163,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     }
     ctx.globalAlpha = 1;
   }
-  // Mortar shells (arcing, with their shadow) and Meteors (falling at an angle): the impact zone shows on the ground.
+}
+
+/** Mortar shells (arcing, with their shadow) and Meteors (falling at an angle): the impact zone shows on the ground. */
+function drawShells(view: RenderView, s: GameState, alpha: number): void {
+  const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_SHELL) continue;
@@ -210,7 +230,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
       view.glow(col, 2);
     }
   }
-  // Autonomous drones: small oriented arrows that fade in.
+}
+
+/** Autonomous drones: small oriented arrows that fade in. */
+function drawDrones(view: RenderView, s: GameState, alpha: number): void {
+  const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_DRONE) continue;
@@ -237,7 +261,10 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     view.glow(def.color, 1.8);
     ctx.globalAlpha = 1;
   }
-  // Phoenix: a fire bird with flapping wings, followed by flamelets.
+}
+
+/** Phoenix: a fire bird with flapping wings, followed by flamelets. */
+function drawPhoenixes(view: RenderView, s: GameState, alpha: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_PHOENIX) continue;
@@ -246,7 +273,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     if (!view.visible(x, y, b.r * 3)) continue;
     drawPhoenix(view, x, y, b.vx, b.vy, b.r, ALL_WEAPONS[b.weapon].color, b.age + alpha);
   }
-  // Turrets: hexagonal base and barrel turned towards the target; they blink before vanishing.
+}
+
+/** Turrets: hexagonal base and barrel turned towards the target; they blink before vanishing. */
+function drawTurrets(view: RenderView, s: GameState): void {
+  const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_TURRET || !view.visible(b.x, b.y, 30)) continue;
@@ -273,7 +304,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     }
     view.glow(def.color, 3);
   }
-  // Ricochet discs: a spinning ring with three notches.
+}
+
+/** Ricochet discs: a spinning ring with three notches. */
+function drawDiscs(view: RenderView, s: GameState, alpha: number): void {
+  const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_RICOCHET) continue;
@@ -293,8 +328,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     ctx.fillStyle = '#ffffff';
     ctx.fill();
   }
-  // Enemy bullets: solid, red with a white core (distinct from everything else). Shooters' bullets,
-  // which can be destroyed, are purple with a dashed ring.
+}
+
+/** Enemy bullets: solid, red with a white core (distinct from everything else). Shooters' bullets, which can be destroyed, are purple with a dashed ring. */
+function drawEnemyBullets(view: RenderView, s: GameState, alpha: number): void {
+  const sp = view.sprites;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_EBULLET || b.life <= 0) continue;
@@ -303,11 +341,38 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     if (!view.visible(x, y, 10)) continue;
     view.spriteAt(b.a === 1 ? sp.breakableBullet : sp.enemyBullet, x, y);
   }
+}
 
-  // Shockwaves (Shockwave, Earthquake, Bastion): few of them, vector.
+/** Shockwaves (Shockwave, Earthquake, Bastion): few of them, vector. */
+function drawRings(view: RenderView, s: GameState, alpha: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_RING || !view.visible(b.x, b.y, b.a)) continue;
     drawShockwave(view, b.x, b.y, b.a, Math.min(1, (b.age + alpha) / b.b), ALL_WEAPONS[b.weapon].color, b.d >= 0.5, i);
   }
+}
+
+type DrawPass = (view: RenderView, s: GameState, alpha: number) => void;
+
+/** One draw pass per projectile kind, back to front. */
+const PASSES = [
+  [PJ_BULLET, drawBullets],
+  [PJ_BOOMERANG, drawBoomerangs],
+  [PJ_MINE, drawMines],
+  [PJ_FIRE, drawFires],
+  [PJ_BLAZE, drawBlazes],
+  [PJ_SHELL, drawShells],
+  [PJ_DRONE, drawDrones],
+  [PJ_PHOENIX, drawPhoenixes],
+  [PJ_TURRET, drawTurrets],
+  [PJ_RICOCHET, drawDiscs],
+  [PJ_EBULLET, drawEnemyBullets],
+  [PJ_RING, drawRings],
+] as const satisfies readonly (readonly [ProjectileKind, DrawPass])[];
+type Undrawn = Exclude<ProjectileKind, (typeof PASSES)[number][0]>;
+// Exhaustive: a ProjectileKind without a pass in PASSES fails to typecheck here (the error names it).
+true satisfies [Undrawn] extends [never] ? true : { undrawn: Undrawn };
+
+export function drawProjectiles(view: RenderView, s: GameState, alpha: number): void {
+  for (let i = 0; i < PASSES.length; i++) PASSES[i][1](view, s, alpha);
 }

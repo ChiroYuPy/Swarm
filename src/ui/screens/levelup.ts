@@ -10,6 +10,7 @@ import {
   MAX_PASSIVE_SLOTS,
   MAX_WEAPON_SLOTS,
   OFFER_FUSION,
+  OFFER_HEAL,
   OFFER_PASSIVE,
   OFFER_SWAP,
   OFFER_WEAPON,
@@ -84,6 +85,8 @@ export function showLevelUp(
         color = r.color;
         iconId = r.id;
       } else {
+        // Exhaustive: an OfferKind without its card fails to typecheck here.
+        o.kind satisfies typeof OFFER_HEAL;
         tag = t('levelup.full');
         name = pickupName(PICKUPS[0].id);
         line = pickupDesc(PICKUPS[0].id);

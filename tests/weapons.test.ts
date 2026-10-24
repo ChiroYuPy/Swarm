@@ -17,12 +17,14 @@ import {
   type GameState,
 } from '../src/sim';
 import { spawnEnemy } from '../src/sim/entities';
-import { enemyId, weaponId } from '../src/sim/registry';
+import { enemyId, passiveId, weaponId } from '../src/sim/registry';
+import { ALL_WEAPONS, FUSED_WEAPONS } from '../src/data/weapons';
 import { addWeapon, rollOffers } from '../src/sim/levelup';
 import { computeStats } from '../src/sim/player';
 import { OFFER_FUSION } from '../src/sim/state';
 
-const DAMAGING = ['whip', 'flamethrower', 'turret', 'drone', 'ricochet', 'mortar', 'scythe', 'fire_tornado', 'phoenix', 'bastion', 'squadron', 'kamikaze_drones', 'meteors'];
+/** Every weapon and evolution deals damage: the list comes from the data, nothing to add for a new weapon. */
+const DAMAGING = ALL_WEAPONS.map((w) => w.id);
 
 /** A game with a single weapon, an immortal hero and enemies all around. */
 function arena(id: string, level: number, hp = 50, type = 'block'): GameState {
@@ -49,7 +51,7 @@ function run(s: GameState, seconds: number, each?: (s: GameState) => void): void
 
 const projs = (s: GameState, kind: number) => s.projectiles.slice(0, s.projCount).filter((b) => b.kind === kind);
 
-describe('new weapons', () => {
+describe('weapons', () => {
   it.each(DAMAGING)('%s deals damage (level 1 and max)', (id) => {
     const max = weaponDef(weaponId(id)).levels.length;
     for (const level of [1, max]) {
@@ -69,8 +71,8 @@ describe('new weapons', () => {
     expect(pushed).toBe(true);
   });
 
-  it('every new evolution is offered when the weapon and its passive are maxed', () => {
-    for (const result of ['scythe', 'fire_tornado', 'phoenix', 'bastion', 'squadron', 'kamikaze_drones', 'meteors']) {
+  it('every evolution is offered when the weapon and its passive are maxed', () => {
+    for (const result of FUSED_WEAPONS.map((w) => w.id)) {
       const fi = FUSION_TABLE.findIndex((f) => f.result === weaponId(result));
       expect(fi, result).toBeGreaterThanOrEqual(0);
       const f = FUSION_TABLE[fi];
@@ -93,7 +95,7 @@ describe('new weapons', () => {
     addWeapon(p, weaponId('flamethrower')).level = 5;
     for (const id of ['amplifier', 'vitality']) {
       const x = new PassiveInst();
-      x.def = ['might', 'overclock', 'amplifier', 'thrusters', 'magnet', 'vitality', 'armor', 'luck'].indexOf(id);
+      x.def = passiveId(id);
       x.level = 5;
       p.passives.push(x);
     }

@@ -1,27 +1,11 @@
 /** XP gems and pickups (instant bonuses, timed buffs, active items, chest). */
-import { LOOT, PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS, type PickupId, type PickupIdOf } from '../data/loot';
 import { DT, TICK_RATE } from './constants';
 import { removeGem, removePickup } from './entities';
 import { healPlayer } from './combat';
 import { addXp, applyBuffs } from './player';
 import { openChest } from './levelup';
-import {
-  EV_GEM,
-  EV_PICKUP,
-  PK_CHEST,
-  PK_FEVER,
-  PK_FIRST_ACTIVE,
-  PK_FRENZY,
-  PK_HEAL,
-  PK_LAST_ACTIVE,
-  PK_RAGE,
-  PK_SHIELD,
-  PK_TOTEM,
-  PK_TURBO,
-  emit,
-  type GameState,
-  type Player,
-} from './state';
+import { EV_GEM, EV_PICKUP, emit, isActiveItem, type GameState, type Player } from './state';
 
 function nearestAlive(s: GameState, x: number, y: number): { p: Player | null; d2: number } {
   let best: Player | null = null;
@@ -99,41 +83,52 @@ function buffTicks(kind: number): number {
   return Math.round((PICKUPS[kind].duration ?? 5) * TICK_RATE);
 }
 
+/** A timed buff that is already active is extended (not stacked). */
+function buffUntil(s: GameState, cur: number, kind: number): number {
+  return Math.max(cur, s.tick) + buffTicks(kind);
+}
+
+type PickupEffect = (s: GameState, p: Player, kind: number) => void;
+
+/**
+ * Effect of each pickup picked up, by id (active items are stored instead: see useActivable in player.ts).
+ * Typed from the data: a new pickup fails to typecheck until it has its entry here.
+ */
+const PICKUP_EFFECTS: Record<Exclude<PickupId, PickupIdOf<'active'>>, PickupEffect> = {
+  heal: (s, p) => healPlayer(s, p, p.stats.maxHp * LOOT.healAmount),
+  rage: (s, p, kind) => {
+    p.rageUntil = buffUntil(s, p.rageUntil, kind);
+  },
+  frenzy: (s, p, kind) => {
+    p.frenzyUntil = buffUntil(s, p.frenzyUntil, kind);
+  },
+  turbo: (s, p, kind) => {
+    p.turboUntil = buffUntil(s, p.turboUntil, kind);
+  },
+  shield: (s, p, kind) => {
+    p.shieldUntil = buffUntil(s, p.shieldUntil, kind);
+  },
+  fever: (s, p, kind) => {
+    p.feverUntil = buffUntil(s, p.feverUntil, kind);
+  },
+  totem: (s, p) => {
+    // Only one Totem at a time: the next one turns into a heal.
+    if (p.totem > 0) healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
+    else p.totem = 1;
+  },
+  chest: (s, p) => openChest(s, p),
+};
+/** PICKUP_EFFECTS by pickup code (null for active items). */
+const EFFECT_BY_CODE: (PickupEffect | null)[] = PICKUPS.map((d) =>
+  d.kind === 'active' ? null : PICKUP_EFFECTS[d.id as keyof typeof PICKUP_EFFECTS],
+);
+
 function applyPickup(s: GameState, p: Player, kind: number, x: number, y: number): void {
   emit(s, EV_PICKUP, x, y, 0, kind, 0, 0, p.index);
-  if (kind >= PK_FIRST_ACTIVE && kind <= PK_LAST_ACTIVE) {
+  if (isActiveItem(kind)) {
     p.activeItem = kind; // a new active item replaces the old one
     return;
   }
-  // A timed buff that is already active is extended (not stacked).
-  const until = (cur: number) => Math.max(cur, s.tick) + buffTicks(kind);
-  switch (kind) {
-    case PK_HEAL:
-      healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
-      break;
-    case PK_RAGE:
-      p.rageUntil = until(p.rageUntil);
-      break;
-    case PK_FRENZY:
-      p.frenzyUntil = until(p.frenzyUntil);
-      break;
-    case PK_TURBO:
-      p.turboUntil = until(p.turboUntil);
-      break;
-    case PK_SHIELD:
-      p.shieldUntil = until(p.shieldUntil);
-      break;
-    case PK_FEVER:
-      p.feverUntil = until(p.feverUntil);
-      break;
-    case PK_TOTEM:
-      // Only one Totem at a time: the next one turns into a heal.
-      if (p.totem > 0) healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
-      else p.totem = 1;
-      break;
-    case PK_CHEST:
-      openChest(s, p);
-      break;
-  }
+  EFFECT_BY_CODE[kind]?.(s, p, kind);
   applyBuffs(p, s.tick);
 }
