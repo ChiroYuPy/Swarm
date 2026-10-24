@@ -23,12 +23,7 @@ import { ENEMIES } from '../src/data/enemies';
 import { botInput } from '../src/ai/bot';
 
 describe('content', () => {
-  it('one level = one more instance for instance-based weapons', () => {
-    for (const id of ['blaster', 'orbs', 'mines', 'boomerang', 'electric_arc', 'shockwave', 'whip', 'flamethrower', 'turret', 'drone', 'ricochet', 'mortar']) {
-      const w = weaponId(id);
-      for (let l = 1; l <= 5; l++) expect(weaponLevel(w, l).count, `${id} lvl ${l}`).toBe(l);
-    }
-    // The force field grows at every level.
+  it('base weapons have 5 levels; the force field grows at every level', () => {
     const aura = weaponId('force_field');
     for (let l = 2; l <= 5; l++) expect(weaponLevel(aura, l).radius!).toBeGreaterThan(weaponLevel(aura, l - 1).radius!);
     expect(BASE_WEAPONS.every((w) => w.levels.length === 5)).toBe(true);

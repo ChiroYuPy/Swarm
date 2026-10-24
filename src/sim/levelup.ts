@@ -32,14 +32,14 @@ import {
 } from './state';
 
 interface UniverseItem {
-  kind: number;
+  kind: typeof OFFER_WEAPON | typeof OFFER_PASSIVE;
   id: number;
   weight: number;
 }
 
 const UNIVERSE: UniverseItem[] = [
-  ...BASE_WEAPONS.map((w, i) => ({ kind: OFFER_WEAPON, id: i, weight: w.weight ?? 1 })),
-  ...PASSIVES.map((p, i) => ({ kind: OFFER_PASSIVE, id: i, weight: p.weight ?? 0.85 })),
+  ...BASE_WEAPONS.map((w, i): UniverseItem => ({ kind: OFFER_WEAPON, id: i, weight: w.weight ?? 1 })),
+  ...PASSIVES.map((p, i): UniverseItem => ({ kind: OFFER_PASSIVE, id: i, weight: p.weight ?? 0.85 })),
 ];
 
 /** Offer order for a given level: only depends on (seed, level). */
@@ -168,6 +168,12 @@ function applyOfferEffect(s: GameState, p: Player, o: Offer): void {
     case OFFER_HEAL:
       healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
       break;
+    case OFFER_SWAP:
+      // Applied by applyChoice (applySwap), never here.
+      break;
+    default:
+      // Exhaustive: an OfferKind without its case fails to typecheck here.
+      o.kind satisfies never;
   }
   computeStats(p);
 }

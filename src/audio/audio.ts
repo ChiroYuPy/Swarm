@@ -507,6 +507,9 @@ export class AudioEngine {
         this.noiseHit(0.25, 0.06, 'highpass', 3500);
         [262, 392, 523, 784].forEach((f, i) => this.tone('triangle', f, f, 0.7, 0.045, 0.28 + i * 0.05));
         break;
+      default:
+        // Exhaustive: a SfxName or UiSfx without its sound fails to typecheck here.
+        name satisfies never;
     }
   }
 

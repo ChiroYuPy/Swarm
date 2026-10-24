@@ -5,7 +5,7 @@
 import { ENEMIES } from '../data/enemies';
 import { ALL_WEAPONS, type Behavior } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { LOOT, PICKUPS, type PickupDef, type PickupKind } from '../data/loot';
+import { LOOT, PICKUPS, type PickupDef, type PickupIdOf, type PickupKind } from '../data/loot';
 import { t, tn } from '../i18n';
 import { bossName, enemyName, passiveName, pickupName, weaponName } from '../i18n/content';
 import {
@@ -52,14 +52,12 @@ import {
   OFFER_FUSION,
   OFFER_PASSIVE,
   OFFER_WEAPON,
-  PK_BOMB,
+  EV_PROP,
+  EV_BOMB,
+  EV_MAGNET,
   PK_CHEST,
-  PK_CLOCK,
-  PK_CLONE,
-  PK_ERADICATE,
-  PK_FREEZE,
-  PK_VACUUM,
   type GameState,
+  type SimEvent,
 } from '../sim';
 import { FX_COLORS, fxColorIndex } from './palette';
 
@@ -139,6 +137,49 @@ const SHOT_SFX: Record<Behavior, SfxName> = {
   mortar: 'mine',
   phoenix: 'boomerang',
 };
+
+type ActivateFx = (fx: Effects, e: SimEvent, h: FxHooks) => void;
+
+/** Visuals and sound of each active item when used (typed from the data: a new active item fails to typecheck until it has its entry). */
+const ACTIVATE_FX: Record<PickupIdOf<'active'>, ActivateFx> = {
+  vacuum: (fx, e, h) => {
+    fx.ring(e.x, e.y, 500, 1, 0.7);
+    h.sfx('magnet');
+  },
+  freeze: (fx, e, h) => {
+    fx.flash = 0.3;
+    fx.flashColor = '#9feaff';
+    fx.ring(e.x, e.y, LOOT.freezeRadius, 16, 0.6);
+    fx.burst(e.x, e.y, 40, 16, 420, 0.6, 3);
+    h.sfx('shatter');
+  },
+  bomb: (fx, _e, h) => {
+    fx.flash = 0.5;
+    fx.flashColor = '#ffffff';
+    fx.addShake(12);
+    h.sfx('bomb');
+  },
+  clock: (fx, e, h) => {
+    fx.flash = 0.3;
+    fx.flashColor = '#7f9cff';
+    fx.ring(e.x, e.y, 900, 18, 1.0);
+    h.sfx('clock');
+  },
+  clone: (fx, e, h) => {
+    fx.ring(e.x, e.y, 120, 17, 0.5);
+    fx.burst(e.x, e.y, 30, 17, 220, 0.6, 3);
+    h.sfx('clone');
+  },
+  eradicate: (fx, e, h) => {
+    fx.flash = 0.6;
+    fx.flashColor = '#ff3df5';
+    fx.ring(e.x, e.y, 900, 10, 1.0);
+    fx.addShake(14);
+    h.sfx('bomb');
+  },
+};
+/** ACTIVATE_FX by pickup code (null for the other pickups). */
+const ACTIVATE_FX_BY_CODE: (ActivateFx | null)[] = PICKUPS.map((d) => (d.kind === 'active' ? ACTIVATE_FX[d.id as PickupIdOf<'active'>] : null));
 
 const ENEMY_COL = ENEMIES.map((e) => fxColorIndex(e.color));
 const WEAPON_COL = ALL_WEAPONS.map((w) => fxColorIndex(w.color));
@@ -390,36 +431,7 @@ export class Effects {
           break;
         case EV_ACTIVATE:
           h.toast(pickupName(PICKUPS[e.k].id), PICKUPS[e.k].color);
-          if (e.k === PK_VACUUM) {
-            this.ring(e.x, e.y, 500, 1, 0.7);
-            h.sfx('magnet');
-          } else if (e.k === PK_FREEZE) {
-            this.flash = 0.3;
-            this.flashColor = '#9feaff';
-            this.ring(e.x, e.y, LOOT.freezeRadius, 16, 0.6);
-            this.burst(e.x, e.y, 40, 16, 420, 0.6, 3);
-            h.sfx('shatter');
-          } else if (e.k === PK_CLOCK) {
-            this.flash = 0.3;
-            this.flashColor = '#7f9cff';
-            this.ring(e.x, e.y, 900, 18, 1.0);
-            h.sfx('clock');
-          } else if (e.k === PK_CLONE) {
-            this.ring(e.x, e.y, 120, 17, 0.5);
-            this.burst(e.x, e.y, 30, 17, 220, 0.6, 3);
-            h.sfx('clone');
-          } else if (e.k === PK_BOMB) {
-            this.flash = 0.5;
-            this.flashColor = '#ffffff';
-            this.addShake(12);
-            h.sfx('bomb');
-          } else if (e.k === PK_ERADICATE) {
-            this.flash = 0.6;
-            this.flashColor = '#ff3df5';
-            this.ring(e.x, e.y, 900, 10, 1.0);
-            this.addShake(14);
-            h.sfx('bomb');
-          }
+          ACTIVATE_FX_BY_CODE[e.k]?.(this, e, h);
           break;
         case EV_DEATH:
           // The hero bursts into neon shards, two rings, a short flash: clean and readable.
@@ -477,6 +489,13 @@ export class Effects {
         case EV_FUSE:
           h.sfx('fuse');
           break;
+        case EV_PROP: // the crate's own sprite is enough
+        case EV_BOMB: // not emitted
+        case EV_MAGNET: // not emitted
+          break;
+        default:
+          // Exhaustive: an EventType without its case fails to typecheck here.
+          e.type satisfies never;
       }
     }
   }

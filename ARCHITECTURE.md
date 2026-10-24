@@ -66,7 +66,9 @@ Behaviour dispatch is by table, typed so a missing entry is a compile error:
 
 - Weapons: `UPDATER_BY_BEHAVIOR: Record<Behavior, WeaponUpdater>` in `src/sim/weapons/index.ts`, resolved per weapon index into `WEAPON_UPDATERS`. One file per behaviour family in `src/sim/weapons/`, shared helpers in `common.ts`.
 - Enemies: `BEHAVIOR` in `registry.ts` (`satisfies Record<Uppercase<EnemyBehavior>, number>`), then an exhaustive `switch` in `updateEnemies` (`src/sim/enemies.ts`). Boss phases: exhaustive switches in `updateBoss` / `enterPhase`.
-- Pickups: `PK_*` constants in `src/sim/state.ts` equal the index in `PICKUPS` (checked by `tests/registry.test.ts`); active items must form the contiguous range `PK_FIRST_ACTIVE..PK_LAST_ACTIVE`.
+- Pickups: a pickup code is its index in `PICKUPS`. The `PK_*` constants in `src/sim/state.ts` are derived from the ids (`pickupCode('vacuum')`) and kinds are read per code (`PICKUP_KIND`, `isActiveItem()`, `ACTIVE_PICKUPS`), so pickups of any kind are appended at the end. Effects are `Record`s keyed by the ids typed from the data (`PickupId`, `PickupIdOf<kind>` in `data/loot.ts`): `PICKUP_EFFECTS` (`sim/pickups.ts`), `ACTIVE_EFFECTS` (`sim/player.ts`), `ACTIVATE_FX` (`render/effects.ts`), `BUFF_FIELDS` (`render/hud.ts`), `PICKUP_PAINTERS` (`render/icons.ts`); the sim ones are resolved once into arrays indexed by code.
+- Projectiles: `Projectile.kind` is the `ProjectileKind` union of the `PJ_*` constants; `updateProjectiles` (`sim/projectiles.ts`) switches on it with a `never` default, and `drawProjectiles` (`render/draw-projectiles.ts`) runs one pass per kind from `PASSES`, checked complete at compile time.
+- Events and offers: `emit()` takes an `EventType` (union of the `EV_*` codes) and `Effects.consume` switches on it exhaustively; `Offer.kind` is an `OfferKind`, exhaustive in `applyOfferEffect` (`sim/levelup.ts`) and in the level-up cards (`ui/screens/levelup.ts`). `AudioEngine.play()` is exhaustive over `SfxName | UiSfx`.
 - Render and UI use exhaustive `switch`es or `Record`s on data unions too (enemy shapes in `render/sprites.ts` and `render/draw-bosses.ts`, `SHOT_SFX: Record<Behavior, SfxName>` in `render/effects.ts`, `codex.behaviors.<behavior>` locale keys).
 
 **Why order matters.** Indices are positions in the data arrays (`ALL_WEAPONS = [...BASE_WEAPONS, ...FUSED_WEAPONS]`, `PASSIVES`, `ENEMIES`, `PICKUPS`, `DIFFICULTIES`, `BOSS_ORDER`). The level-up offer pool is built from `BASE_WEAPONS` then `PASSIVES` by index, `FUSIONS` order is the evolution priority, `BOSS_ORDER` is the arrival order, and saved scores store the difficulty index. Reordering changes gameplay and breaks the golden test (which builds its scenarios by index, so renaming ids does not change the hashes).
@@ -107,9 +109,9 @@ All in `tests/`, run with `npm test` (Vitest, Node environment). `npm run typech
 | `i18n.test.ts` | Locales have the same keys and placeholders, every content id has its text (one line per weapon level), `t()` / `tn()`, sim/data never import i18n. |
 | `english-code.test.ts` | No French text outside the locales and the legacy id table. |
 | `icons.test.ts` | Every weapon, passive and pickup has an icon painter, and every painter has content. |
-| `registry.test.ts` | Bosses vs `BOSS_ORDER`, boss phases and their parameter groups (`bossConfig()` type errors included), summons, wall rise and egg hatching, `PK_*` codes vs `PICKUPS` order. |
+| `registry.test.ts` | Bosses vs `BOSS_ORDER`, boss phases and their parameter groups (`bossConfig()` type errors included), summons, wall rise and egg hatching, `PK_*` codes vs their ids, pickup kind tables, distinct `PJ_*` / `EV_*` / `OFFER_*` codes. |
 | `content.test.ts` | Weapon level progression, enemy arrival over time, timed bonuses, active items as zero-time steps, difficulty effect. |
-| `weapons.test.ts` | Each newer weapon and evolution deals damage and behaves as designed. |
+| `weapons.test.ts` | Every weapon and evolution of the data deals damage (level 1 and max), every evolution is offered when due, specific behaviours. |
 | `fusion.test.ts` | Evolution recipes are consistent and applied correctly, boss chest grants them. |
 | `levelup.test.ts` | Offer order depends only on (seed, level), choices apply, world frozen during choice, fusions first. |
 | `swap.test.ts` | Weapon swap at level-up, arena items, gem merging. |

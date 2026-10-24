@@ -5,7 +5,7 @@
  */
 import { ALL_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { PICKUPS, type PickupDef, type PickupKind } from '../data/loot';
+import { PICKUPS, type PickupDef, type PickupId, type PickupKind } from '../data/loot';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -706,21 +706,8 @@ function flakePath(ctx: Ctx, r: number): void {
   }
 }
 
-export type PickupIcon =
-  | 'heal'
-  | 'rage'
-  | 'frenzy'
-  | 'turbo'
-  | 'shield'
-  | 'fever'
-  | 'totem'
-  | 'vacuum'
-  | 'freeze'
-  | 'bomb'
-  | 'clock'
-  | 'clone'
-  | 'eradicate'
-  | 'chest';
+/** Pickup icon ids: every pickup id (a pickup without a painter in PICKUP_PAINTERS fails to typecheck). */
+export type PickupIcon = PickupId;
 
 /** Pickup families: a different frame makes them recognizable at a glance. */
 const KIND_FAMILY: Record<PickupKind, 'bonus' | 'active' | 'relic' | 'chest'> = {

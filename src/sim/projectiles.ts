@@ -92,6 +92,9 @@ export function updateProjectiles(s: GameState): void {
       case PJ_PHOENIX:
         dead = phoenix(s, b);
         break;
+      default:
+        // Exhaustive: a ProjectileKind without its case fails to typecheck here.
+        b.kind satisfies never;
     }
     if (!dead) {
       b.life--;

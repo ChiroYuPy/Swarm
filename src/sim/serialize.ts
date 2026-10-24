@@ -5,7 +5,7 @@
  * - `serializeState` / `deserializeState`: full, restorable JSON snapshot.
  */
 import { createGame } from './game';
-import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState, type SandboxRules } from './state';
+import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState, type OfferKind, type SandboxRules } from './state';
 
 const ENEMY_KEYS = Object.keys(new Enemy()).filter((k) => k !== 'immune');
 const PROJ_KEYS = Object.keys(new Projectile()).filter((k) => k !== 'hitIds');
@@ -196,7 +196,7 @@ export function deserializeState(json: string): GameState {
     Object.assign(p.stats, pd.stats as Rec);
     Object.assign(p.base, pd.base as Rec);
     p.banned = [...(pd.banned as number[])];
-    p.offers = (pd.offers as Rec[]).map((o) => ({ kind: o.kind as number, id: o.id as number, toLevel: o.toLevel as number }));
+    p.offers = (pd.offers as Rec[]).map((o) => ({ kind: o.kind as OfferKind, id: o.id as number, toLevel: o.toLevel as number }));
     p.passives = (pd.passives as Rec[]).map((x) => {
       const ps = new PassiveInst();
       ps.def = x.def as number;

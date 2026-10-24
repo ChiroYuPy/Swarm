@@ -68,12 +68,23 @@ describe('registry: content links', () => {
     });
   });
 
-  it('PK_* codes match PICKUPS order', () => {
-    const codes = state as unknown as Record<string, number>;
-    PICKUPS.forEach((p, i) => expect(codes[`PK_${p.id.toUpperCase()}`], p.id).toBe(i));
-    const active = PICKUPS.flatMap((p, i) => (p.kind === 'active' ? [i] : []));
-    expect(active[0]).toBe(state.PK_FIRST_ACTIVE);
-    expect(active[active.length - 1]).toBe(state.PK_LAST_ACTIVE);
-    expect(active.length).toBe(state.PK_LAST_ACTIVE - state.PK_FIRST_ACTIVE + 1);
+  it('PK_* codes match PICKUPS order, pickup kinds come from the data', () => {
+    const codes = Object.entries(state).filter(([name]) => name.startsWith('PK_'));
+    expect(codes.length).toBeGreaterThan(0);
+    for (const [name, code] of codes) expect(PICKUPS[code as number]?.id.toUpperCase(), name).toBe(name.slice(3));
+    PICKUPS.forEach((p, i) => {
+      expect(state.PICKUP_KIND[i], p.id).toBe(p.kind);
+      expect(state.isActiveItem(i), p.id).toBe(p.kind === 'active');
+    });
+    expect(state.ACTIVE_PICKUPS).toEqual(PICKUPS.flatMap((p, i) => (p.kind === 'active' ? [i] : [])));
+    expect(state.isActiveItem(-1)).toBe(false);
+  });
+
+  it('projectile kinds, event codes and offer kinds are distinct', () => {
+    for (const prefix of ['PJ_', 'EV_', 'OFFER_']) {
+      const codes = Object.entries(state).filter(([name]) => name.startsWith(prefix)).map(([, v]) => v);
+      expect(codes.length, prefix).toBeGreaterThan(0);
+      expect(new Set(codes).size, prefix).toBe(codes.length);
+    }
   });
 });
