@@ -22,7 +22,7 @@ export function showMenu(ui: UI): void {
   );
   el.querySelector('#play')!.addEventListener('click', () => ui.showDifficulty());
   el.querySelector('#sandbox')!.addEventListener('click', () => ui.showSandbox());
-  el.querySelector('#codex')!.addEventListener('click', () => ui.showCodex('armes', 0, () => ui.showMenu()));
+  el.querySelector('#codex')!.addEventListener('click', () => ui.showCodex('weapons', 0, () => ui.showMenu()));
   el.querySelector('#scores')!.addEventListener('click', () => ui.showScores(ui.app.save.difficulty));
   el.querySelector('#settings')!.addEventListener('click', () => ui.showSettings(() => ui.showMenu()));
 }

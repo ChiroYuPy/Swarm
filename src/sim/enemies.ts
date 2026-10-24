@@ -1,5 +1,5 @@
 /** IA des ennemis, du boss, séparation, contact avec les joueurs. */
-import { BOSS, ENEMIES, ETOILE, HEXAGONE, OEIL, REINE, type BossPhaseKind } from '../data/enemies';
+import { TRAPEZOID_BOSS, ENEMIES, RICOCHET_STAR_BOSS, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM_QUEEN_BOSS, type BossPhaseKind } from '../data/enemies';
 import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DT, TICK_RATE } from './constants';
@@ -449,19 +449,19 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
     }
     case 'charge':
       // Ligne d'avertissement, puis il fonce jusqu'au bout de la ligne (e.ax : distance parcourue).
-      if (elapsed >= Math.round(BOSS.chargeTelegraph * TICK_RATE) && e.ax < BOSS.chargeLength) {
-        VX = dcos(e.aux) * BOSS.chargeSpeed;
-        VY = dsin(e.aux) * BOSS.chargeSpeed;
-        e.ax += BOSS.chargeSpeed * DT * tf;
+      if (elapsed >= Math.round(TRAPEZOID_BOSS.chargeTelegraph * TICK_RATE) && e.ax < TRAPEZOID_BOSS.chargeLength) {
+        VX = dcos(e.aux) * TRAPEZOID_BOSS.chargeSpeed;
+        VY = dsin(e.aux) * TRAPEZOID_BOSS.chargeSpeed;
+        e.ax += TRAPEZOID_BOSS.chargeSpeed * DT * tf;
       }
       break;
     case 'volley': {
-      const every = Math.round(HEXAGONE.volleyEvery * TICK_RATE);
+      const every = Math.round(BUILDER_HEXAGON_BOSS.volleyEvery * TICK_RATE);
       if ((elapsed - 1) % every === 0) {
         const a = datan2(dy, dx);
-        const n = HEXAGONE.volleyCount;
+        const n = BUILDER_HEXAGON_BOSS.volleyCount;
         for (let k = 0; k < n; k++) {
-          fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * HEXAGONE.volleySpread, HEXAGONE.bulletSpeed, HEXAGONE.bulletDamage * dm);
+          fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * BUILDER_HEXAGON_BOSS.volleySpread, BUILDER_HEXAGON_BOSS.bulletSpeed, BUILDER_HEXAGON_BOSS.bulletDamage * dm);
         }
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
@@ -472,21 +472,21 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       break;
     case 'burst':
       if (elapsed === 1 || elapsed === total >> 1) {
-        const n = ETOILE.burstArms;
+        const n = RICOCHET_STAR_BOSS.burstArms;
         const off = elapsed === 1 ? 0 : PI / n;
-        for (let k = 0; k < n; k++) fireEnemyBullet(s, e.x, e.y, off + (k * TWO_PI) / n, ETOILE.bulletSpeed, ETOILE.bulletDamage * dm);
+        for (let k = 0; k < n; k++) fireEnemyBullet(s, e.x, e.y, off + (k * TWO_PI) / n, RICOCHET_STAR_BOSS.bulletSpeed, RICOCHET_STAR_BOSS.bulletDamage * dm);
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
       break;
     case 'watch': {
       if (!stunned) {
-        keepAway(s, e, dx, dy, dist, OEIL.keepMin, OEIL.keepMax);
+        keepAway(s, e, dx, dy, dist, LASER_EYE_BOSS.keepMin, LASER_EYE_BOSS.keepMax);
         VX = DX * e.speed;
         VY = DY * e.speed;
       }
-      const every = Math.round(OEIL.shootEvery * TICK_RATE);
+      const every = Math.round(LASER_EYE_BOSS.shootEvery * TICK_RATE);
       if (elapsed % every === 0 && dist < 600) {
-        fireEnemyBullet(s, e.x, e.y, datan2(dy, dx), OEIL.bulletSpeed, OEIL.bulletDamage * dm);
+        fireEnemyBullet(s, e.x, e.y, datan2(dy, dx), LASER_EYE_BOSS.bulletSpeed, LASER_EYE_BOSS.bulletDamage * dm);
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
       }
       break;
@@ -496,7 +496,7 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       break;
     case 'flee':
       if (!stunned) {
-        keepAway(s, e, dx, dy, dist, REINE.keepMin, REINE.keepMax);
+        keepAway(s, e, dx, dy, dist, SWARM_QUEEN_BOSS.keepMin, SWARM_QUEEN_BOSS.keepMax);
         VX = DX * e.speed;
         VY = DY * e.speed;
       }
@@ -545,8 +545,8 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
       // Œil : le cône va d'un bord à l'autre en passant par le joueur, dans un sens puis dans l'autre.
       const c = datan2(dy, dx);
       const dir = e.ai & 2 ? -1 : 1;
-      e.ax = c - (dir * OEIL.arc) / 2;
-      e.ay = c + (dir * OEIL.arc) / 2;
+      e.ax = c - (dir * LASER_EYE_BOSS.arc) / 2;
+      e.ay = c + (dir * LASER_EYE_BOSS.arc) / 2;
       e.aux = e.ax;
       break;
     }
@@ -557,9 +557,9 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
     case 'lay': {
       layEggs(s, e);
       const a = datan2(dy, dx);
-      const n = REINE.volleyCount;
+      const n = SWARM_QUEEN_BOSS.volleyCount;
       for (let k = 0; k < n; k++) {
-        fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * REINE.volleySpread, REINE.bulletSpeed, REINE.bulletDamage * dmgMul(s));
+        fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * SWARM_QUEEN_BOSS.volleySpread, SWARM_QUEEN_BOSS.bulletSpeed, SWARM_QUEEN_BOSS.bulletDamage * dmgMul(s));
       }
       emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       break;
@@ -582,7 +582,7 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
 
 /** Étoile : fonce, rebondit sur les bords de sa boîte, sème des flammes. */
 function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
-  const H = ETOILE.box;
+  const H = RICOCHET_STAR_BOSS.box;
   let ux = dcos(e.aux);
   let uy = dsin(e.aux);
   if ((e.x - e.ax > H && ux > 0) || (e.x - e.ax < -H && ux < 0)) {
@@ -595,9 +595,9 @@ function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
     uy = -uy;
     emit(s, EV_WALL_HIT, e.x, e.y, 2, e.type);
   }
-  VX = ux * ETOILE.dashSpeed;
-  VY = uy * ETOILE.dashSpeed;
-  if (elapsed % ETOILE.fireEvery === 0) {
+  VX = ux * RICOCHET_STAR_BOSS.dashSpeed;
+  VY = uy * RICOCHET_STAR_BOSS.dashSpeed;
+  if (elapsed % RICOCHET_STAR_BOSS.fireEvery === 0) {
     const b = spawnProjectile(s);
     if (!b) return;
     b.kind = PJ_FIRE;
@@ -605,9 +605,9 @@ function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
     b.x = b.px = e.x;
     b.y = b.py = e.y;
     b.vx = b.vy = 0;
-    b.r = ETOILE.fireRadius;
-    b.a = ETOILE.fireDps * dm;
-    b.life = Math.round(ETOILE.fireLife * TICK_RATE);
+    b.r = RICOCHET_STAR_BOSS.fireRadius;
+    b.a = RICOCHET_STAR_BOSS.fireDps * dm;
+    b.life = Math.round(RICOCHET_STAR_BOSS.fireLife * TICK_RATE);
   }
 }
 
@@ -622,7 +622,7 @@ function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
     const qy = q.y - e.y;
     const along = qx * ux + qy * uy;
     const perp = Math.abs(qy * ux - qx * uy);
-    if (along > 0 && along < OEIL.beamLength + q.r && perp < OEIL.beamWidth / 2 + q.r) hurtPlayer(s, q, OEIL.beamDamage * dm);
+    if (along > 0 && along < LASER_EYE_BOSS.beamLength + q.r && perp < LASER_EYE_BOSS.beamWidth / 2 + q.r) hurtPlayer(s, q, LASER_EYE_BOSS.beamDamage * dm);
   }
 }
 
@@ -632,15 +632,15 @@ function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
  */
 function buildCage(s: GameState, e: Enemy, p: Player): void {
   e.ax++;
-  if ((e.ax - 1) % HEXAGONE.cageEvery !== 0) return;
-  const R = HEXAGONE.cageRadius;
-  const n = Math.max(1, Math.round(R / HEXAGONE.wallSpacing));
-  const life = Math.round(HEXAGONE.wallLife * TICK_RATE);
-  const solid = Math.round((HEXAGONE.wallLife - HEXAGONE.wallRise) * TICK_RATE);
+  if ((e.ax - 1) % BUILDER_HEXAGON_BOSS.cageEvery !== 0) return;
+  const R = BUILDER_HEXAGON_BOSS.cageRadius;
+  const n = Math.max(1, Math.round(R / BUILDER_HEXAGON_BOSS.wallSpacing));
+  const life = Math.round(BUILDER_HEXAGON_BOSS.wallLife * TICK_RATE);
+  const solid = Math.round((BUILDER_HEXAGON_BOSS.wallLife - BUILDER_HEXAGON_BOSS.wallRise) * TICK_RATE);
   const hm = hpMul(s);
   // Les sorties changent de côtés d'une cage à l'autre.
-  const gapSide = ((e.ax - 1) / HEXAGONE.cageEvery) % 3;
-  const g0 = Math.floor((n - HEXAGONE.gapWalls) / 2) + 1;
+  const gapSide = ((e.ax - 1) / BUILDER_HEXAGON_BOSS.cageEvery) % 3;
+  const g0 = Math.floor((n - BUILDER_HEXAGON_BOSS.gapWalls) / 2) + 1;
   for (let side = 0; side < 6; side++) {
     const a0 = (side * PI) / 3 + PI / 6;
     const a1 = a0 + PI / 3;
@@ -649,7 +649,7 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
     const x1 = p.x + dcos(a1) * R;
     const y1 = p.y + dsin(a1) * R;
     for (let j = 0; j < n; j++) {
-      if (side % 3 === gapSide && j >= g0 && j < g0 + HEXAGONE.gapWalls) continue;
+      if (side % 3 === gapSide && j >= g0 && j < g0 + BUILDER_HEXAGON_BOSS.gapWalls) continue;
       const x = x0 + ((x1 - x0) * j) / n;
       const y = y0 + ((y1 - y0) * j) / n;
       if (circleHitsObstacle(s.map, x, y, 4)) continue;
@@ -669,13 +669,13 @@ function layEggs(s: GameState, e: Enemy): void {
   for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === EGG_TYPE) eggs++;
   // ay = pontes déjà faites (aux sert à la spirale de dards)
   e.ay++;
-  const n = Math.min(REINE.maxEggs - eggs, e.ay % REINE.bigEvery === 0 ? 3 : 1);
+  const n = Math.min(SWARM_QUEEN_BOSS.maxEggs - eggs, e.ay % SWARM_QUEEN_BOSS.bigEvery === 0 ? 3 : 1);
   const hm = hpMul(s);
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / 3 + e.ay;
     const egg = spawnEnemy(s, EGG_TYPE, e.x + (n > 1 ? dcos(a) * 34 : 0), e.y + (n > 1 ? dsin(a) * 34 : 0), hm, 1, 1, e.target);
     if (!egg) return;
-    egg.timer = Math.round(REINE.hatchAfter * TICK_RATE) + k * 12;
+    egg.timer = Math.round(SWARM_QUEEN_BOSS.hatchAfter * TICK_RATE) + k * 12;
   }
 }
 
@@ -683,10 +683,10 @@ function layEggs(s: GameState, e: Enemy): void {
 function hatch(s: GameState, egg: Enemy): void {
   egg.alive = false;
   egg.hp = 0;
-  const n = REINE.hatchCount;
+  const n = SWARM_QUEEN_BOSS.hatchCount;
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / n;
-    spawnEnemy(s, SWARM_TYPE, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s) * REINE.broodHp, dmgMul(s), spdMul(s), egg.target);
+    spawnEnemy(s, SWARM_TYPE, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s) * SWARM_QUEEN_BOSS.broodHp, dmgMul(s), spdMul(s), egg.target);
   }
   emit(s, EV_HATCH, egg.x, egg.y, n);
 }
@@ -720,8 +720,8 @@ function summon(s: GameState, boss: Enemy, p: Player): void {
 /** Dégâts de contact d'un boss : bien plus forts quand il fonce (charge du Trapèze, ruée de l'Étoile). */
 function bossContactMul(e: Enemy): number {
   const kind = BOSS_PATTERNS[e.type][e.ai]?.kind;
-  if (kind === 'charge' && e.ax > 0 && e.ax < BOSS.chargeLength) return BOSS.chargeDamage;
-  if (kind === 'dash') return ETOILE.dashDamage;
+  if (kind === 'charge' && e.ax > 0 && e.ax < TRAPEZOID_BOSS.chargeLength) return TRAPEZOID_BOSS.chargeDamage;
+  if (kind === 'dash') return RICOCHET_STAR_BOSS.dashDamage;
   return 1;
 }
 

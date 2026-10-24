@@ -20,7 +20,7 @@ export interface DifficultyDef {
 
 export const DIFFICULTIES: DifficultyDef[] = [
   {
-    id: 'facile',
+    id: 'easy',
     name: 'Facile',
     desc: 'Ennemis plus lents, moins nombreux et moins coriaces. Les nouveaux types arrivent tranquillement.',
     color: '#39ff7a',
@@ -42,7 +42,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     pace: 1.15,
   },
   {
-    id: 'difficile',
+    id: 'hard',
     name: 'Difficile',
     desc: 'Plus nombreux, plus solides, plus tôt. Pour les habitués.',
     color: '#ff3d6e',

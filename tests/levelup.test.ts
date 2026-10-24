@@ -82,10 +82,10 @@ describe('propositions de level-up', () => {
     const p = s.players[0];
     // Blaster niveau max + Surcadence niveau max => Spirale
     p.weapons[0].level = 5;
-    const cafe = new PassiveInst();
-    cafe.def = PASSIVES.findIndex((x) => x.id === 'cafe');
-    cafe.level = 5;
-    p.passives.push(cafe);
+    const overclock = new PassiveInst();
+    overclock.def = PASSIVES.findIndex((x) => x.id === 'overclock');
+    overclock.level = 5;
+    p.passives.push(overclock);
     p.offers = [];
     p.pendingLevels = 1;
     // Les propositions sont retirées au pas suivant.

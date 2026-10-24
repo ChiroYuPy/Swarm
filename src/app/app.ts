@@ -127,7 +127,7 @@ export class App implements AppApi {
       this.start(this.config);
     } else this.ui.showIntro();
 
-    (window as unknown as { __neonawak: App }).__neonawak = this;
+    (window as unknown as { __swarm: App }).__swarm = this;
     requestAnimationFrame((t) => this.frame(t));
   }
 

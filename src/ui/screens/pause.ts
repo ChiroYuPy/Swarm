@@ -78,7 +78,7 @@ export function showPause(ui: UI, build: BuildInfo, run: RunInfo, instant = fals
     ${statTiles(
       [
         ['Score', `<span class="gold">${pad7(r.score)}</span>`],
-        ['Temps', formatTime(r.tempsSurvecu)],
+        ['Temps', formatTime(r.survivedSec)],
         ['Éliminés', num(r.kills)],
         ['Niveau', String(r.level)],
         ['Boss vaincus', String(run.bossKills)],
@@ -102,7 +102,7 @@ export function showPause(ui: UI, build: BuildInfo, run: RunInfo, instant = fals
   );
   fillIcons(el, 34);
   el.querySelector('#resume')!.addEventListener('click', () => ui.app.resume());
-  el.querySelector('#codex')!.addEventListener('click', () => ui.showCodex('armes', 0, () => ui.showPause(build, run)));
+  el.querySelector('#codex')!.addEventListener('click', () => ui.showCodex('weapons', 0, () => ui.showPause(build, run)));
   el.querySelector('#settings')!.addEventListener('click', () => ui.showSettings(() => ui.showPause(build, run)));
   el.querySelector('#quit')!.addEventListener('click', () => ui.app.quit());
 }

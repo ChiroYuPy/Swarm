@@ -57,7 +57,7 @@ describe('fusions', () => {
     const s = createGame({ seed: 'FUSION-1' });
     const p = s.players[0];
     p.weapons[0].level = 4; // Pistolet à Confettis niv. 4
-    givePassive(p, 'cafe', 5);
+    givePassive(p, 'overclock', 5);
     expect(availableFusions(p)).toEqual([]);
     p.weapons[0].level = 5;
     expect(availableFusions(p).length).toBe(1);
@@ -67,12 +67,12 @@ describe('fusions', () => {
     const s = createGame({ seed: 'FUSION-2' });
     const p = s.players[0];
     p.weapons[0].level = 5;
-    givePassive(p, 'cafe', 5);
+    givePassive(p, 'overclock', 5);
     levelUpAndPickFirst(s);
-    expect(p.weapons.map((w) => weaponDef(w.def).id)).toEqual(['cotillons']);
-    expect(p.passives.map((x) => PASSIVES[x.def].id)).toEqual(['cafe']);
+    expect(p.weapons.map((w) => weaponDef(w.def).id)).toEqual(['spiral']);
+    expect(p.passives.map((x) => PASSIVES[x.def].id)).toEqual(['overclock']);
     // L'arme de base ne peut plus être reproposée.
-    expect(p.banned).toContain(wIdx('confetti'));
+    expect(p.banned).toContain(wIdx('blaster'));
   });
 
   it('toute évolution = une arme de base + un passif, et chaque évolution a sa recette', () => {
@@ -86,16 +86,16 @@ describe('fusions', () => {
   it('une évolution garde l’emplacement de son arme, et le passif reste', () => {
     const s = createGame({ seed: 'FUSION-3' });
     const p = s.players[0];
-    giveWeapon(p, 'rallonge', 5);
-    givePassive(p, 'cafe', 5);
+    giveWeapon(p, 'electric_arc', 5);
+    givePassive(p, 'overclock', 5);
     const before = p.weapons.length;
-    const slot = p.weapons.findIndex((w) => weaponDef(w.def).id === 'rallonge');
-    const fi = FUSION_TABLE.findIndex((f) => weaponDef(f.result).id === 'multiprise');
+    const slot = p.weapons.findIndex((w) => weaponDef(w.def).id === 'electric_arc');
+    const fi = FUSION_TABLE.findIndex((f) => weaponDef(f.result).id === 'electric_storm');
     expect(availableFusions(p)).toContain(fi);
     levelUpAndPickFirst(s);
-    expect(weaponDef(p.weapons[slot].def).id).toBe('multiprise');
+    expect(weaponDef(p.weapons[slot].def).id).toBe('electric_storm');
     expect(p.weapons.length).toBe(before);
-    expect(p.passives.some((x) => PASSIVES[x.def].id === 'cafe')).toBe(true);
+    expect(p.passives.some((x) => PASSIVES[x.def].id === 'overclock')).toBe(true);
   });
 
   it('chaque arme fusionnée a un comportement qui inflige des dégâts', () => {
@@ -113,7 +113,7 @@ describe('fusions', () => {
     const s = createGame({ seed: 'COFFRE' });
     const p = s.players[0];
     p.weapons[0].level = 5;
-    givePassive(p, 'cafe', 5);
+    givePassive(p, 'overclock', 5);
     // Pose un coffre sous les pieds du héros.
     s.pickups[0].kind = PK_CHEST;
     s.pickups[0].life = -1;
@@ -124,7 +124,7 @@ describe('fusions', () => {
     let fused = false;
     for (let i = 0; i < s.eventCount; i++) if (s.events[i].type === EV_FUSION) fused = true;
     expect(fused).toBe(true);
-    expect(weaponDef(p.weapons[0].def).id).toBe('cotillons');
+    expect(weaponDef(p.weapons[0].def).id).toBe('spiral');
     expect(OFFER_FUSION).toBe(2);
   });
 });

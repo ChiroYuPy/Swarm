@@ -20,14 +20,14 @@ const DEMO_SANDBOX: SandboxConfig = {
   might: 1,
   xp: 1,
   weapons: [
-    { id: 'aura', level: 4 },
+    { id: 'force_field', level: 4 },
     { id: 'boomerang', level: 4 },
     { id: 'laser', level: 3 },
-    { id: 'confetti', level: 4 },
+    { id: 'blaster', level: 4 },
   ],
   passives: [
-    { id: 'aimant', level: 3 },
-    { id: 'chaussettes', level: 2 },
+    { id: 'magnet', level: 3 },
+    { id: 'thrusters', level: 2 },
   ],
   item: null,
 };

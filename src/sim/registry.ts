@@ -179,7 +179,7 @@ function uniqueType(b: EnemyBehavior): number {
  * Content that engine code refers to by id (render variants, bot taste). Kept here so a renamed or
  * removed id throws at load instead of silently matching nothing.
  */
-export const SQUADRON_WEAPON = weaponId('escadrille');
-export const KAMIKAZE_DRONES_WEAPON = weaponId('kamikazes');
-export const BLACK_HOLE_WEAPON = weaponId('trounoir');
-export const BOT_FAVORITE_PASSIVES = ['soupe', 'biceps', 'blindage'].map(passiveId);
+export const SQUADRON_WEAPON = weaponId('squadron');
+export const KAMIKAZE_DRONES_WEAPON = weaponId('kamikaze_drones');
+export const BLACK_HOLE_WEAPON = weaponId('black_holes');
+export const BOT_FAVORITE_PASSIVES = ['vitality', 'might', 'armor'].map(passiveId);

@@ -1,5 +1,5 @@
 /** Bosses: vector body (enemy shape outline), eyes or pupil, and their attack telegraphs. */
-import { ENEMIES, BOSS, ETOILE, OEIL } from '../data/enemies';
+import { ENEMIES, TRAPEZOID_BOSS, RICOCHET_STAR_BOSS, LASER_EYE_BOSS } from '../data/enemies';
 import { BOSS_PATTERNS, TICK_RATE, type GameState, type Enemy } from '../sim';
 import { eyePath, queenPath } from './sprites';
 import type { RenderView } from './view';
@@ -122,12 +122,12 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
   const elapsed = total - boss.timer;
 
   // Avertissements, sous le boss.
-  if (ph?.kind === 'charge' && elapsed < BOSS.chargeTelegraph * TICK_RATE) {
-    dangerLine(view, x, y, boss.aux, BOSS.chargeLength, boss.r * 1.6, time);
+  if (ph?.kind === 'charge' && elapsed < TRAPEZOID_BOSS.chargeTelegraph * TICK_RATE) {
+    dangerLine(view, x, y, boss.aux, TRAPEZOID_BOSS.chargeLength, boss.r * 1.6, time);
   }
   if (ph?.kind === 'aim' || ph?.kind === 'dash') {
     // Étoile : la boîte de rebond, et sa direction pendant qu'elle vise.
-    const H = ETOILE.box;
+    const H = RICOCHET_STAR_BOSS.box;
     ctx.beginPath();
     ctx.rect(boss.ax - H, boss.ay - H, H * 2, H * 2);
     ctx.setLineDash([10, 12]);
@@ -141,7 +141,7 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
   }
   if (ph?.kind === 'focus' || ph?.kind === 'sweep') {
     // Œil : le cône que le rayon va balayer, puis le rayon.
-    const L = OEIL.beamLength;
+    const L = LASER_EYE_BOSS.beamLength;
     const a0 = Math.min(boss.ax, boss.ay);
     const a1 = Math.max(boss.ax, boss.ay);
     ctx.beginPath();
@@ -164,13 +164,13 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
       ctx.lineTo(x + Math.cos(boss.aux) * L, y + Math.sin(boss.aux) * L);
       ctx.strokeStyle = '#ff2b2b';
       ctx.globalAlpha = 0.35;
-      ctx.lineWidth = OEIL.beamWidth * 2.2;
+      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 2.2;
       ctx.stroke();
       ctx.globalAlpha = 1;
-      ctx.lineWidth = OEIL.beamWidth * 0.8;
+      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 0.8;
       ctx.stroke();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = OEIL.beamWidth * 0.3;
+      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 0.3;
       ctx.stroke();
     }
   }

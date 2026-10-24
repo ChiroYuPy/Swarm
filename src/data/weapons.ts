@@ -121,7 +121,7 @@ function prog(base: WeaponLevel, ...deltas: Partial<WeaponLevel>[]): WeaponLevel
 
 export const BASE_WEAPONS: WeaponDef[] = [
   {
-    id: 'confetti',
+    id: 'blaster',
     name: 'Blaster',
     desc: 'Arme de départ. Tire sur l’ennemi le plus proche.',
     behavior: 'projectile',
@@ -142,7 +142,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'petitspois',
+    id: 'orbs',
     name: 'Orbes',
     desc: 'Des orbes tournent autour de toi et repoussent ce qui approche.',
     behavior: 'orbit',
@@ -157,7 +157,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'aura',
+    id: 'force_field',
     name: 'Champ de force',
     desc: 'Blesse en continu tout ce qui est près de toi. Grandit à chaque niveau.',
     behavior: 'aura',
@@ -193,7 +193,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'crepes',
+    id: 'mines',
     name: 'Mines',
     desc: 'Pose des mines qui explosent au contact. Idéal en fuyant.',
     behavior: 'mine',
@@ -223,7 +223,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'rallonge',
+    id: 'electric_arc',
     name: 'Arc électrique',
     desc: 'Éclairs qui sautent d’un ennemi à l’autre.',
     behavior: 'chain',
@@ -238,7 +238,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'klaxon',
+    id: 'shockwave',
     name: 'Onde de choc',
     desc: 'Ondes qui blessent, repoussent et ralentissent un peu tout autour de toi.',
     behavior: 'pulse',
@@ -253,7 +253,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'fouet',
+    id: 'whip',
     name: 'Fouet',
     desc: 'Des lanières qui claquent en éventail devant toi, blessent et envoient valser les ennemis.',
     behavior: 'whip',
@@ -274,7 +274,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'flammes',
+    id: 'flamethrower',
     name: 'Lance-flammes',
     desc: 'Des jets de flammes côte à côte, là où tu vises. Chaque jet couvre 1/10 de tour : au niveau max, un demi-cercle de feu.',
     behavior: 'flame',
@@ -295,7 +295,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'tourelle',
+    id: 'turret',
     name: 'Tourelle',
     desc: 'Pose une tourelle qui tire seule sur ce qui passe à portée. Bats-toi autour d’elle.',
     behavior: 'turret',
@@ -358,7 +358,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'mortier',
+    id: 'mortar',
     name: 'Mortier',
     desc: 'Lance des obus au loin, sur les groupes d’ennemis. Le point d’impact s’affiche au sol.',
     behavior: 'mortar',
@@ -382,7 +382,7 @@ export const BASE_WEAPONS: WeaponDef[] = [
 
 export const FUSED_WEAPONS: WeaponDef[] = [
   {
-    id: 'cotillons',
+    id: 'spiral',
     name: 'Spirale',
     desc: 'Évolution de Blaster avec Surcadence.',
     behavior: 'spiral',
@@ -397,7 +397,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     ],
   },
   {
-    id: 'trounoir',
+    id: 'black_holes',
     name: 'Trous noirs',
     desc: 'Évolution d’Orbes avec Aimant.',
     behavior: 'orbit',
@@ -407,7 +407,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 22, count: 3, radius: 118, rotSpeed: 1.4, size: 24, hitCd: 0.3, pull: 150, pullRadius: 140, knockback: 0 }],
   },
   {
-    id: 'malaise',
+    id: 'vampire_field',
     name: 'Champ vampire',
     desc: 'Évolution de Champ de force avec Vitalité.',
     behavior: 'aura',
@@ -417,7 +417,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 16, radius: 178, tick: 0.35, slow: 0.45, lifesteal: 0.03 }],
   },
   {
-    id: 'multiprise',
+    id: 'electric_storm',
     name: 'Tempête électrique',
     desc: 'Évolution d’Arc électrique avec Surcadence.',
     behavior: 'chain',
@@ -427,7 +427,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 34, cooldown: 0.85, range: 340, jumps: 4, jumpRange: 180, branch: 2, count: 1, stun: 0.35 }],
   },
   {
-    id: 'creperang',
+    id: 'mine_boomerang',
     name: 'Boomerang miné',
     desc: 'Évolution de Boomerang avec Amplificateur.',
     behavior: 'boomerang',
@@ -439,7 +439,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     ],
   },
   {
-    id: 'periph',
+    id: 'earthquake',
     name: 'Séisme',
     desc: 'Évolution d’Onde de choc avec Propulseurs.',
     behavior: 'pulse',
@@ -449,7 +449,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 16, cooldown: 1.5, radius: 265, duration: 0.45, knockback: 0, count: 3, delay: 0.18, slow: 0.6, slowTime: 2.5 }],
   },
   {
-    id: 'faux',
+    id: 'scythe',
     name: 'Faux',
     desc: 'Évolution de Fouet avec Puissance.',
     behavior: 'scythe',
@@ -459,7 +459,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 0, pctHp: 0.15, bossPct: 0.015, cooldown: 2, length: 200, arc: Math.PI, count: 1, knockback: 0, execute: 0.12 }],
   },
   {
-    id: 'tornade',
+    id: 'fire_tornado',
     name: 'Tornade de feu',
     desc: 'Évolution de Lance-flammes avec Amplificateur.',
     behavior: 'flame',
@@ -469,7 +469,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 10, tick: 0.12, length: 200, arc: 0.3, count: 4, spin: 2.4 }],
   },
   {
-    id: 'phenix',
+    id: 'phoenix',
     name: 'Phénix',
     desc: 'Évolution de Lance-flammes avec Vitalité.',
     behavior: 'phoenix',
@@ -499,7 +499,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     ],
   },
   {
-    id: 'escadrille',
+    id: 'squadron',
     name: 'Escadrille',
     desc: 'Évolution de Ricochet avec Blindage.',
     behavior: 'drone',
@@ -514,7 +514,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     ],
   },
   {
-    id: 'kamikazes',
+    id: 'kamikaze_drones',
     name: 'Kamikazes',
     desc: 'Évolution de Drone avec Puissance.',
     behavior: 'drone',
@@ -524,7 +524,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 75, count: 4, speed: 430, range: 520, radius: 150, knockback: 260, respawn: 0.3, dive: 1, hp: 1, turn: 4 }],
   },
   {
-    id: 'meteores',
+    id: 'meteors',
     name: 'Météores',
     desc: 'Évolution de Mortier avec Chance.',
     behavior: 'mortar',

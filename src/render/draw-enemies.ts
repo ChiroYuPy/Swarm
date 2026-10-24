@@ -2,7 +2,7 @@
  * Enemies: sprites batched by type, frozen shells, leader zones and speed trails, blinker targets,
  * rising walls, kamikaze blast zones, then the boss on top.
  */
-import { ENEMIES, HEXAGONE } from '../data/enemies';
+import { ENEMIES, BUILDER_HEXAGON_BOSS } from '../data/enemies';
 import { EF_BOSS, WALL_TYPE, EGG_TYPE, MAX_ENEMIES, TICK_RATE, type GameState, type Enemy } from '../sim';
 import { drawBoss } from './draw-bosses';
 import { lerp, type RenderView } from './view';
@@ -219,7 +219,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
 /** Murs en train de sortir du sol : contour en pointillés qui grandit. */
 function drawRisingWalls(view: RenderView, s: GameState, time: number): void {
   const ctx = view.ctx;
-  const rise = HEXAGONE.wallRise * TICK_RATE;
+  const rise = BUILDER_HEXAGON_BOSS.wallRise * TICK_RATE;
   let any = false;
   ctx.beginPath();
   for (let i = 0; i < s.enemyCount; i++) {

@@ -107,8 +107,12 @@ function assign(o: unknown, data: Rec, keys: string[]): void {
   for (const k of keys) if (k in data) r[k] = data[k];
 }
 
+export const SNAPSHOT_FORMAT = 'swarm-snapshot';
+/** Format string written before the project was renamed, still accepted when reading. */
+const LEGACY_SNAPSHOT_FORMAT = 'neonawak-snapshot';
+
 export interface Snapshot {
-  format: 'neonawak-snapshot';
+  format: typeof SNAPSHOT_FORMAT;
   version: number;
   seedLabel: string;
   difficulty: number;
@@ -124,7 +128,7 @@ export interface Snapshot {
 
 export function serializeState(s: GameState): string {
   const snap: Snapshot = {
-    format: 'neonawak-snapshot',
+    format: SNAPSHOT_FORMAT,
     version: s.version,
     seedLabel: s.seedLabel,
     difficulty: s.difficulty,
@@ -167,7 +171,7 @@ export function serializeState(s: GameState): string {
 
 export function deserializeState(json: string): GameState {
   const snap = JSON.parse(json) as Snapshot;
-  if (snap.format !== 'neonawak-snapshot') throw new Error('Instantané invalide');
+  if (snap.format !== SNAPSHOT_FORMAT && (snap.format as string) !== LEGACY_SNAPSHOT_FORMAT) throw new Error('Instantané invalide');
   const s = createGame({ seed: snap.seedLabel, difficulty: snap.difficulty, players: snap.playerCount });
   if (snap.version !== s.version) throw new Error(`Version de sim incompatible (${snap.version} ≠ ${s.version})`);
   const c = snap.core;

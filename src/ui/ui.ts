@@ -45,7 +45,7 @@ export class UI {
   codexReturn: () => void = () => this.showMenu();
   /** codex ouvert depuis la pause : affiché par-dessus la partie */
   codexOverlay = false;
-  codexTab: CodexTab = 'armes';
+  codexTab: CodexTab = 'weapons';
   countAnim = 0;
   levelOpenedAt = 0;
   /** écran affiché (ceux qui sortent restent un instant dans #ui, inertes) */

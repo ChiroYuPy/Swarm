@@ -24,12 +24,12 @@ import { botInput } from '../src/ai/bot';
 
 describe('contenu', () => {
   it('un niveau = une instance de plus pour les armes à instances', () => {
-    for (const id of ['confetti', 'petitspois', 'crepes', 'boomerang', 'rallonge', 'klaxon', 'fouet', 'flammes', 'tourelle', 'drone', 'ricochet', 'mortier']) {
+    for (const id of ['blaster', 'orbs', 'mines', 'boomerang', 'electric_arc', 'shockwave', 'whip', 'flamethrower', 'turret', 'drone', 'ricochet', 'mortar']) {
       const w = weaponId(id);
       for (let l = 1; l <= 5; l++) expect(weaponLevel(w, l).count, `${id} niv. ${l}`).toBe(l);
     }
     // Le champ de force grandit à chaque niveau.
-    const aura = weaponId('aura');
+    const aura = weaponId('force_field');
     for (let l = 2; l <= 5; l++) expect(weaponLevel(aura, l).radius!).toBeGreaterThan(weaponLevel(aura, l - 1).radius!);
     expect(BASE_WEAPONS.every((w) => w.levels.length === 5 && w.levelText.length === 5)).toBe(true);
   });
@@ -37,7 +37,7 @@ describe('contenu', () => {
   it('les orbes en jeu sont aussi nombreux que le niveau', () => {
     const s = createGame({ seed: 'ORBES' });
     const p = s.players[0];
-    const w = addWeapon(p, weaponId('petitspois'));
+    const w = addWeapon(p, weaponId('orbs'));
     for (let l = 1; l <= 5; l++) {
       w.level = l;
       step(s, [0]);
@@ -74,9 +74,9 @@ describe('contenu', () => {
     const normal = firstSeen(1, 380);
     const hard = firstSeen(2, 200);
     // Au début, uniquement des Chasseurs ; les autres sont annoncés plus tard.
-    expect(normal.get('losange')).toBeGreaterThan(60);
-    expect(normal.has('carre')).toBe(true);
-    expect(hard.get('losange')!).toBeLessThan(normal.get('losange')!);
+    expect(normal.get('rusher')).toBeGreaterThan(60);
+    expect(normal.has('block')).toBe(true);
+    expect(hard.get('rusher')!).toBeLessThan(normal.get('rusher')!);
     expect(spawnRate(30 * TICK_RATE, 0).rate).toBeLessThan(spawnRate(30 * TICK_RATE, 2).rate);
   });
 

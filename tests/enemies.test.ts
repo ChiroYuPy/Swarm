@@ -32,13 +32,13 @@ describe('nouveaux ennemis', () => {
     const g = put(s, 'golem', 400, 0);
     damageEnemy(s, s.enemies.indexOf(g), 1e6, 0, 0, 0);
     step(s, [0]);
-    const mid = alive(s, 'golem2');
+    const mid = alive(s, 'golem_medium');
     expect(mid.length).toBe(2);
     // Ils partent chacun de leur côté.
     expect(Math.abs(mid[0].y - mid[1].y)).toBeGreaterThan(10);
     for (const e of mid) damageEnemy(s, s.enemies.indexOf(e), 1e6, 0, 0, 0);
     step(s, [0]);
-    const small = alive(s, 'golem3');
+    const small = alive(s, 'golem_small');
     expect(small.length).toBe(4);
     for (const e of small) damageEnemy(s, s.enemies.indexOf(e), 1e6, 0, 0, 0);
     step(s, [0]);
@@ -47,17 +47,17 @@ describe('nouveaux ennemis', () => {
 
   it('Meneur : les voisins vont plus vite, plus du tout une fois le Meneur gelé', () => {
     const s = arena();
-    const m = put(s, 'meneur', 400, 0, 100);
-    const a = put(s, 'carre', 460, 0, 100);
-    const far = put(s, 'carre', -400, 0, 100);
+    const m = put(s, 'leader', 400, 0, 100);
+    const a = put(s, 'block', 460, 0, 100);
+    const far = put(s, 'block', -400, 0, 100);
     step(s, [0]);
     expect(a.boostUntil).toBeGreaterThan(s.tick);
     expect(far.boostUntil).toBe(0);
     expect(m.boostUntil).toBe(0); // il ne s'accélère pas lui-même
     // Même Bloc, avec et sans Meneur : celui qui est galvanisé avance plus.
     const b = arena();
-    const ref = put(b, 'carre', 460, 0, 100);
-    put(b, 'carre', -400, 0, 100);
+    const ref = put(b, 'block', 460, 0, 100);
+    put(b, 'block', -400, 0, 100);
     const x0 = a.x;
     for (let i = 0; i < 30; i++) {
       step(s, [0]);
@@ -73,14 +73,14 @@ describe('nouveaux ennemis', () => {
   it('Téléporteur : marque le sol sous le joueur, y atterrit et blesse qui est resté', () => {
     const s = arena();
     const p = s.players[0];
-    const t = put(s, 'teleporteur', 300, 0, 100);
+    const t = put(s, 'teleporter', 300, 0, 100);
     step(s, [0]);
     expect(t.ai).toBe(1);
     const tx = t.aux;
     const ty = t.aux2;
     expect(Math.hypot(tx - p.x, ty - p.y)).toBeLessThan(5);
     const hp0 = p.hp;
-    for (let i = 0; i < def('teleporteur').fuse! * TICK_RATE + 2; i++) step(s, [0]);
+    for (let i = 0; i < def('teleporter').fuse! * TICK_RATE + 2; i++) step(s, [0]);
     expect(t.x).toBe(tx);
     expect(t.y).toBe(ty);
     expect(p.hp).toBeLessThan(hp0);
@@ -89,18 +89,18 @@ describe('nouveaux ennemis', () => {
   it('Téléporteur : on esquive en sortant du cercle', () => {
     const s = arena();
     const p = s.players[0];
-    put(s, 'teleporteur', 300, 0, 100);
+    put(s, 'teleporter', 300, 0, 100);
     step(s, [0]);
     const hp0 = p.hp;
     // On fuit vers le bas pendant l’avertissement (code 1 + 16 : un quart de tour sur 64 directions).
-    for (let i = 0; i < def('teleporteur').fuse! * TICK_RATE + 2; i++) step(s, [17]);
+    for (let i = 0; i < def('teleporter').fuse! * TICK_RATE + 2; i++) step(s, [17]);
     expect(p.hp).toBe(hp0);
   });
 
   it('Orbiteur : tourne autour du joueur en se rapprochant', () => {
     const s = arena();
     const p = s.players[0];
-    const o = put(s, 'orbiteur', 380, 0, 100);
+    const o = put(s, 'orbiter', 380, 0, 100);
     const a0 = Math.atan2(o.y - p.y, o.x - p.x);
     const d0 = Math.hypot(o.x - p.x, o.y - p.y);
     for (let i = 0; i < 90; i++) step(s, [0]);
@@ -131,7 +131,7 @@ describe('vagues lisibles', () => {
     const slot = UNLOCK_SLOT[1][t];
     expect(MIXES[mixAt(7, 1, slot)].types).toContain(t);
     // (dès qu'il y a le choix : au tout début, seuls les Chasseurs existent)
-    for (let k = UNLOCK_SLOT[1][enemyId('losange')] + 1; k < 40; k++) expect(mixAt(7, 1, k)).not.toBe(mixAt(7, 1, k - 1));
+    for (let k = UNLOCK_SLOT[1][enemyId('rusher')] + 1; k < 40; k++) expect(mixAt(7, 1, k)).not.toBe(mixAt(7, 1, k - 1));
   });
 
   it('Golem : nombre en vie plafonné', () => {
@@ -145,10 +145,10 @@ describe('vagues lisibles', () => {
 describe('ennemis semés et plafond', () => {
   it('un ennemi semé loin du joueur disparaît, sans gemme ni kill', () => {
     const s = arena();
-    put(s, 'triangle', WAVES.lostDistance + 200, 0);
-    put(s, 'triangle', 300, 0);
+    put(s, 'hunter', WAVES.lostDistance + 200, 0);
+    put(s, 'hunter', 300, 0);
     step(s, [0]);
-    expect(alive(s, 'triangle').length).toBe(1);
+    expect(alive(s, 'hunter').length).toBe(1);
     expect(s.gemCount).toBe(0);
     expect(s.players[0].kills).toBe(0);
   });

@@ -28,7 +28,7 @@ export function showDifficulty(ui: UI): void {
     const best = topScores(save, i)[0];
     const tile = (k: string, v: string) => `<span><small>${k}</small><b>${v}</b></span>`;
     const record = best
-      ? `<small>Record</small><b>${pad7(best.score)}</b><span class="stats mini">${tile('Temps', formatTime(best.tempsSurvecu))}${tile('Niveau', String(best.level || '—'))}${tile('Éliminés', num(best.kills))}</span>`
+      ? `<small>Record</small><b>${pad7(best.score)}</b><span class="stats mini">${tile('Temps', formatTime(best.survivedSec))}${tile('Niveau', String(best.level || '—'))}${tile('Éliminés', num(best.kills))}</span>`
       : '<small>Record</small><em>Aucune partie pour l’instant</em>';
     return `<button class="diff nav ${i === save.difficulty ? 'primary' : ''}" data-d="${i}" style="--c:${d.color};--i:${i}">
       <span class="diff-top">

@@ -18,7 +18,7 @@ import { dec, formatTime } from '../render/hud';
 import { esc, num, rows, statTiles } from './html';
 import { FIRST_BOSS, passiveTotal } from './describe';
 
-export type CodexTab = 'regles' | 'armes' | 'bonus' | 'objets' | 'ennemis' | 'fusions';
+export type CodexTab = 'rules' | 'weapons' | 'passives' | 'items' | 'enemies' | 'evolutions';
 
 // ---------- Codex : données ----------
 interface CodexItem {
@@ -72,18 +72,18 @@ const PICKUP_GROUP: Record<PickupKind, (typeof PICKUP_GROUPS)[number]> = {
 
 export function codexItems(tab: CodexTab): CodexItem[] {
   switch (tab) {
-    case 'regles':
+    case 'rules':
       return [];
-    case 'armes':
+    case 'weapons':
       return BASE_WEAPONS.map((w) => ({ tab, id: w.id, name: w.name, color: w.color, icon: `weapon:${w.id}` }));
-    case 'fusions':
+    case 'evolutions':
       return FUSIONS.map((f) => {
         const r = ALL_WEAPONS.find((w) => w.id === f.result)!;
         return { tab, id: r.id, name: r.name, color: r.color, icon: `weapon:${r.id}` };
       });
-    case 'bonus':
+    case 'passives':
       return PASSIVES.map((p) => ({ tab, id: p.id, name: p.name, color: p.color, icon: `passive:${p.id}` }));
-    case 'objets': {
+    case 'items': {
       const out: CodexItem[] = [];
       for (const group of PICKUP_GROUPS)
         for (const p of PICKUPS) if (PICKUP_GROUP[p.kind] === group) out.push({ tab, id: p.id, name: p.name, color: p.color, icon: `pickup:${p.id}`, group });
@@ -91,7 +91,7 @@ export function codexItems(tab: CodexTab): CodexItem[] {
       out.push({ tab, id: prop.id, name: prop.name, color: prop.color, icon: `enemy:${prop.id}`, group: 'Autres' });
       return out;
     }
-    case 'ennemis': {
+    case 'enemies': {
       return ENEMIES.filter((e) => e.behavior !== 'prop' && !e.hidden)
         .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 + BOSS_ORDER.indexOf(e.id) : enemyArrival(e.id)[DEFAULT_DIFFICULTY] }))
         .sort((a, b) => a.at - b.at)
@@ -109,7 +109,7 @@ function chip(tab: CodexTab, id: string, suffix = ''): string {
 
 function recipe(i: number): string {
   const f = FUSIONS[i];
-  return `<div class="recipe">${chip('armes', f.weapon, 'niv. 5')}<span class="op">+</span>${chip('bonus', f.with, 'niv. 5')}<span class="res"><span class="op">→</span>${chip('fusions', f.result)}</span></div>`;
+  return `<div class="recipe">${chip('weapons', f.weapon, 'niv. 5')}<span class="op">+</span>${chip('passives', f.with, 'niv. 5')}<span class="res"><span class="op">→</span>${chip('evolutions', f.result)}</span></div>`;
 }
 
 /** « 12 → 18 » si la valeur change entre le niveau 1 et le niveau max, sinon « 12 ». */
@@ -138,7 +138,7 @@ export function codexDetail(it: CodexItem): string {
   let figures = '';
   const h3 = (t: string) => `<h3 class="rule">${t}</h3>`;
   switch (it.tab) {
-    case 'armes': {
+    case 'weapons': {
       const w = ALL_WEAPONS.find((x) => x.id === it.id)!;
       tag = 'Arme';
       desc = w.desc;
@@ -148,7 +148,7 @@ export function codexDetail(it: CodexItem): string {
       if (fi.length) body += `${h3(fi.length > 1 ? 'Évolutions' : 'Évolution')}${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
-    case 'fusions': {
+    case 'evolutions': {
       const w = ALL_WEAPONS.find((x) => x.id === it.id)!;
       const i = FUSIONS.findIndex((f) => f.result === it.id);
       tag = 'Évolution';
@@ -157,7 +157,7 @@ export function codexDetail(it: CodexItem): string {
       body = `${h3('Effet')}<p>${esc(w.levelText[0])}</p>${h3('Recette')}${recipe(i)}<p class="hint">Proposée au level-up quand l’arme et le passif sont au niveau 5, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement, et tu gardes le passif.</p>`;
       break;
     }
-    case 'bonus': {
+    case 'passives': {
       const p = PASSIVES.find((x) => x.id === it.id)!;
       tag = 'Passif';
       desc = p.desc;
@@ -170,7 +170,7 @@ export function codexDetail(it: CodexItem): string {
       if (fi.length) body += `${h3(fi.length > 1 ? 'Évolutions' : 'Évolution')}${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
-    case 'objets': {
+    case 'items': {
       const p = PICKUPS.find((x) => x.id === it.id);
       if (!p) {
         const e = ENEMIES.find((x) => x.id === it.id)!;
@@ -207,7 +207,7 @@ export function codexDetail(it: CodexItem): string {
       }
       break;
     }
-    case 'ennemis': {
+    case 'enemies': {
       const e = ENEMIES.find((x) => x.id === it.id)!;
       tag = BEHAVIOR_LABEL[e.behavior];
       desc = e.desc;

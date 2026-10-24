@@ -32,7 +32,7 @@ export interface PassiveDef {
 
 export const PASSIVES: PassiveDef[] = [
   {
-    id: 'biceps',
+    id: 'might',
     name: 'Puissance',
     desc: 'Toutes tes armes font plus mal.',
     effect: 'Dégâts +8 %',
@@ -40,7 +40,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { might: 0.08 },
   },
   {
-    id: 'cafe',
+    id: 'overclock',
     name: 'Surcadence',
     desc: 'Toutes tes armes se rechargent plus vite.',
     effect: 'Recharge −6 %',
@@ -48,7 +48,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { cooldown: 0.06 },
   },
   {
-    id: 'lunettes',
+    id: 'amplifier',
     name: 'Amplificateur',
     desc: 'Zones, explosions, orbes et projectiles plus grands.',
     effect: 'Zone +8 %',
@@ -56,7 +56,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { area: 0.08 },
   },
   {
-    id: 'chaussettes',
+    id: 'thrusters',
     name: 'Propulseurs',
     desc: 'Tu te déplaces plus vite.',
     effect: 'Vitesse +6 %',
@@ -64,7 +64,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { speed: 0.06 },
   },
   {
-    id: 'aimant',
+    id: 'magnet',
     name: 'Aimant',
     desc: 'Tu ramasses l’XP de plus loin.',
     effect: 'Rayon de collecte +25 %',
@@ -72,7 +72,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { magnet: 0.25 },
   },
   {
-    id: 'soupe',
+    id: 'vitality',
     name: 'Vitalité',
     desc: 'Plus de vie et une régénération continue.',
     effect: 'PV max +15, régén. +0,15 PV/s',
@@ -80,7 +80,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { maxHp: 15, regen: 0.15 },
   },
   {
-    id: 'blindage',
+    id: 'armor',
     name: 'Blindage',
     desc: 'Tu encaisses mieux les coups.',
     effect: 'Dégâts subis −5 %',
@@ -88,7 +88,7 @@ export const PASSIVES: PassiveDef[] = [
     perLevel: { armor: 0.05 },
   },
   {
-    id: 'chance',
+    id: 'luck',
     name: 'Chance',
     desc: 'Les ennemis lâchent plus souvent des bonus et des objets.',
     effect: 'Objets +20 %',

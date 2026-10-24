@@ -2,7 +2,7 @@
  * Équilibrage headless : le bot joue plusieurs seeds sans interface, on mesure la survie.
  *   npm run balance            (6 seeds, 15 min max)
  *   npm run balance -- 10 20   (10 seeds, 20 min max)
- *   npm run balance -- 6 15 0  (difficulté : 0 facile, 1 normal, 2 difficile)
+ *   npm run balance -- 6 15 0  (difficulté : 0 easy, 1 normal, 2 hard)
  */
 import { createGame, step, computeScore, findBoss, hashState, weaponDef, TICK_RATE, type GameState } from '../src/sim';
 import { botInput } from '../src/ai/bot';
@@ -44,9 +44,9 @@ for (let k = 0; k < seeds; k++) {
   totalMs += ms;
   totalTicks += s.tick;
   const r = computeScore(s);
-  results.push(r.tempsSurvecu);
-  const mm = Math.floor(r.tempsSurvecu / 60);
-  const ss = Math.floor(r.tempsSurvecu % 60).toString().padStart(2, '0');
+  results.push(r.survivedSec);
+  const mm = Math.floor(r.survivedSec / 60);
+  const ss = Math.floor(r.survivedSec % 60).toString().padStart(2, '0');
   console.log(
     `${seed.padEnd(11)} ${s.over ? 'mort ' : 'vivant'} ${mm}:${ss}  kills ${String(r.kills).padStart(5)}  niv ${String(r.level).padStart(2)}  ` +
       `boss1 ${firstBossKilledAt > 0 ? ((firstBossKilledAt - bossSeenAt) / 60).toFixed(0) + 's' : '—'}  max ennemis ${maxEnemies}  ` +

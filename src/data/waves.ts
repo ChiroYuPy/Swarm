@@ -39,7 +39,7 @@ export const WAVES = {
    * Date (s, × pace) à partir de laquelle chaque type peut apparaître. L'arrivée prend effet au début
    * du mélange suivant, qui le met en vedette (et l'annonce).
    */
-  unlocks: { triangle: 0, losange: 90, pentagone: 210, carre: 270, orbiteur: 330, cercle: 390, golem: 450, meneur: 540, teleporteur: 630 } as Record<string, number>,
+  unlocks: { hunter: 0, rusher: 90, shooter: 210, block: 270, orbiter: 330, bomber: 390, golem: 450, leader: 540, teleporter: 630 } as Record<string, number>,
   /**
    * Rythme : une vague de `waveLength` s, puis `pause` s de calme. Toutes les `wavesPerBoss` vagues,
    * un boss : plus aucune vague tant qu'il vit (l'horloge s'arrête), puis `afterBoss` s de calme.
@@ -54,22 +54,22 @@ export const WAVES = {
    * Le type « vedette » reste minoritaire (20-30 %) : le gros du flux, ce sont des ennemis simples.
    */
   mixes: [
-    { triangle: 1 },
-    { triangle: 3, losange: 2 },
-    { losange: 3, pentagone: 0.6 },
-    { triangle: 3, pentagone: 0.6 },
-    { triangle: 2, carre: 1 },
-    { losange: 2, carre: 1, pentagone: 0.5 },
-    { orbiteur: 1, triangle: 3 },
-    { orbiteur: 1, carre: 1, losange: 2 },
-    { cercle: 0.5, losange: 3, triangle: 2 },
-    { cercle: 0.5, carre: 1, triangle: 3 },
-    { golem: 1, losange: 3 },
-    { golem: 1, pentagone: 1, triangle: 2 },
-    { meneur: 0.5, triangle: 3, losange: 2 },
-    { meneur: 0.5, carre: 2, orbiteur: 1 },
-    { teleporteur: 0.8, triangle: 3 },
-    { teleporteur: 0.8, carre: 1, losange: 2 },
+    { hunter: 1 },
+    { hunter: 3, rusher: 2 },
+    { rusher: 3, shooter: 0.6 },
+    { hunter: 3, shooter: 0.6 },
+    { hunter: 2, block: 1 },
+    { rusher: 2, block: 1, shooter: 0.5 },
+    { orbiter: 1, hunter: 3 },
+    { orbiter: 1, block: 1, rusher: 2 },
+    { bomber: 0.5, rusher: 3, hunter: 2 },
+    { bomber: 0.5, block: 1, hunter: 3 },
+    { golem: 1, rusher: 3 },
+    { golem: 1, shooter: 1, hunter: 2 },
+    { leader: 0.5, hunter: 3, rusher: 2 },
+    { leader: 0.5, block: 2, orbiter: 1 },
+    { teleporter: 0.8, hunter: 3 },
+    { teleporter: 0.8, block: 1, rusher: 2 },
   ] as Record<string, number>[],
   /** PV des ennemis × (1 + a·minutes + b·minutes²) */
   hpScalePerMinute: 0.3,
@@ -78,11 +78,11 @@ export const WAVES = {
   speedScalePerMinute: 0.025,
   speedScaleMax: 1.3,
   /** temps forts d'une vague, `at` s après son début (à partir de `firstAt` s d'horloge) */
-  swarm: { type: 'points', firstAt: 60, at: 14, count: 14, countPerMinute: 3 },
+  swarm: { type: 'swarm', firstAt: 60, at: 14, count: 14, countPerMinute: 3 },
   /** hordes (vagues paires) : un gros paquet d'anciens ennemis (en alternance) qui arrive d'un seul côté */
-  horde: { types: ['triangle', 'losange'], firstAt: 240, at: 24, count: 16, countPerMinute: 2.5 },
+  horde: { types: ['hunter', 'rusher'], firstAt: 240, at: 24, count: 16, countPerMinute: 2.5 },
   /** encerclements (vagues impaires) */
-  ring: { type: 'triangle', firstAt: 130, at: 24, count: 22, countPerMinute: 3, radius: 640 },
+  ring: { type: 'hunter', firstAt: 130, at: 24, count: 22, countPerMinute: 3, radius: 640 },
   /** caisses bonus : une toutes les `every` secondes près du joueur, au plus `max` en même temps */
   props: { every: 22, max: 4, minDist: 380, maxDist: 650, despawn: 2200 },
 };

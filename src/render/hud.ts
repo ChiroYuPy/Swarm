@@ -457,7 +457,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `700 28px ${FONT}`;
-  glowText(ctx, formatTime(score.tempsSurvecu), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
+  glowText(ctx, formatTime(score.survivedSec), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
 
   // ---------- Haut gauche : le score, et le mode ----------
   const lx = 18;

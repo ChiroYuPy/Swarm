@@ -23,9 +23,9 @@ describe('bac à sable', () => {
         startWave: 6,
         weapons: [
           { id: 'laser', level: 3 },
-          { id: 'cotillons', level: 1 },
+          { id: 'spiral', level: 1 },
         ],
-        passives: [{ id: 'biceps', level: 5 }],
+        passives: [{ id: 'might', level: 5 }],
         item: 'bomb',
         might: 3,
       }),
@@ -33,9 +33,9 @@ describe('bac à sable', () => {
     const p = s.players[0];
     expect(p.weapons.map((w) => [weaponDef(w.def).id, w.level])).toEqual([
       ['laser', 3],
-      ['cotillons', 1],
+      ['spiral', 1],
     ]);
-    expect(PASSIVES[p.passives[0].def].id).toBe('biceps');
+    expect(PASSIVES[p.passives[0].def].id).toBe('might');
     expect(p.level).toBe(12);
     expect(p.activable).toBeGreaterThanOrEqual(0);
     expect(s.tick).toBe(5 * MIX_TICKS);
@@ -56,33 +56,33 @@ describe('bac à sable', () => {
   });
 
   it('types choisis : uniquement ceux-là, dès le début', () => {
-    const s = run({ seed: 'SB-TYPES', sandbox: rules({ enemies: ['carre'], weapons: [] }) }, 30);
+    const s = run({ seed: 'SB-TYPES', sandbox: rules({ enemies: ['block'], weapons: [] }) }, 30);
     const types = new Set<string>();
     for (let i = 0; i < s.enemyCount; i++) if (!(s.enemies[i].flags & EF_PROP)) types.add(ENEMIES[s.enemies[i].type].id);
-    expect([...types]).toEqual(['carre']);
+    expect([...types]).toEqual(['block']);
   });
 
   it('ids inconnus ignorés, partie reproductible', () => {
-    const cfg = { seed: 'SB-REPRO', sandbox: rules({ weapons: [{ id: 'nexistepas', level: 2 }, { id: 'aura', level: 9 }], xp: 5 }) };
+    const cfg = { seed: 'SB-REPRO', sandbox: rules({ weapons: [{ id: 'nexistepas', level: 2 }, { id: 'force_field', level: 9 }], xp: 5 }) };
     const a = run(cfg, 60);
     const b = run(cfg, 60);
-    expect(weaponDef(a.players[0].weapons[0].def).id).toBe('aura');
+    expect(weaponDef(a.players[0].weapons[0].def).id).toBe('force_field');
     expect(a.players[0].weapons[0].level).toBe(5);
     expect(hashState(a)).toBe(hashState(b));
   });
   it('duel : le boss choisi arrive tout de suite, seul, avec la force de son rang', () => {
-    const s = run({ seed: 'SB-DUEL', sandbox: rules({ startWave: 3, duel: 'etoile', duelMark: 2, weapons: [] }) }, 1);
+    const s = run({ seed: 'SB-DUEL', sandbox: rules({ startWave: 3, duel: 'ricochet_star', duelMark: 2, weapons: [] }) }, 1);
     const bosses = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.flags & EF_BOSS);
-    expect(bosses.map((e) => ENEMIES[e.type].id)).toEqual(['etoile']);
+    expect(bosses.map((e) => ENEMIES[e.type].id)).toEqual(['ricochet_star']);
     // Mk II : son deuxième passage dans une partie.
-    expect(bosses[0].aux2).toBe(BOSS_ORDER.length + BOSS_ORDER.indexOf('etoile'));
+    expect(bosses[0].aux2).toBe(BOSS_ORDER.length + BOSS_ORDER.indexOf('ricochet_star'));
     // Hors du compte : le boss de la vague 4 reste le Trapèze.
     expect(s.bossSpawned).toBe(0);
   });
 
   it('renforts des boss : coupés, le boss reste seul', () => {
     const minions = (summons: boolean) => {
-      const s = run({ seed: 'SB-SEUL', sandbox: rules({ duel: 'boss', summons, enemyMul: 0, weapons: [] }) }, 20);
+      const s = run({ seed: 'SB-SEUL', sandbox: rules({ duel: 'trapezoid', summons, enemyMul: 0, weapons: [] }) }, 20);
       return s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && !(e.flags & (EF_BOSS | EF_PROP))).length;
     };
     expect(minions(true)).toBeGreaterThan(0);

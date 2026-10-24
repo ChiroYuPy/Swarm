@@ -6,11 +6,12 @@
 import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { HERO } from '../data/hero';
+import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, upgradeId } from './legacy-ids';
 
 export const SAVE_KEY = 'swarm.save';
 /** Key used before the project was renamed, moved to SAVE_KEY on first load. */
 export const LEGACY_SAVE_KEY = 'neonawak.save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const TOP_PER_DIFFICULTY = 10;
 
 export interface Settings {
@@ -106,6 +107,11 @@ export function migrate(raw: unknown): SaveData {
     };
     version = 2;
   }
+  if (version === 2) {
+    // v2 → v3: content ids renamed to English (sandbox setup), score field tempsSurvecu → survivedSec.
+    data = { ...data, scores: Array.isArray(data.scores) ? data.scores.map(upgradeScore) : [], sandbox: upgradeSandbox(data.sandbox) };
+    version = 3;
+  }
   if (version > SAVE_VERSION) return base; // sauvegarde d'une version future : on ne la casse pas, on l'ignore
   const d = typeof data.difficulty === 'number' ? data.difficulty : DEFAULT_DIFFICULTY;
   return {
@@ -115,6 +121,33 @@ export function migrate(raw: unknown): SaveData {
     scores: Array.isArray(data.scores) ? (data.scores as ScoreRecord[]).filter(isScore) : [],
     sandbox: readSandbox(data.sandbox),
   };
+}
+
+/** v2 → v3 score record: `tempsSurvecu` becomes `survivedSec`. */
+function upgradeScore(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const { tempsSurvecu, ...rest } = raw as Record<string, unknown>;
+  return { ...rest, survivedSec: typeof rest.survivedSec === 'number' ? rest.survivedSec : typeof tempsSurvecu === 'number' ? tempsSurvecu : 0 };
+}
+
+/** v2 → v3 sandbox setup: legacy weapon / passive / enemy / duel ids mapped to the current ones, unknown ids dropped. */
+function upgradeSandbox(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const setup = raw as Record<string, unknown>;
+  if (!setup.rules || typeof setup.rules !== 'object') return setup;
+  const rules = { ...(setup.rules as Record<string, unknown>) };
+  const loadout = (list: unknown, table: Readonly<Record<string, string>>) =>
+    Array.isArray(list)
+      ? list.flatMap((x) => {
+          const id = x && typeof x === 'object' ? upgradeId(table, (x as { id?: unknown }).id) : null;
+          return id ? [{ ...(x as object), id }] : [];
+        })
+      : list;
+  if ('weapons' in rules) rules.weapons = loadout(rules.weapons, LEGACY_WEAPON_IDS);
+  if ('passives' in rules) rules.passives = loadout(rules.passives, LEGACY_PASSIVE_IDS);
+  if (Array.isArray(rules.enemies)) rules.enemies = rules.enemies.flatMap((id) => upgradeId(LEGACY_ENEMY_IDS, id) ?? []);
+  if (typeof rules.duel === 'string') rules.duel = upgradeId(LEGACY_ENEMY_IDS, rules.duel);
+  return { ...setup, rules };
 }
 
 /** Réglages du bac à sable relus avec prudence : tout champ manquant ou invalide reprend sa valeur par défaut. */
@@ -184,7 +217,7 @@ export function writeSave(data: SaveData): boolean {
   }
 }
 
-const byScore = (a: ScoreRecord, b: ScoreRecord) => b.score - a.score || b.tempsSurvecu - a.tempsSurvecu;
+const byScore = (a: ScoreRecord, b: ScoreRecord) => b.score - a.score || b.survivedSec - a.survivedSec;
 
 /** Classement d'une difficulté, du meilleur au moins bon. */
 export function topScores(data: SaveData, difficulty: number): ScoreRecord[] {

@@ -22,10 +22,10 @@ import { addWeapon, rollOffers } from '../src/sim/levelup';
 import { computeStats } from '../src/sim/player';
 import { OFFER_FUSION } from '../src/sim/state';
 
-const DAMAGING = ['fouet', 'flammes', 'tourelle', 'drone', 'ricochet', 'mortier', 'faux', 'tornade', 'phenix', 'bastion', 'escadrille', 'kamikazes', 'meteores'];
+const DAMAGING = ['whip', 'flamethrower', 'turret', 'drone', 'ricochet', 'mortar', 'scythe', 'fire_tornado', 'phoenix', 'bastion', 'squadron', 'kamikaze_drones', 'meteors'];
 
 /** Une partie avec une seule arme, un héros immortel et des ennemis tout autour. */
-function arena(id: string, level: number, hp = 50, type = 'carre'): GameState {
+function arena(id: string, level: number, hp = 50, type = 'block'): GameState {
   const s = createGame({ seed: 'ARMES' });
   s.sandbox = { invincible: true, enemyMul: 0, enemies: null, bosses: false, summons: true, duel: -1, xp: 1 };
   const p = s.players[0];
@@ -60,7 +60,7 @@ describe('nouvelles armes', () => {
   });
 
   it('le Fouet blesse et repousse', () => {
-    const s = arena('fouet', 5, 5000);
+    const s = arena('whip', 5, 5000);
     const p = s.players[0];
     const before = s.enemies.slice(0, s.enemyCount).map((e) => Math.hypot(e.x - p.x, e.y - p.y));
     run(s, 0.8);
@@ -70,7 +70,7 @@ describe('nouvelles armes', () => {
   });
 
   it('chaque nouvelle évolution est proposée quand l’arme et son passif sont au max', () => {
-    for (const result of ['faux', 'tornade', 'phenix', 'bastion', 'escadrille', 'kamikazes', 'meteores']) {
+    for (const result of ['scythe', 'fire_tornado', 'phoenix', 'bastion', 'squadron', 'kamikaze_drones', 'meteors']) {
       const fi = FUSION_TABLE.findIndex((f) => f.result === weaponId(result));
       expect(fi, result).toBeGreaterThanOrEqual(0);
       const f = FUSION_TABLE[fi];
@@ -90,22 +90,22 @@ describe('nouvelles armes', () => {
     const s = createGame({ seed: 'FUSIONS' });
     const p = s.players[0];
     p.weapons.length = 0;
-    addWeapon(p, weaponId('flammes')).level = 5;
-    for (const id of ['lunettes', 'soupe']) {
+    addWeapon(p, weaponId('flamethrower')).level = 5;
+    for (const id of ['amplifier', 'vitality']) {
       const x = new PassiveInst();
-      x.def = ['biceps', 'cafe', 'lunettes', 'chaussettes', 'aimant', 'soupe', 'blindage', 'chance'].indexOf(id);
+      x.def = ['might', 'overclock', 'amplifier', 'thrusters', 'magnet', 'vitality', 'armor', 'luck'].indexOf(id);
       x.level = 5;
       p.passives.push(x);
     }
     p.pendingLevels = 1;
     rollOffers(s, p);
     const fused = p.offers.filter((o) => o.kind === OFFER_FUSION).map((o) => FUSION_TABLE[o.id].result);
-    expect(fused).toContain(weaponId('tornade'));
-    expect(fused).toContain(weaponId('phenix'));
+    expect(fused).toContain(weaponId('fire_tornado'));
+    expect(fused).toContain(weaponId('phoenix'));
   });
 
   it('la Faux enlève une part des PV max, et achève les ennemis presque morts', () => {
-    const s = arena('faux', 1, 1);
+    const s = arena('scythe', 1, 1);
     for (let i = 0; i < s.enemyCount; i++) {
       const e = s.enemies[i];
       e.maxHp = 100000;
@@ -113,7 +113,7 @@ describe('nouvelles armes', () => {
       e.hp = i % 2 ? 20000 : 100000;
     }
     run(s, 1);
-    const L = weaponDef(weaponId('faux')).levels[0];
+    const L = weaponDef(weaponId('scythe')).levels[0];
     // les gros touchés (les plus lointains sont hors de portée) perdent exactement leur part de PV max
     const hit = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.hp < e.maxHp && e.hp > 20000);
     expect(s.players[0].kills).toBeGreaterThan(0);
@@ -122,7 +122,7 @@ describe('nouvelles armes', () => {
   });
 
   it('la tourelle reste posée et tire sans le joueur', () => {
-    const s = arena('tourelle', 1);
+    const s = arena('turret', 1);
     run(s, 0.5);
     const t = projs(s, PJ_TURRET)[0];
     expect(t).toBeDefined();
@@ -143,7 +143,7 @@ describe('nouvelles armes', () => {
   });
 
   it('les drones partent chasser, et reviennent près du joueur quand ils sont abattus', () => {
-    const s = arena('drone', 2, 50, 'pentagone');
+    const s = arena('drone', 2, 50, 'shooter');
     run(s, 1);
     expect(projs(s, PJ_DRONE).length).toBe(2);
     // On abat tous les drones : ils doivent réapparaître près du joueur.
@@ -159,7 +159,7 @@ describe('nouvelles armes', () => {
   });
 
   it('le Lance-flammes ne tourne plus une fois allumé', () => {
-    const s = arena('flammes', 1, 5000);
+    const s = arena('flamethrower', 1, 5000);
     const w = s.players[0].weapons[0];
     let start = NaN;
     let moved = false;
@@ -197,7 +197,7 @@ describe('nouvelles armes', () => {
   });
 
   it('les Tireurs ne tirent que droit devant eux', () => {
-    const s = arena('fouet', 1, 100000, 'pentagone');
+    const s = arena('whip', 1, 100000, 'shooter');
     s.players[0].weapons.length = 0;
     let checked = 0;
     run(s, 6, (st) => {
@@ -215,7 +215,7 @@ describe('nouvelles armes', () => {
   });
 
   it('les Phénix filent tout droit sans revenir, renaissent près de toi et laissent du feu', () => {
-    const s = arena('phenix', 1, 100000);
+    const s = arena('phoenix', 1, 100000);
     const p = s.players[0];
     let maxTurn = 0;
     let fires = 0;
@@ -252,7 +252,7 @@ describe('nouvelles armes', () => {
   });
 
   it('le Phénix part vers le plus gros sac à PV, pas vers l’ennemi le plus proche', () => {
-    const s = arena('phenix', 1, 5, 'triangle');
+    const s = arena('phoenix', 1, 5, 'hunter');
     const p = s.players[0];
     // Un « boss » loin à gauche, la petite foule tout autour : il doit partir vers la gauche.
     const big = s.enemies[0];
@@ -269,7 +269,7 @@ describe('nouvelles armes', () => {
   });
 
   it('le Fouet claque en éventail devant toi et le Lance-flammes en demi-cercle au max', () => {
-    const whip = arena('fouet', 5, 100000);
+    const whip = arena('whip', 5, 100000);
     run(whip, 2);
     const w = whip.players[0].weapons[0];
     const spread = (a: Float64Array, n: number) => {
@@ -282,7 +282,7 @@ describe('nouvelles armes', () => {
       return hi - lo;
     };
     expect(spread(w.angles, 5)).toBeCloseTo((2 * Math.PI) / 5, 5);
-    const fl = arena('flammes', 5, 100000);
+    const fl = arena('flamethrower', 5, 100000);
     run(fl, 2);
     const f = fl.players[0].weapons[0];
     // 5 jets de 1/10 de tour, côte à côte : un demi-cercle (bord à bord).
@@ -290,12 +290,12 @@ describe('nouvelles armes', () => {
   });
 
   it('le Mortier lance des obus qui explosent au loin, les Météores laissent un cratère', () => {
-    const m = arena('mortier', 1);
+    const m = arena('mortar', 1);
     let shells = 0;
     run(m, 3, (st) => (shells += projs(st, PJ_SHELL).length));
     expect(shells).toBeGreaterThan(0);
     expect(m.players[0].damageDealt).toBeGreaterThan(0);
-    const met = arena('meteores', 1);
+    const met = arena('meteors', 1);
     let craters = 0;
     run(met, 3, (st) => (craters += projs(st, PJ_BLAZE).length));
     expect(craters).toBeGreaterThan(0);

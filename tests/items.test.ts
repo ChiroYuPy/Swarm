@@ -43,7 +43,7 @@ function use(s: GameState, kind: number) {
 describe('balles de Tireur cassables', () => {
   it('le Tireur tire des balles cassables, le boss non', () => {
     const s = arena();
-    put(s, 'pentagone', 300, 0);
+    put(s, 'shooter', 300, 0);
     run(s, 4 * TICK_RATE);
     const shots = s.projectiles.slice(0, s.projCount).filter((b) => b.kind === PJ_EBULLET);
     expect(shots.length).toBeGreaterThan(0);
@@ -51,9 +51,9 @@ describe('balles de Tireur cassables', () => {
   });
 
   it('une aura détruit les balles avant qu’elles touchent', () => {
-    const withAura = arena([{ id: 'aura', level: 5 }]);
+    const withAura = arena([{ id: 'force_field', level: 5 }]);
     const without = arena();
-    for (const s of [withAura, without]) put(s, 'pentagone', 320, 0, 100);
+    for (const s of [withAura, without]) put(s, 'shooter', 320, 0, 100);
     run(withAura, 6 * TICK_RATE);
     run(without, 6 * TICK_RATE);
     const p = withAura.players[0];
@@ -65,8 +65,8 @@ describe('balles de Tireur cassables', () => {
 describe('Gel et Horloge', () => {
   it('Gel : fige les ennemis proches seulement, ils éclatent en chaîne', () => {
     const s = arena();
-    const near = [0, 1, 2, 3, 4].map((k) => put(s, 'triangle', 120 + k * 30, 0));
-    const far = put(s, 'triangle', 900, 0);
+    const near = [0, 1, 2, 3, 4].map((k) => put(s, 'hunter', 120 + k * 30, 0));
+    const far = put(s, 'hunter', 900, 0);
     use(s, PK_FREEZE);
     expect(near.every((e) => e.frozenUntil > s.tick)).toBe(true);
     expect(far.frozenUntil).toBe(0);
@@ -83,8 +83,8 @@ describe('Gel et Horloge', () => {
   it('Horloge : les ennemis avancent environ 3× moins vite', () => {
     const a = arena();
     const b = arena();
-    const ea = put(a, 'triangle', 500, 0, 50);
-    const eb = put(b, 'triangle', 500, 0, 50);
+    const ea = put(a, 'hunter', 500, 0, 50);
+    const eb = put(b, 'hunter', 500, 0, 50);
     use(b, PK_CLOCK);
     run(a, 60);
     run(b, 60);
@@ -103,7 +103,7 @@ describe('Totem, Clone, Fièvre', () => {
     run(s, 2);
     expect(p.totem).toBe(1);
     p.hp = 1;
-    put(s, 'carre', p.x + 10, p.y, 100);
+    put(s, 'block', p.x + 10, p.y, 100);
     run(s, 10);
     expect(p.alive).toBe(true);
     expect(p.totem).toBe(0);
@@ -111,14 +111,14 @@ describe('Totem, Clone, Fièvre', () => {
   });
 
   it('Clone : tire pour le joueur, ne ramasse rien, disparaît à l’heure', () => {
-    const s = arena([{ id: 'confetti', level: 5 }]);
+    const s = arena([{ id: 'blaster', level: 5 }]);
     use(s, PK_CLONE);
     const c = s.players[1];
     expect(c.master).toBe(0);
     expect(c.weapons.length).toBe(1);
     // Le joueur part loin : seuls les tirs du clone peuvent tuer cet ennemi.
     for (let i = 0; i < 90; i++) step(s, [1]);
-    put(s, 'triangle', c.x + 120, c.y, 1);
+    put(s, 'hunter', c.x + 120, c.y, 1);
     run(s, 2 * TICK_RATE);
     expect(s.players[0].kills).toBeGreaterThan(0);
     expect(c.kills).toBe(0);

@@ -196,7 +196,7 @@ export function gameTime(s: GameState): number {
 }
 
 export interface ScoreResult {
-  tempsSurvecu: number;
+  survivedSec: number;
   kills: number;
   bossKills: number;
   level: number;
@@ -208,7 +208,7 @@ export function computeScore(s: GameState, player = 0): ScoreResult {
   const ticks = p.deathTick >= 0 ? p.deathTick : s.tick;
   const t = ticks * DT;
   return {
-    tempsSurvecu: Math.round(t * 10) / 10,
+    survivedSec: Math.round(t * 10) / 10,
     kills: p.kills,
     bossKills: p.bossKills,
     level: p.level,
@@ -220,7 +220,7 @@ export function computeScore(s: GameState, player = 0): ScoreResult {
 export interface ScoreRecord {
   seed: string;
   difficulty: number;
-  tempsSurvecu: number;
+  survivedSec: number;
   kills: number;
   level: number;
   score: number;
@@ -233,7 +233,7 @@ export function makeScoreRecord(s: GameState, dateIso: string, player = 0): Scor
   return {
     seed: s.seedLabel,
     difficulty: s.difficulty,
-    tempsSurvecu: r.tempsSurvecu,
+    survivedSec: r.survivedSec,
     kills: r.kills,
     level: r.level,
     score: r.score,

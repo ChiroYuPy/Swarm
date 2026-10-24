@@ -12,7 +12,7 @@ export const HERO = {
   radius: 14,
   /** invulnérabilité après un coup (secondes) */
   iframes: 0.2,
-  startWeapon: 'confetti',
+  startWeapon: 'blaster',
 };
 
 /** XP nécessaire pour passer du niveau `level` au suivant. */

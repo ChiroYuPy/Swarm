@@ -42,13 +42,13 @@ describe("échange d'arme", () => {
       expect(o.kind).toBe(OFFER_SWAP);
       expect(o.toLevel).toBe(3);
       expect(weaponDef(o.id).fusion).toBeFalsy();
-      expect(o.id).not.toBe(weaponId('confetti'));
+      expect(o.id).not.toBe(weaponId('blaster'));
     }
     const target = p.offers[1].id;
     step(s, [choiceCode(1)]);
     expect(p.weapons[0].def).toBe(target);
     expect(p.weapons[0].level).toBe(3);
-    expect(p.banned).toContain(weaponId('confetti'));
+    expect(p.banned).toContain(weaponId('blaster'));
     expect(p.swaps).toBe(LOOT.swaps.start - 1);
     expect(p.swapSlot).toBe(-1);
     // Le niveau reste à choisir, avec ses propositions normales.
@@ -75,7 +75,7 @@ describe("échange d'arme", () => {
     const s = createGame({ seed: 'ECHANGE' });
     untilLevelUp(s);
     const p = s.players[0];
-    p.weapons[0].def = weaponId('cotillons');
+    p.weapons[0].def = weaponId('spiral');
     p.weapons[0].level = 1;
     step(s, [swapCode(0)]);
     expect(p.offers.length).toBeGreaterThan(0);

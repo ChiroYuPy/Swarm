@@ -13,7 +13,7 @@ import type { UI } from '../ui';
 
 /** Une phrase courte sur la partie, choisie selon ce qui s'est passé. */
 function deathLine(d: DeathInfo): string {
-  const t = d.record.tempsSurvecu;
+  const t = d.record.survivedSec;
   const k = d.record.kills;
   if (d.isReplay) return 'Fin de la relecture.';
   if (d.sandbox) return 'Partie sandbox : rien n’est enregistré dans les records.';
@@ -76,7 +76,7 @@ export function showDeath(ui: UI, d: DeathInfo): void {
     <p class="sub ${reveal(0)}">${esc(deathLine(d))}</p>
     ${badge ? `<div class="${reveal(1)}">${badge}</div>` : ''}
     <div class="stats ${reveal(2)}">
-      <div><small>Temps</small><b>${formatTime(r.tempsSurvecu)}</b></div>
+      <div><small>Temps</small><b>${formatTime(r.survivedSec)}</b></div>
       <div><small>Éliminés</small><b>${num(r.kills)}</b></div>
       <div><small>Niveau</small><b>${r.level}</b></div>
       <div><small>Boss vaincus</small><b>${d.bossKills}</b></div>

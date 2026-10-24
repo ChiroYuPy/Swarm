@@ -24,7 +24,7 @@ export function showScores(ui: UI, difficulty: number): void {
       return `<div class="pod p${i + 1}">
         <span class="medal">${i + 1}</span>
         <b class="pod-score">${pad7(r.score)}</b>
-        <span class="pod-meta">${formatTime(r.tempsSurvecu)} · niv. ${r.level || '—'} · ${num(r.kills)} éliminés <span class="pod-date">· ${date(r.date)}</span></span>
+        <span class="pod-meta">${formatTime(r.survivedSec)} · niv. ${r.level || '—'} · ${num(r.kills)} éliminés <span class="pod-date">· ${date(r.date)}</span></span>
         <span class="step"></span>
       </div>`;
     })
@@ -35,7 +35,7 @@ export function showScores(ui: UI, difficulty: number): void {
       (r, i) => `<tr>
         <td class="rank">${i + 4}</td>
         <td class="num score">${pad7(r.score)}</td>
-        <td class="num">${formatTime(r.tempsSurvecu)}</td>
+        <td class="num">${formatTime(r.survivedSec)}</td>
         <td class="num">${r.level || '—'}</td>
         <td class="num">${num(r.kills)}</td>
         <td class="date">${date(r.date)}</td>
@@ -46,9 +46,9 @@ export function showScores(ui: UI, difficulty: number): void {
     const best = bestScore(save, i);
     return `<button class="tab dtab nav ${i === difficulty ? 'on' : ''}" data-d="${i}" style="--c:${d.color}"><span>${esc(d.name)}</span><small>${best ? pad7(best) : '—'}</small></button>`;
   }).join('');
-  const top = <K extends 'score' | 'tempsSurvecu' | 'level' | 'kills'>(k: K) => Math.max(...list.map((r) => r[k] || 0));
+  const top = <K extends 'score' | 'survivedSec' | 'level' | 'kills'>(k: K) => Math.max(...list.map((r) => r[k] || 0));
   const bests = `<div class="stats rec-bests">
-      <div><small>Plus longue survie</small><b>${formatTime(top('tempsSurvecu'))}</b></div>
+      <div><small>Plus longue survie</small><b>${formatTime(top('survivedSec'))}</b></div>
       <div><small>Plus haut niveau</small><b>${top('level') || '—'}</b></div>
       <div><small>Plus d’éliminés</small><b>${num(top('kills'))}</b></div>
     </div>`;

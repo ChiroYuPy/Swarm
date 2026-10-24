@@ -6,7 +6,7 @@
 import { FUSIONS } from '../data/fusions';
 import { BASE_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { ENEMIES, OEIL } from '../data/enemies';
+import { ENEMIES, LASER_EYE_BOSS } from '../data/enemies';
 import {
   OFFER_FUSION,
   OFFER_PASSIVE,
@@ -222,7 +222,7 @@ export function botInput(s: GameState, pi = 0): number {
       const rx = x2 - chargeX;
       const ry = y2 - chargeY;
       const d = Math.sqrt(rx * rx + ry * ry);
-      if (d < OEIL.beamLength + 40) threat += 60 * (1 - d / (OEIL.beamLength + 40)) + 10;
+      if (d < LASER_EYE_BOSS.beamLength + 40) threat += 60 * (1 - d / (LASER_EYE_BOSS.beamLength + 40)) + 10;
     }
     score -= threat;
     score += (gw * (dx * gx + dy * gy)) / gl / (1 + threat * 0.3);

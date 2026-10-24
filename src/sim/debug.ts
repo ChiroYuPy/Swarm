@@ -13,7 +13,7 @@ import { PASSIVES } from '../data/passives';
 
 export function debugSpawnHorde(s: GameState, count: number): void {
   const p = s.players[0];
-  const types = ['triangle', 'losange', 'carre', 'pentagone', 'points'].map(enemyId);
+  const types = ['hunter', 'rusher', 'block', 'shooter', 'swarm'].map(enemyId);
   for (let i = 0; i < count; i++) {
     const ring = 260 + (i % 9) * 70;
     const a = (i * TWO_PI * 0.618033988749895) % TWO_PI;
@@ -29,7 +29,7 @@ export function debugSpawnHorde(s: GameState, count: number): void {
 export function debugBigBuild(s: GameState): void {
   const p = s.players[0];
   p.weapons.length = 0;
-  for (const id of ['cotillons', 'trounoir', 'creperang', 'periph', 'multiprise']) addWeapon(p, weaponId(id));
+  for (const id of ['spiral', 'black_holes', 'mine_boomerang', 'earthquake', 'electric_storm']) addWeapon(p, weaponId(id));
   p.passives = PASSIVES.slice(0, 4).map((_, i) => {
     const x = new PassiveInst();
     x.def = i;

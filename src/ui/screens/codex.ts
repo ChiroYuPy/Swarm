@@ -19,12 +19,12 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
   }
   ui.codexTab = tab;
   const cats: [CodexTab, string, number, string][] = [
-    ['regles', 'Comment jouer', 0, '#f2eaff'],
-    ['armes', 'Armes', BASE_WEAPONS.length, '#38f6ff'],
-    ['fusions', 'Évolutions', FUSIONS.length, '#ffd23a'],
-    ['bonus', 'Passifs', PASSIVES.length, '#39ff7a'],
-    ['objets', 'Objets', codexItems('objets').length, '#ff9b3d'],
-    ['ennemis', 'Ennemis', codexItems('ennemis').length, '#ff3d6e'],
+    ['rules', 'Comment jouer', 0, '#f2eaff'],
+    ['weapons', 'Armes', BASE_WEAPONS.length, '#38f6ff'],
+    ['evolutions', 'Évolutions', FUSIONS.length, '#ffd23a'],
+    ['passives', 'Passifs', PASSIVES.length, '#39ff7a'],
+    ['items', 'Objets', codexItems('items').length, '#ff9b3d'],
+    ['enemies', 'Ennemis', codexItems('enemies').length, '#ff3d6e'],
   ];
   // Onglets soulignés, comme les records : la catégorie ouverte prend sa couleur.
   const side = cats
