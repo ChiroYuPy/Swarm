@@ -1,0 +1,70 @@
+/* In-game toasts and the attract (demo) mode overlay. */
+
+/* ---------- Messages en jeu ---------- */
+#toasts {
+  position: fixed;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 5;
+}
+.toast {
+  --c: #fff;
+  padding: 6px 14px;
+  border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
+  border-radius: var(--radius);
+  background: rgba(7, 6, 15, 0.82);
+  font-size: var(--fs-m);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c);
+  animation: appear 0.16s ease-out;
+  transition: opacity 0.5s, transform 0.5s;
+}
+.toast.out {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.attract-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  animation: fade-in 0.8s 0.3s ease-out backwards;
+}
+.attract-tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: press-blink 2.4s ease-in-out infinite;
+}
+@keyframes press-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+
+@media (max-width: 760px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .card {
+    width: 100%;
+  }
+}

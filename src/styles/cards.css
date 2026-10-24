@@ -1,0 +1,168 @@
+/* Cards (difficulty, level-up offers), the level-up weapon swap bar and level pips. */
+
+/* ---------- Cartes (difficulté, level-up) ---------- */
+.cards {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+.card {
+  --c: #fff;
+  position: relative;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: left;
+  color: var(--text);
+  transition: border-color 0.1s, transform 0.1s, background 0.1s;
+}
+.card.focus,
+.card:focus,
+:where(body:not(.kbd)) .card:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 8%, rgba(12, 10, 26, 0.95));
+  transform: translateY(-3px);
+}
+.card.fusion {
+  border-color: var(--c);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c) 35%, transparent);
+}
+.card-title {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--c);
+}
+.card.offer .card-title {
+  color: var(--text);
+}
+.card-tag {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c);
+}
+.card-line {
+  font-size: var(--fs-l);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.card-text {
+  font-size: var(--fs-m);
+  color: var(--muted);
+  line-height: 1.35;
+}
+.card-meta {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card.offer {
+  width: 240px;
+  min-height: 270px;
+}
+.card .key {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-size: var(--fs-s);
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+}
+/* Échange d'arme, sous les cartes du level-up */
+.swapbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.swap-label {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.swap-label b {
+  color: var(--text);
+}
+.swap-btn {
+  --c: #fff;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: var(--radius);
+  background: var(--panel);
+  transition: border-color 0.1s, transform 0.1s, background 0.1s;
+}
+.swap-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.swap-btn.focus,
+:where(body:not(.kbd)) .swap-btn.pick:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 10%, rgba(12, 10, 26, 0.95));
+  transform: translateY(-2px);
+}
+.swap-cancel {
+  padding: 10px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+.swap-cancel.focus,
+:where(body:not(.kbd)) .swap-cancel:hover {
+  border-color: var(--text);
+}
+.card .icon {
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.35);
+}
+.pips {
+  display: flex;
+  gap: 4px;
+}
+.pips i {
+  width: 22px;
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.pips i.on {
+  background: var(--c);
+}
+.pips i.new {
+  background: #fff;
+}

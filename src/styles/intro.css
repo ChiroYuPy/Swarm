@@ -1,0 +1,239 @@
+/* First-load intro: standby LED, CRT power-on lines, particle swarm canvas, letter neon and the menu unroll that follows. */
+
+/* ---------- Intro du premier chargement ---------- */
+/* Rien ne s'affiche avant l'allumage (seule la veille est visible). */
+body.booting #game,
+body.booting #ui {
+  visibility: hidden;
+}
+/* 0. Veille : écran noir, un voyant rouge au centre (il deviendra le point lumineux), l'invitation dessous. */
+.standby {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.standby .led {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow:
+    0 0 8px var(--red),
+    0 0 22px rgba(255, 61, 110, 0.6);
+  animation: led-pulse 2.4s ease-in-out infinite;
+}
+@keyframes led-pulse {
+  50% {
+    opacity: 0.35;
+    box-shadow: 0 0 4px var(--red);
+  }
+}
+.standby p {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + 34px);
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-m);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: fade-in 0.8s 0.4s ease-out backwards;
+}
+/*
+ * 1. Allumage cathodique, en deux temps (durées alignées sur CRT_MS dans ui.ts) :
+ *  - 0 → 0,45 s : un point lumineux au centre, qui s'étire en un trait sur toute la largeur ;
+ *  - 0,45 → 1,05 s : le trait se dédouble, une ligne monte, l'autre descend. Seul l'espace entre les
+ *    deux est visible (masque sur le jeu et l'interface, même courbe que les lignes) : au-delà, noir.
+ */
+body.booting,
+body.crt-on {
+  background: #000;
+}
+body.crt-on #game,
+body.crt-on #ui {
+  animation: crt-open 0.6s 0.45s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+}
+@keyframes crt-open {
+  from {
+    clip-path: inset(50% 0 50% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.crt-line,
+.crt-edge {
+  position: fixed;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  pointer-events: none;
+  background: #eafdff;
+  box-shadow:
+    0 0 14px #38f6ff,
+    0 0 42px #38f6ff;
+}
+/* le point (un trait réduit à quelques pixels) qui s'étire sur toute la largeur, puis passe le relais */
+.crt-line {
+  animation: crt-dot 0.45s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+@keyframes crt-dot {
+  0%,
+  25% {
+    transform: scaleX(0.004);
+    opacity: 1;
+  }
+  99.9% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+/* les deux lignes : invisibles jusqu'au dédoublement, puis elles filent au bord et s'éteignent */
+.crt-edge {
+  opacity: 0;
+}
+.crt-edge.up {
+  animation: crt-up 0.6s 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.crt-edge.down {
+  animation: crt-down 0.6s 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+@keyframes crt-up {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  0% {
+    transform: none;
+  }
+  100% {
+    transform: translateY(-50vh);
+    opacity: 0;
+  }
+}
+@keyframes crt-down {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  0% {
+    transform: none;
+  }
+  100% {
+    transform: translateY(50vh);
+    opacity: 0;
+  }
+}
+/*
+ * 2. Logo seul, plus grand, centré pile en hauteur. L'essaim (canvas .swarm-intro, voir swarmLogo dans
+ *    ui.ts) le dessine de 1,05 s à 2,65 s, puis les lettres s'allument une par une (délais alignés sur
+ *    INTRO_TIMING dans audio.ts).
+ */
+.swarm-intro {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 7;
+  pointer-events: none;
+}
+.screen-menu.intro {
+  position: relative;
+}
+.screen-menu.intro .stack,
+.screen-menu.intro .version {
+  display: none;
+}
+.screen-menu.intro .brand {
+  transform: scale(1.6);
+}
+.screen-menu.intro .title span {
+  opacity: 0;
+  text-shadow: none;
+  animation: letter-on 0.6s steps(1, end) forwards;
+  animation-delay: calc(2.65s + var(--i) * 0.2s);
+}
+@keyframes letter-on {
+  0% {
+    opacity: 0.9;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+  14% {
+    opacity: 0.15;
+    text-shadow: none;
+  }
+  30% {
+    opacity: 1;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+  44% {
+    opacity: 0.3;
+    text-shadow: none;
+  }
+  58%,
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+  }
+}
+/* 3. Le logo remonte (animé en JS), les boutons se déroulent de haut en bas, un par un. */
+.screen-menu.intro-out .stack {
+  animation: unroll-clip 0.6s 0.3s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+}
+.screen-menu.intro-out .stack .btn {
+  transform-origin: 50% 0;
+  animation: unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+/* le bouton sélectionné garde son déroulé en plus du balayage (délais : règles nth-child ci-dessous) */
+.screen-menu.intro-out .stack .btn:focus {
+  animation:
+    unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards,
+    btn-sweep 0.55s ease-out;
+}
+.screen-menu.intro-out .stack .btn:nth-child(1) {
+  animation-delay: 0.32s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(2) {
+  animation-delay: 0.42s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(3) {
+  animation-delay: 0.52s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(4) {
+  animation-delay: 0.62s;
+}
+.screen-menu.intro-out .stack .btn:nth-child(5) {
+  animation-delay: 0.72s;
+}
+.screen-menu.intro-out .version {
+  animation: fade-in 0.6s 1.2s ease-out backwards;
+}
+@keyframes unroll-clip {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes unroll-btn {
+  from {
+    opacity: 0;
+    transform: perspective(500px) rotateX(-80deg);
+  }
+}

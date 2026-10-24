@@ -1,0 +1,179 @@
+/* Options screen: setting rows and the custom controls (slider, switch, choice arrows). */
+
+/* ---------- Options : curseurs, interrupteurs, choix ---------- */
+.screen-settings .panel.form {
+  width: min(640px, 100%);
+}
+.screen-settings {
+  gap: 16px;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form h3 {
+  margin: 14px 0 6px;
+}
+.form h3:first-child {
+  margin-top: 0;
+}
+.set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  font-size: var(--fs-l);
+  text-align: left;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.set:focus,
+:where(body:not(.kbd)) .set:hover {
+  outline: none;
+  border-color: var(--line-strong);
+  background: rgba(56, 246, 255, 0.05);
+}
+.set:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.set:focus-visible,
+.set.drag {
+  border-color: var(--accent);
+}
+.set-label kbd {
+  margin-left: 6px;
+}
+.ctl {
+  --v: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+.ctl .val {
+  min-width: 52px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+/* Curseur */
+.track {
+  position: relative;
+  width: 220px;
+  height: 22px;
+  touch-action: none;
+}
+.track::before,
+.fill {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 3px;
+}
+.track::before {
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+.fill {
+  width: calc(var(--v) * 100%);
+  background: linear-gradient(90deg, rgba(56, 246, 255, 0.35), var(--accent));
+  box-shadow: 0 0 10px rgba(56, 246, 255, 0.35);
+}
+.thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--v) * 100%);
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 0 10px rgba(56, 246, 255, 0.55);
+  transition: transform 0.12s;
+}
+.set:focus .thumb,
+:where(body:not(.kbd)) .set:hover .thumb,
+.set.drag .thumb {
+  transform: scale(1.2);
+  background: var(--accent);
+}
+/* Interrupteur */
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1),
+    background 0.15s;
+}
+.set.on .switch {
+  border-color: var(--green);
+  background: rgba(57, 255, 122, 0.18);
+}
+.set.on .switch i {
+  transform: translateX(20px);
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(57, 255, 122, 0.6);
+}
+.set[data-kind='toggle'] .val {
+  color: var(--muted);
+}
+.set.on[data-kind='toggle'] .val {
+  color: var(--green);
+}
+/* Choix */
+.ctl .arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+:where(body:not(.kbd)) .ctl .arrow:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.set[data-kind='choice'] .val {
+  min-width: 70px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .track {
+    width: 130px;
+  }
+}

@@ -1,0 +1,215 @@
+/* Records screen: difficulty tabs (.dtab), podium, best performances line and the top 10 table. */
+
+/* ---------- Records : hall des records ---------- */
+/* Onglets en texte : la difficulté affichée est soulignée de sa couleur. */
+.dtab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 132px;
+  padding: 6px 18px 12px;
+  border: none;
+}
+.dtab::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--c);
+  opacity: 0.5;
+  transform: scaleX(0);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s;
+}
+.dtab.on {
+  background: none;
+}
+.dtab.on::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.dtab:focus::after,
+:where(body:not(.kbd)) .dtab:hover::after {
+  transform: scaleX(1);
+}
+.dtab.on:focus {
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.dtab small {
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.dtab.on small {
+  color: var(--yellow);
+}
+.records {
+  --c: var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  /* hauteur fixe : passer d'un onglet plein à un onglet vide ne fait pas sauter l'écran */
+  min-height: min(470px, 58vh);
+}
+/* Podium : 2e, 1er, 3e. Chaque marche est un aplat léger surmonté d'un filet à la couleur de la médaille. */
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 14px;
+  width: 100%;
+}
+.pod {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 250px;
+  text-align: center;
+}
+.pod .medal {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  font-size: var(--fs-m);
+}
+.pod.p1 .medal {
+  width: 36px;
+  height: 36px;
+  font-size: var(--fs-l);
+}
+.pod-score {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--yellow);
+}
+.pod.p1 .pod-score {
+  font-size: 32px;
+  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
+}
+.pod-meta {
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pod-date {
+  opacity: 0.6;
+}
+.step {
+  align-self: stretch;
+  height: 8px;
+  margin-top: 8px;
+  border-top: 2px solid var(--m);
+  background: color-mix(in srgb, var(--m) 7%, transparent);
+}
+.p1 .step {
+  height: 34px;
+}
+.p2 .step {
+  height: 20px;
+}
+.medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.podium .medal {
+  border: 1px solid var(--m);
+  background: color-mix(in srgb, var(--m) 16%, transparent);
+  color: var(--m);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--m) 35%, transparent);
+}
+.p1 {
+  --m: var(--gold);
+}
+.p2 {
+  --m: #d6dcef;
+}
+.p3 {
+  --m: #e0975a;
+}
+/* meilleures performances : une ligne « libellé valeur », séparée par des filets */
+.stats.rec-bests div {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.stats.rec-bests b {
+  font-size: var(--fs-l);
+}
+/* Suite du top 10 : une liste à filets, sans cadre. */
+table.scores {
+  border-collapse: collapse;
+  width: min(760px, 100%);
+  font-size: var(--fs-m);
+}
+table.scores th,
+table.scores td {
+  padding: 5px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+}
+table.scores th {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+table.scores .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.scores td.score {
+  font-weight: 700;
+  color: var(--yellow);
+}
+table.scores td.rank,
+table.scores td.date {
+  color: var(--muted);
+}
+table.scores td.date {
+  text-align: right;
+}
+table.scores tbody tr {
+  transition: background 0.12s;
+}
+:where(body:not(.kbd)) table.scores tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+table.scores tbody tr:last-child td {
+  border-bottom: none;
+}
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+@media (max-width: 760px) {
+  .pod {
+    width: 33%;
+  }
+  .pod.p1 .pod-score {
+    font-size: var(--fs-xl);
+  }
+  .pod-meta {
+    display: none;
+  }
+}

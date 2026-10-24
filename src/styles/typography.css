@@ -1,0 +1,150 @@
+/* Typography: headings, section rules, the neon screen header (.head), version line, key hints (.foot.keys) and kbd. */
+
+/* ---------- Typographie ---------- */
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+.title {
+  font-size: clamp(48px, 7vw, 88px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #eafdff;
+  text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
+}
+h2 {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+h3 {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+/* Titre de section suivi d'un filet qui s'efface : remplace les cadres. */
+h3.rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+h3.rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
+h3.rule small {
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  opacity: 0.6;
+}
+.gold {
+  color: var(--yellow);
+}
+.sub {
+  margin-top: 6px;
+  font-size: var(--fs-l);
+  color: var(--muted);
+}
+.brand,
+.foot {
+  text-align: center;
+}
+/* En-tête d'écran : titre néon à la couleur de l'écran (--c), filet qui s'étire depuis le centre. */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.head h2 {
+  font-size: var(--fs-2xl);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow:
+    0 0 2px var(--c),
+    0 0 16px color-mix(in srgb, var(--c) 70%, transparent);
+  animation: neon-on 0.9s 0.05s ease-out both;
+}
+/* le filet prend la largeur du titre, un peu plus de chaque côté (ses bouts s'effacent) */
+.head .ttl {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.head .line {
+  margin: 0 -32px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--c), transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 55%, transparent);
+  animation: line-in 0.55s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.head .sub {
+  margin-top: 2px;
+  font-size: var(--fs-m);
+}
+.head .sub b {
+  font-variant-numeric: tabular-nums;
+}
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+.version {
+  margin: -6px 0 0;
+  font-size: var(--fs-s);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  opacity: 0.45;
+}
+.foot {
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+/* Rappel des touches : des touches de clavier, puis l'action. */
+.foot.keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 22px;
+  margin-top: -4px;
+}
+.foot.keys kbd {
+  margin-right: 3px;
+}
+.note,
+.empty {
+  color: var(--muted);
+  font-size: var(--fs-m);
+}
+.note {
+  margin-bottom: 14px;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font);
+  font-size: var(--fs-s);
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}

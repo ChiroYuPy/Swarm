@@ -1,0 +1,245 @@
+/* Codex screen: category tabs, item tile grid, detail sheet, rows, evolution recipes, chips and rules page. */
+
+/* ---------- Codex : onglets, grille | fiche ---------- */
+.screen-codex {
+  width: min(1180px, 100%);
+  gap: 16px;
+}
+.cats .dtab {
+  min-width: 0;
+  padding: 6px 16px 10px;
+}
+.cats .dtab.on small {
+  color: var(--c);
+}
+.codex {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 430px);
+  gap: 0;
+  width: 100%;
+  height: min(58vh, 560px);
+}
+.codex.solo {
+  grid-template-columns: minmax(0, 820px);
+  justify-content: center;
+}
+.codex .panel {
+  width: 100%;
+  overflow-y: auto;
+}
+.list {
+  padding-right: 18px;
+}
+/* La fiche : séparée de la grille par un simple filet. */
+.detail {
+  padding: 2px 6px 0 26px;
+  border-left: 1px solid var(--line);
+}
+.codex.solo .detail {
+  padding: 0 6px 0 0;
+  border-left: none;
+}
+.list h3 {
+  margin: 4px 0 8px;
+}
+.list .tiles + h3 {
+  margin-top: 18px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 6px;
+}
+/* Tuile : icône et nom à nu ; un cadre teinté seulement sur l'élément choisi. */
+.tile {
+  --c: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    box-shadow 0.12s,
+    color 0.12s;
+}
+.tile .nm {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+.tile:focus,
+:where(body:not(.kbd)) .tile:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.tile.on {
+  border-color: color-mix(in srgb, var(--c) 65%, transparent);
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 18%, transparent);
+}
+.tile.on .nm,
+.tile:focus .nm {
+  color: var(--text);
+}
+.ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.detail h3 {
+  margin: 18px 0 8px;
+}
+/* En-tête de fiche : l'icône dans un halo, le nom, et un filet à la couleur de l'élément. */
+.dhead {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding-bottom: 14px;
+}
+.dhead::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--c), transparent 85%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.dhead .ico.big {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 20%, transparent), transparent 70%);
+}
+.dhead .tag {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c);
+}
+.dhead h2 {
+  font-size: var(--fs-2xl);
+  line-height: 1.1;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--c) 40%, transparent);
+}
+.detail .desc {
+  margin-top: 14px;
+  font-size: var(--fs-l);
+  line-height: 1.4;
+}
+.detail p {
+  font-size: var(--fs-m);
+  line-height: 1.4;
+  color: #d9d0f2;
+}
+.detail p.hint {
+  margin-top: 10px;
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  margin: 0;
+  font-size: var(--fs-m);
+}
+.rows dt,
+.rows dd {
+  margin: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+}
+.rows dt {
+  padding-right: 14px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Recette d'évolution : arme + passif → évolution, en grand. */
+.recipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+/* le résultat sur sa propre ligne : « A + B », puis « → C » */
+.recipe .res {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 8px;
+}
+.recipe .op {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--muted);
+}
+.chip {
+  --c: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 5px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--c) 6%, transparent);
+  font-size: var(--fs-m);
+  font-weight: 600;
+  color: var(--text);
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.chip small {
+  font-size: var(--fs-s);
+  color: var(--c);
+}
+:where(body:not(.kbd)) .chip:hover,
+.chip:focus {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.rules {
+  display: grid;
+  gap: 18px;
+}
+.rules p {
+  font-size: var(--fs-l);
+  line-height: 1.5;
+  color: #d9d0f2;
+  margin-bottom: 6px;
+}
+@media (max-width: 1100px) {
+  .codex {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .tiles {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .codex {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .detail {
+    padding: 14px 0 0;
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .codex .panel {
+    max-height: 46vh;
+  }
+}

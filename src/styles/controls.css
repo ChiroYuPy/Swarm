@@ -1,0 +1,173 @@
+/* Buttons (single style plus primary / go / tint / danger), the main menu button stack, action bars, underlined tabs and panels. */
+
+/* ---------- Boutons (un seul style) ---------- */
+button {
+  font: inherit;
+  color: inherit;
+}
+button:focus {
+  outline: none;
+}
+.btn {
+  min-width: 180px;
+  padding: 11px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(12, 10, 26, 0.7);
+  font-size: var(--fs-l);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text);
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s,
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:focus,
+:where(body:not(.kbd)) .btn:hover {
+  border-color: var(--accent);
+  background: rgba(56, 246, 255, 0.1);
+  color: #fff;
+}
+.btn.primary {
+  border-color: rgba(56, 246, 255, 0.6);
+  color: var(--accent);
+}
+.btn.primary:focus,
+:where(body:not(.kbd)) .btn.primary:hover {
+  background: rgba(56, 246, 255, 0.16);
+  color: #fff;
+}
+.btn.go {
+  border-color: rgba(57, 255, 122, 0.6);
+  color: var(--green);
+}
+.btn.go:focus,
+:where(body:not(.kbd)) .btn.go:hover {
+  border-color: var(--green);
+  background: rgba(57, 255, 122, 0.14);
+  color: #fff;
+}
+/* Bouton à la couleur de son contexte (--c), ex. « Jouer en Difficile » dans les records. */
+.btn.tint {
+  border-color: color-mix(in srgb, var(--c) 60%, transparent);
+  color: var(--c);
+}
+.btn.tint:focus,
+:where(body:not(.kbd)) .btn.tint:hover {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: #fff;
+}
+.btn.danger {
+  border-color: rgba(255, 61, 110, 0.5);
+  color: var(--red);
+}
+.btn.danger:focus,
+:where(body:not(.kbd)) .btn.danger:hover {
+  border-color: var(--red);
+  background: rgba(255, 61, 110, 0.16);
+  color: #fff;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+}
+.stack .btn {
+  width: 100%;
+  text-align: center;
+}
+.screen-menu .stack .btn {
+  position: relative;
+  background-image: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.16) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: -30% 0;
+}
+.screen-menu .stack .btn::before,
+.screen-menu .stack .btn::after {
+  position: absolute;
+  top: 50%;
+  color: var(--accent);
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.screen-menu .stack .btn::before {
+  content: '›';
+  left: 16px;
+  transform: translate(-8px, -52%);
+}
+.screen-menu .stack .btn::after {
+  content: '‹';
+  right: 16px;
+  transform: translate(8px, -52%);
+}
+.screen-menu .stack .btn:focus::before,
+.screen-menu .stack .btn:focus::after {
+  opacity: 1;
+  transform: translate(0, -52%);
+}
+.screen-menu .stack .btn:focus {
+  text-shadow: 0 0 10px rgba(56, 246, 255, 0.7);
+  animation: btn-sweep 0.55s ease-out;
+}
+@keyframes btn-sweep {
+  from {
+    background-position: 130% 0;
+  }
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.actions .btn {
+  text-align: center;
+}
+
+/* ---------- Onglets ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tab {
+  --c: var(--accent);
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  font-size: var(--fs-m);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tab:focus,
+:where(body:not(.kbd)) .tab:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.tab.on {
+  border-color: var(--c);
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+}
+
+/* ---------- Colonnes de contenu (sans cadre) ---------- */
+.panel {
+  width: min(560px, 100%);
+}

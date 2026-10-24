@@ -1,0 +1,82 @@
+/* Design tokens (CSS variables), global reset and the #game canvas states (intro, demo, death, pause filters). */
+
+/*
+ * Système visuel unique, celui de la fin de partie : une police (Chakra Petch), une échelle de tailles,
+ * un titre néon souligné en tête de chaque écran, du contenu à nu séparé par des filets (pas de cadres),
+ * des chiffres « libellé / valeur », des onglets soulignés, et une arrivée en cascade.
+ * Les lueurs sont réservées aux titres et aux scores.
+ */
+:root {
+  --bg: #07060f;
+  --panel: rgba(12, 10, 26, 0.92);
+  --line: rgba(150, 130, 255, 0.22);
+  --line-strong: rgba(150, 130, 255, 0.45);
+  --text: #f2eaff;
+  --muted: #9a8fc0;
+  --accent: #38f6ff;
+  --pink: #ff3df5;
+  --green: #39ff7a;
+  --gold: #ffd23a;
+  --yellow: #ffe14d;
+  --red: #ff3d6e;
+  --violet: #b48cff;
+  --font: 'Chakra Petch', 'Trebuchet MS', system-ui, sans-serif;
+  /* Échelle de tailles */
+  --fs-s: 12px;
+  --fs-m: 14px;
+  --fs-l: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 28px;
+  --radius: 6px;
+  font-family: var(--font);
+  font-size: var(--fs-l);
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  user-select: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  display: block;
+  transition:
+    filter 0.5s,
+    opacity 1s ease-in-out;
+}
+/* Intro : fond uni, la démo reste cachée (et figée) jusqu'à l'arrivée du menu. */
+body.intro-bg #game {
+  opacity: 0;
+}
+body.intro-bg #ui.menu::before {
+  background: var(--bg);
+}
+body.demo #game {
+  filter: saturate(0.85) brightness(0.5);
+}
+/* Menu principal et mode démo : la démo reste bien visible, sous un simple filtre léger. */
+body.demo.menu-home #game,
+body.demo.attract #game {
+  filter: saturate(0.95) brightness(0.85);
+}
+/* Relève de la démo : elle s'efface le temps d'échanger (voir prepareDemo dans main.ts). */
+body.demo-swap #game {
+  opacity: 0;
+}
+body.dead #game {
+  filter: saturate(0.4) brightness(0.35) blur(2px);
+}
+body.paused #game {
+  filter: saturate(0.55) brightness(0.45) blur(1.5px);
+}

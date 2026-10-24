@@ -1,0 +1,25 @@
+/* Scrollbars. */
+
+/* ---------- Barres de défilement ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 130, 255, 0.4) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: rgba(150, 130, 255, 0.4) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent) padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

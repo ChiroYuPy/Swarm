@@ -1,0 +1,82 @@
+/* Label / value stat tiles (.stats, .stats.mini) shared by game over, pause, codex and difficulty, plus the final build layout. */
+
+/* Chiffres « libellé / valeur » séparés par un filet, sans cadre (fin de partie, pause, codex…). */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 4px 0;
+}
+.stats > * {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 132px;
+  padding: 2px 26px;
+}
+.stats > * + * {
+  border-left: 1px solid var(--line);
+}
+/* Version compacte, alignée à gauche (fiches du codex, record d'une difficulté). */
+.stats.mini {
+  justify-content: flex-start;
+  margin: 14px 0 4px;
+}
+.stats.mini > * {
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0 16px;
+  gap: 2px;
+}
+.stats.mini > :first-child {
+  padding-left: 0;
+}
+.stats.mini b {
+  font-size: var(--fs-xl);
+  white-space: nowrap;
+}
+.stats.mini .to {
+  font-style: normal;
+  font-size: var(--fs-m);
+  color: var(--muted);
+}
+/* valeurs en texte (passifs) : plus petites, sur plusieurs lignes */
+.stats.mini.wide > * {
+  flex: 1;
+}
+.stats.mini.wide b {
+  font-size: var(--fs-m);
+  white-space: normal;
+  line-height: 1.3;
+}
+.stats.arrivals > * small {
+  color: var(--c);
+}
+.stats small {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stats b {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* Équipement final : les icônes à nu, centrées. */
+.final-build {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.final-build .items {
+  justify-content: center;
+  gap: 10px 26px;
+}
+.final-build .item {
+  padding: 0;
+  border: none;
+  background: none;
+}

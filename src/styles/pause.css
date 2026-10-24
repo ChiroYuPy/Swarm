@@ -1,0 +1,149 @@
+/* Equipment lists: final build items (game over) and the pause summary (gear rows, stat grid). */
+
+/* ---------- Équipement (fin de partie) ---------- */
+.build .items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.build .item {
+  --c: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.build .item .icon {
+  display: flex;
+}
+.build .item .txt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: var(--fs-m);
+}
+.build .lv {
+  font-size: var(--fs-s);
+  color: var(--c);
+}
+.build .lv.max {
+  color: var(--gold);
+}
+
+/* ---------- Pause : résumé de la partie ---------- */
+.screen-pause {
+  width: min(1100px, 100%);
+  gap: 16px;
+}
+.stats.run b {
+  font-size: var(--fs-xl);
+}
+.stats.run .gold {
+  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
+}
+.pause-gear {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px 40px;
+  width: 100%;
+}
+.pause-gear h3,
+.pause-stats h3 {
+  margin-bottom: 6px;
+}
+/* Une ligne d'équipement : icône, nom + niveau en pastilles, chiffres, évolution. */
+.gear {
+  --c: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+}
+.gear:last-child {
+  border-bottom: none;
+}
+.gear .icon {
+  display: flex;
+  flex: none;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 40%, transparent));
+}
+.gear-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.gear-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-m);
+}
+.gear-top .pips i {
+  width: 14px;
+  height: 4px;
+}
+.gear-top .tag {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.gear small {
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.gear .evo {
+  font-style: normal;
+  opacity: 0.85;
+}
+.gear .evo.ready {
+  color: var(--gold);
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(255, 210, 58, 0.45);
+}
+/* Stats : trois colonnes « libellé valeur » ; celles qui ont un bonus en couleur, avec leurs sources. */
+.pause-stats {
+  width: 100%;
+}
+.statgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 40px;
+}
+.statgrid div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(150, 130, 255, 0.1);
+  font-size: var(--fs-m);
+  color: var(--muted);
+}
+.statgrid b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(242, 234, 255, 0.55);
+}
+.statgrid div.on {
+  color: var(--text);
+}
+.statgrid div.on b {
+  color: var(--green);
+}
+.statgrid small {
+  flex-basis: 100%;
+  font-size: var(--fs-s);
+  color: rgba(154, 143, 192, 0.8);
+}
+@media (max-width: 860px) {
+  .pause-gear {
+    grid-template-columns: 1fr;
+  }
+  .statgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,57 @@
+/* Neon cursor (see ui/cursor.ts). */
+
+/* ---------- Curseur néon (voir ui/cursor.ts) ---------- */
+/* Le curseur système est masqué partout : c'est #cursor qui le remplace. */
+*,
+*::before,
+*::after {
+  cursor: none !important;
+}
+#cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+  will-change: transform;
+}
+#cursor svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 0 3px rgba(56, 246, 255, 0.85));
+}
+/* Même structure pour la flèche et le point (pointe = centre du point) : le passage de l'un à l'autre est un morphing. */
+#cursor path {
+  d: path('M 5 1 C 6.66 1 8 2.34 8 4 C 8 5.66 6.66 7 5 7 C 3.34 7 2 5.66 2 4 C 2 2.34 3.34 1 5 1 Z');
+  fill: var(--accent);
+  stroke: #eafdff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  transition:
+    d 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    fill 0.2s,
+    stroke 0.2s;
+}
+#cursor:not([data-state='off']) {
+  opacity: 1;
+}
+#cursor[data-state='arrow'] path,
+#cursor[data-state='hover'] path {
+  d: path('M 5 4 C 12 7.5 19 11 26 14.5 C 22.5 15.33 19 16.17 15.5 17 C 14.17 20.5 12.83 24 11.5 27.5 C 9.33 19.33 7.17 11.67 5 4 Z');
+}
+#cursor[data-state='arrow'] path {
+  fill: rgba(7, 6, 15, 0.85);
+  stroke: var(--accent);
+}
+#cursor[data-state='hover'] path {
+  fill: color-mix(in srgb, var(--accent) 55%, rgba(7, 6, 15, 0.85));
+}
+/* Viser (clic maintenu en partie) : le point s'ouvre en anneau, centré sur le même point. */
+#cursor[data-state='aim'] path {
+  d: path('M 5 -4 C 9.42 -4 13 -0.42 13 4 C 13 8.42 9.42 12 5 12 C 0.58 12 -3 8.42 -3 4 C -3 -0.42 0.58 -4 5 -4 Z');
+  fill: rgba(56, 246, 255, 0.12);
+  stroke: var(--accent);
+  stroke-width: 2;
+}

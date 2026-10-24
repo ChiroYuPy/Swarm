@@ -1,0 +1,105 @@
+/* Sandbox screen: settings form next to the starting loadout tiles, slot counters, foe and boss duel tiles. */
+
+/* ---------- Sandbox : réglages | équipement de départ ---------- */
+.screen-sandbox {
+  width: min(1180px, 100%);
+}
+.sandbox-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 22px;
+  width: 100%;
+  height: min(64vh, 600px);
+}
+.screen-sandbox {
+  gap: 16px;
+}
+.screen-sandbox .panel {
+  width: 100%;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+.screen-sandbox .loadout {
+  padding: 0 4px 0 22px;
+  border-left: 1px solid var(--line);
+}
+.screen-sandbox .set {
+  min-height: 42px;
+  padding: 6px 12px;
+}
+.set-label small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.screen-sandbox .set[data-kind='choice'] .val {
+  min-width: 96px;
+}
+.screen-sandbox .tiles {
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.screen-sandbox .tile {
+  padding: 8px 4px 6px;
+  gap: 4px;
+}
+.screen-sandbox .tile .ico {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  transition:
+    opacity 0.12s,
+    filter 0.12s;
+}
+.screen-sandbox .tile.on .ico {
+  opacity: 1;
+  filter: none;
+}
+.tile .lv {
+  font-size: var(--fs-s);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.tile.on .lv {
+  color: var(--c);
+}
+.loadout h3 {
+  margin: 16px 0 8px;
+}
+.loadout h3:first-child {
+  margin-top: 0;
+}
+.slots {
+  font-size: var(--fs-s);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+}
+.slots.full {
+  animation: slots-full 0.5s ease-out;
+}
+@keyframes slots-full {
+  0%,
+  40% {
+    color: var(--red);
+    transform: scale(1.25);
+  }
+}
+.foes {
+  margin: 6px 0 2px;
+}
+/* boss à affronter d'emblée, sous « Commencer à » */
+.tiles.duels {
+  grid-template-columns: repeat(5, 1fr);
+  margin: 4px 0 8px;
+}
+.foes.off {
+  opacity: 0.35;
+}
+@media (max-width: 860px) {
+  .sandbox-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}

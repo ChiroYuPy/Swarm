@@ -1,0 +1,20 @@
+/* In-place screen changes: the picked level-up card glow while leaving, and the fade when switching tabs (codex, records). */
+
+/* Level-up : la carte choisie s'illumine pendant que l'écran file. */
+.screen-levelup {
+  gap: 18px;
+}
+.screen-levelup.leaving .card.picked {
+  border-color: var(--c);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--c) 60%, transparent);
+  transform: translateY(-3px) scale(1.04);
+}
+/* Onglets (codex, records) : l'écran ne bouge pas, seul le contenu change, en fondu. */
+.screen.same .list,
+.screen.same .detail,
+.screen.same .records {
+  animation: fade-in 0.2s ease-out backwards;
+}
+.detail.swap {
+  animation: fade-in 0.18s ease-out backwards;
+}

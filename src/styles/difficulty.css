@@ -1,0 +1,180 @@
+/* Difficulty screen: cards, threat chevrons, comparison meters and per-difficulty record. */
+
+/* ---------- Choix de la difficulté ---------- */
+.diffs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+.diff {
+  --c: #fff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 20px 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  border-radius: 10px;
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--c) 12%, transparent), transparent 70%),
+    var(--panel);
+  text-align: left;
+  color: var(--text);
+  transition:
+    border-color 0.15s,
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s,
+    opacity 0.2s,
+    filter 0.2s;
+  animation: diff-in 0.5s calc(0.22s + var(--i) * 0.07s) cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.diff:focus,
+:where(body:not(.kbd)) .diff:hover {
+  border-color: var(--c);
+  transform: translateY(-5px);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 0 26px color-mix(in srgb, var(--c) 30%, transparent);
+}
+/* les cartes non sélectionnées passent en retrait */
+.diffs:has(.diff:focus) .diff:not(:focus) {
+  opacity: 0.5;
+  filter: saturate(0.5);
+}
+.diff:active {
+  transform: translateY(-2px) scale(0.985);
+}
+@keyframes diff-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+.screen.enter-back .diff {
+  animation: none;
+}
+.diff-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+}
+/* niveau de menace : 1 à 3 chevrons allumés */
+.threat {
+  display: flex;
+  gap: 4px;
+}
+.threat i {
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  clip-path: polygon(0 0, 55% 0, 100% 50%, 55% 100%, 0 100%, 45% 50%);
+}
+.threat i.on {
+  background: var(--c);
+  filter: drop-shadow(0 0 4px var(--c));
+}
+.diff-name {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--c);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.diff-desc {
+  min-height: 3.9em;
+  font-size: var(--fs-m);
+  line-height: 1.35;
+  color: var(--muted);
+}
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(150, 130, 255, 0.12);
+  border-bottom: 1px solid rgba(150, 130, 255, 0.12);
+}
+.meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.segs {
+  display: flex;
+  gap: 3px;
+}
+.segs i {
+  width: 18px;
+  height: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.segs i.on {
+  background: var(--c);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c) 55%, transparent);
+}
+.diff-record {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.diff-record small {
+  font-size: var(--fs-s);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.diff-record b {
+  height: 32px;
+  line-height: 32px;
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--yellow);
+  text-shadow: 0 0 14px rgba(255, 225, 77, 0.35);
+}
+.diff-record em {
+  font-style: normal;
+  font-size: var(--fs-s);
+  color: var(--muted);
+}
+.diff-record .stats.mini {
+  margin: 6px 0 0;
+}
+.diff-record .stats.mini > * {
+  padding: 0 12px;
+}
+.diff-record .stats.mini > :first-child {
+  padding-left: 0;
+}
+.diff-record .stats.mini small {
+  font-size: 10px;
+}
+.diff-record .stats.mini b {
+  height: auto;
+  line-height: 1.2;
+  font-size: var(--fs-m);
+  color: var(--text);
+  text-shadow: none;
+  letter-spacing: 0;
+}
+@media (max-width: 860px) {
+  .diffs {
+    grid-template-columns: 1fr;
+  }
+  .diff-desc {
+    min-height: 0;
+  }
+}
