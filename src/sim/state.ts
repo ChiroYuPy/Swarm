@@ -2,6 +2,7 @@
  * Structures de l'état de jeu. Tout est préalloué (pools) pour ne rien allouer dans la boucle chaude.
  * Les tableaux actifs sont compacts : les entités vivantes occupent [0, count).
  */
+import { HERO } from '../data/hero';
 import {
   IMMUNE_SLOTS,
   MAX_ENEMIES,
@@ -194,7 +195,17 @@ export interface PlayerStats {
 }
 
 export function baseStats(): PlayerStats {
-  return { maxHp: 100, speed: 150, magnet: 72, regen: 0, might: 1, area: 1, cooldownMul: 1, armor: 0, luck: 1 };
+  return {
+    maxHp: HERO.maxHp,
+    speed: HERO.speed,
+    magnet: HERO.magnet,
+    regen: HERO.regen,
+    might: 1,
+    area: 1,
+    cooldownMul: 1,
+    armor: 0,
+    luck: 1,
+  };
 }
 
 /** Proposition de level-up. */
@@ -220,8 +231,8 @@ export class Player {
   y = 0;
   px = 0;
   py = 0;
-  r = 14;
-  hp = 100;
+  r = HERO.radius;
+  hp = HERO.maxHp;
   level = 1;
   xp = 0;
   xpNext = 5;

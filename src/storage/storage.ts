@@ -7,7 +7,9 @@ import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { HERO } from '../data/hero';
 
-export const SAVE_KEY = 'neonawak.save';
+export const SAVE_KEY = 'swarm.save';
+/** Key used before the project was renamed, moved to SAVE_KEY on first load. */
+export const LEGACY_SAVE_KEY = 'neonawak.save';
 export const SAVE_VERSION = 2;
 export const TOP_PER_DIFFICULTY = 10;
 
@@ -145,9 +147,24 @@ function isScore(x: unknown): x is ScoreRecord {
 /** Sauvegarde écrite par une version plus récente du jeu : on l'ignore et, surtout, on ne l'écrase pas. */
 let futureSaveDetected = false;
 
+/** Raw save text, moving a legacy-key save to SAVE_KEY if that is all there is. */
+function readSaveText(): string | null {
+  const txt = localStorage.getItem(SAVE_KEY);
+  if (txt !== null) return txt;
+  const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
+  if (legacy === null) return null;
+  try {
+    localStorage.setItem(SAVE_KEY, legacy);
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+  } catch {
+    // keep the legacy key, it will be retried on next load
+  }
+  return legacy;
+}
+
 export function loadSave(): SaveData {
   try {
-    const txt = localStorage.getItem(SAVE_KEY);
+    const txt = readSaveText();
     if (!txt) return defaultSave();
     const raw = JSON.parse(txt) as { version?: unknown };
     if (typeof raw.version === 'number' && raw.version > SAVE_VERSION) futureSaveDetected = true;

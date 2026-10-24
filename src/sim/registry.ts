@@ -5,7 +5,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, type WeaponDef, type WeaponLevel } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { ENEMIES, BOSS, BOSS_ORDER, ETOILE, HEXAGONE, OEIL, REINE, type BossPhase, type BossSummon } from '../data/enemies';
+import { ENEMIES, BOSS, BOSS_ORDER, ETOILE, HEXAGONE, OEIL, REINE, type BossPhase, type BossSummon, type EnemyBehavior } from '../data/enemies';
 import { WAVES } from '../data/waves';
 import { DIFFICULTIES } from '../data/difficulty';
 import { TICK_RATE } from './constants';
@@ -61,21 +61,8 @@ export const BEHAVIOR = {
   ORBITER: 9,
   WALL: 10,
   EGG: 11,
-} as const;
-const BEHAVIOR_BY_NAME: Record<string, number> = {
-  chaser: BEHAVIOR.CHASER,
-  shooter: BEHAVIOR.SHOOTER,
-  kamikaze: BEHAVIOR.KAMIKAZE,
-  swarm: BEHAVIOR.SWARM,
-  prop: BEHAVIOR.PROP,
-  boss: BEHAVIOR.BOSS,
-  leader: BEHAVIOR.LEADER,
-  blinker: BEHAVIOR.BLINKER,
-  orbiter: BEHAVIOR.ORBITER,
-  wall: BEHAVIOR.WALL,
-  egg: BEHAVIOR.EGG,
-};
-export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR_BY_NAME[e.behavior]);
+} as const satisfies Record<Uppercase<EnemyBehavior>, number>;
+export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR[e.behavior.toUpperCase() as Uppercase<EnemyBehavior>]);
 /** Diviseur : type d'ennemi né à sa mort (-1 : aucun). */
 export const SPLIT_INTO = ENEMIES.map((e) => (e.splitInto ? enemyId(e.splitInto) : -1));
 /** Meneur : bonus de vitesse des ennemis qu'il galvanise. */

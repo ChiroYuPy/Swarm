@@ -1,9 +1,10 @@
+import { version } from '../../package.json';
 import { MAP_GEN } from '../data/map';
 
 /** Version de la simulation : à incrémenter dès qu'un changement casse la compatibilité des replays. */
 export const SIM_VERSION = 18;
 /** Version affichée du jeu, stockée dans les scores. */
-export const GAME_VERSION = '0.8.5';
+export const GAME_VERSION: string = version;
 
 export const TICK_RATE = 60;
 export const DT = 1 / TICK_RATE;

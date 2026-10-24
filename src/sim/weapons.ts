@@ -1,15 +1,15 @@
 /**
  * Comportements des armes. Chaque `behavior` des données correspond à une fonction ici.
  * Pour ajouter une arme : réutiliser un comportement existant dans data/weapons.ts,
- * ou ajouter un cas dans le switch de `updateWeapons`.
+ * ou ajouter une entrée dans `UPDATER_BY_BEHAVIOR`.
  */
-import type { WeaponLevel } from '../data/weapons';
+import { ALL_WEAPONS, type Behavior, type WeaponLevel } from '../data/weapons';
 import { INPUT_DIRS, MAX_WEAPON_SLOTS, TICK_RATE, DT } from './constants';
 import { TWO_PI, dcos, datan2, dsin } from './dmath';
 import { spawnProjectile } from './entities';
 import { damageEnemy, healPlayer, pushEnemy } from './combat';
 import { clearShotsIn, clearShotsOnLine } from './shots';
-import { ENEMY_INDEX, weaponDef, weaponLevel } from './registry';
+import { ENEMY_INDEX, weaponLevel } from './registry';
 import {
   EF_BOSS,
   EV_LINE,
@@ -126,63 +126,34 @@ export function spawnMine(
   m.knock = knock;
 }
 
+type WeaponUpdater = (s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel) => void;
+
+const UPDATER_BY_BEHAVIOR: Record<Behavior, WeaponUpdater> = {
+  projectile,
+  spiral,
+  orbit,
+  aura,
+  beam,
+  mine,
+  boomerang,
+  chain,
+  pulse,
+  whip,
+  scythe,
+  mortar,
+  phoenix,
+  flame,
+  turret,
+  drone,
+  ricochet,
+};
+/** Updater per weapon index, resolved once from the data. */
+const WEAPON_UPDATERS: WeaponUpdater[] = ALL_WEAPONS.map((d) => UPDATER_BY_BEHAVIOR[d.behavior]);
+
 export function updateWeapons(s: GameState, p: Player): void {
   for (let slot = 0; slot < p.weapons.length; slot++) {
     const w = p.weapons[slot];
-    const L = weaponLevel(w.def, w.level);
-    switch (weaponDef(w.def).behavior) {
-      case 'projectile':
-        projectile(s, p, w, slot, L);
-        break;
-      case 'spiral':
-        spiral(s, p, w, slot, L);
-        break;
-      case 'orbit':
-        orbit(s, p, w, slot, L);
-        break;
-      case 'aura':
-        aura(s, p, w, L);
-        break;
-      case 'beam':
-        beam(s, p, w, L);
-        break;
-      case 'mine':
-        mine(s, p, w, L);
-        break;
-      case 'boomerang':
-        boomerang(s, p, w, slot, L);
-        break;
-      case 'chain':
-        chain(s, p, w, L);
-        break;
-      case 'pulse':
-        pulse(s, p, w, slot, L);
-        break;
-      case 'whip':
-        whip(s, p, w, L);
-        break;
-      case 'scythe':
-        scythe(s, p, w, L);
-        break;
-      case 'mortar':
-        mortar(s, p, w, slot, L);
-        break;
-      case 'phoenix':
-        phoenix(s, p, w, slot, L);
-        break;
-      case 'flame':
-        flame(s, p, w, L);
-        break;
-      case 'turret':
-        turret(s, p, w, slot, L);
-        break;
-      case 'drone':
-        drone(s, p, w, slot, L);
-        break;
-      case 'ricochet':
-        ricochet(s, p, w, slot, L);
-        break;
-    }
+    WEAPON_UPDATERS[w.def](s, p, w, slot, weaponLevel(w.def, w.level));
   }
 }
 
@@ -278,7 +249,7 @@ function orbit(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLe
   }
 }
 
-function aura(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function aura(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   const R = (L.radius ?? 80) * p.stats.area;
   w.vR = R;
   if (w.activeTicks > 0) w.activeTicks--;
@@ -312,7 +283,7 @@ function aura(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   if (heal > 0) healPlayer(s, p, Math.min(heal, 4), false);
 }
 
-function beam(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function beam(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   const len = L.length ?? 420;
   const width = (L.width ?? 8) * p.stats.area;
   const n = Math.min(4, L.count ?? 1);
@@ -360,7 +331,7 @@ function beam(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }
 
-function mine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function mine(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
   // Les mines sont des pièges : on en pose dès que des ennemis approchent, pas dans le vide.
@@ -429,7 +400,7 @@ function boomerang(s: GameState, p: Player, w: WeaponInst, slot: number, L: Weap
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }
 
-function chain(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function chain(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
   const g = s.grid;
@@ -563,7 +534,7 @@ export const WHIP_FX_TICKS = 16;
 const WHIP_STEP = TWO_PI / 20;
 
 /** Fouet : des lanières en éventail devant toi (1/5 de tour au plus), qui blessent et repoussent loin dans leur axe. */
-function whip(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function whip(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;
   w.timer -= 1;
   if (w.timer > 0) return;
@@ -614,7 +585,7 @@ export const SCYTHE_FX_TICKS = 18;
  * Faux : un coup instantané tout autour de toi, qui enlève une part des PV max de chaque cible (moins sur
  * les boss) : autant de coups pour un petit que pour un gros. Elle achève les ennemis presque morts.
  */
-function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function scythe(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;
   w.timer -= 1;
   if (w.timer > 0) return;
@@ -661,7 +632,7 @@ function scythe(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
  * Lance-flammes : des jets côte à côte, centrés là où tu vises, figés dans leur direction de départ (comme le laser).
  * Tornade de feu : des jets répartis tout autour, qui tournent sans arrêt.
  */
-function flame(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+function flame(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   const len = (L.length ?? 135) * p.stats.area;
   const arc = L.arc ?? 0.32;
   const n = Math.min(8, L.count ?? 1);

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   base: './',
@@ -9,4 +9,4 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     testTimeout: 60000,
   },
-} as never);
+});
