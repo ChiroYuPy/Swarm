@@ -5,11 +5,13 @@
  */
 import { iconCanvas } from '../render/icons';
 import { enemyPreview } from '../render/sprites';
+import { intlTag } from '../i18n';
 
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 
-export const num = (n: number) => n.toLocaleString('fr-FR');
+/** Integer with the locale's digit grouping. */
+export const num = (n: number) => n.toLocaleString(intlTag());
 
 export function rows(list: [string, string][]): string {
   return `<dl class="rows">${list.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;

@@ -10,6 +10,8 @@ import { MAX_PASSIVE_SLOTS, MAX_WEAPON_SLOTS } from '../../sim';
 import { formatTime, pad7 } from '../../render/hud';
 import { passiveTotal, weaponNumbers } from '../describe';
 import { SCREEN_COLOR, cascade, esc, fillIcons, heading, levelPips, num, statTiles } from '../html';
+import { t } from '../../i18n';
+import { difficultyName, passiveName, weaponName } from '../../i18n/content';
 import type { BuildInfo, RunInfo } from '../types';
 import type { UI } from '../ui';
 
@@ -27,15 +29,15 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
       const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
       const lines = [esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))];
       for (const f of FUSIONS.filter((f) => f.weapon === x.id)) {
-        const res = ALL_WEAPONS.find((y) => y.id === f.result)!.name;
+        const res = esc(weaponName(f.result));
         const pl = owned.get(f.with) ?? 0;
         lines.push(
           x.level >= 5 && pl >= 5
-            ? `<em class="evo ready">✦ ${esc(res)} : évolution prête</em>`
-            : `<em class="evo">Évolue en ${esc(res)} · ${esc(PASSIVES.find((p) => p.id === f.with)!.name)} ${pl ? `${pl}/5` : 'à prendre'}</em>`,
+            ? `<em class="evo ready">${t('pause.evoReady', { name: res })}</em>`
+            : `<em class="evo">${t('pause.evolvesInto', { name: res, passive: esc(passiveName(f.with)), progress: pl ? `${pl}/5` : t('pause.toTake') })}</em>`,
         );
       }
-      return row('weapon', x.id, d.color, d.name, x.fusion ? '<span class="tag">Évolution</span>' : levelPips(x.level, 5), lines);
+      return row('weapon', x.id, d.color, weaponName(d.id), x.fusion ? `<span class="tag">${t('common.evolution')}</span>` : levelPips(x.level, 5), lines);
     })
     .join('');
   const passives = b.passives
@@ -43,8 +45,8 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
       const d = PASSIVES.find((y) => y.id === x.id)!;
       const lines = [esc(passiveTotal(d, x.level))];
       for (const f of FUSIONS.filter((f) => f.with === x.id && armed.has(f.weapon)))
-        lines.push(`<em class="evo">Fait évoluer ${esc(ALL_WEAPONS.find((y) => y.id === f.weapon)!.name)}</em>`);
-      return row('passive', x.id, d.color, d.name, levelPips(x.level, 5), lines);
+        lines.push(`<em class="evo">${t('pause.evolves', { name: esc(weaponName(f.weapon)) })}</em>`);
+      return row('passive', x.id, d.color, passiveName(d.id), levelPips(x.level, 5), lines);
     })
     .join('');
   return { weapons, passives };
@@ -58,11 +60,15 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
 export function showPause(ui: UI, build: BuildInfo, run: RunInfo, instant = false): void {
   const r = run.record;
   const diff = DIFFICULTIES[r.difficulty];
-  const dname = `<span style="color:${diff.color}">${esc(diff.name)}</span>`;
+  const dname = `<span style="color:${diff.color}">${esc(difficultyName(diff.id))}</span>`;
   const sub = run.sandbox
-    ? `Sandbox · ${dname}`
+    ? `${t('common.sandbox')} · ${dname}`
     : `${dname} · ${
-        !run.best ? 'Premier record en jeu' : r.score > run.best ? '<b class="gold">Record battu !</b>' : `Record à battre : <b class="gold">${pad7(run.best)}</b>`
+        !run.best
+          ? t('pause.firstRecord')
+          : r.score > run.best
+            ? `<b class="gold">${t('pause.recordBeaten')}</b>`
+            : t('pause.toBeat', { score: pad7(run.best) })
       }`;
   const gear = gearHtml(build);
   const stats = build.stats
@@ -74,27 +80,27 @@ export function showPause(ui: UI, build: BuildInfo, run: RunInfo, instant = fals
   const el = ui.mount(
     'pause',
     `
-    ${heading('Pause', SCREEN_COLOR.pause, sub)}
+    ${heading(t('pause.title'), SCREEN_COLOR.pause, sub)}
     ${statTiles(
       [
-        ['Score', `<span class="gold">${pad7(r.score)}</span>`],
-        ['Temps', formatTime(r.survivedSec)],
-        ['Éliminés', num(r.kills)],
-        ['Niveau', String(r.level)],
-        ['Boss vaincus', String(run.bossKills)],
+        [t('run.score'), `<span class="gold">${pad7(r.score)}</span>`],
+        [t('run.time'), formatTime(r.survivedSec)],
+        [t('run.kills'), num(r.kills)],
+        [t('run.level'), String(r.level)],
+        [t('run.bossKills'), String(run.bossKills)],
       ],
       `run ${cascade(1)}`,
     )}
     <div class="pause-gear ${cascade(2)}">
-      <section><h3 class="rule">Armes <small>${build.weapons.length}/${MAX_WEAPON_SLOTS}</small></h3>${gear.weapons}</section>
-      <section><h3 class="rule">Passifs <small>${build.passives.length}/${MAX_PASSIVE_SLOTS}</small></h3>${gear.passives || '<p class="empty">Aucun passif pour l’instant.</p>'}</section>
+      <section><h3 class="rule">${t('common.weapons')} <small>${build.weapons.length}/${MAX_WEAPON_SLOTS}</small></h3>${gear.weapons}</section>
+      <section><h3 class="rule">${t('common.passives')} <small>${build.passives.length}/${MAX_PASSIVE_SLOTS}</small></h3>${gear.passives || `<p class="empty">${t('pause.noPassive')}</p>`}</section>
     </div>
-    <section class="pause-stats ${cascade(3)}"><h3 class="rule">Stats</h3><div class="statgrid">${stats}</div></section>
+    <section class="pause-stats ${cascade(3)}"><h3 class="rule">${t('pause.stats')}</h3><div class="statgrid">${stats}</div></section>
     <footer class="actions ${cascade(4)}">
-      <button class="btn nav primary go" id="resume">Reprendre</button>
-      <button class="btn nav" id="codex">Codex</button>
-      <button class="btn nav" id="settings">Options</button>
-      <button class="btn nav danger" id="quit">Abandonner</button>
+      <button class="btn nav primary go" id="resume">${t('pause.resume')}</button>
+      <button class="btn nav" id="codex">${t('common.codex')}</button>
+      <button class="btn nav" id="settings">${t('common.options')}</button>
+      <button class="btn nav danger" id="quit">${t('pause.quit')}</button>
     </footer>
   `,
     true,

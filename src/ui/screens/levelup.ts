@@ -17,6 +17,8 @@ import {
   type Offer,
 } from '../../sim';
 import { iconCanvas } from '../../render/icons';
+import { t, tn } from '../../i18n';
+import { passiveDesc, passiveEffect, passiveName, pickupDesc, pickupName, weaponDesc, weaponLevelText, weaponName } from '../../i18n/content';
 import { evolutionHint, fusionPartner, passiveTotal } from '../describe';
 import { SCREEN_COLOR, esc, heading, levelPips } from '../html';
 import type { LevelUpSwap } from '../types';
@@ -45,46 +47,46 @@ export function showLevelUp(
       if (o.kind === OFFER_WEAPON) {
         const d = ALL_WEAPONS[o.id];
         const owned = ownedLevels(o);
-        tag = owned ? `Arme · niveau ${owned} → ${o.toLevel}` : `Nouvelle arme · ${slots.weapons + 1}/${MAX_WEAPON_SLOTS}`;
-        name = d.name;
-        line = d.levelText[Math.max(0, o.toLevel - 1)];
-        sub = owned ? (o.toLevel === 5 ? evolutionHint(d.id) : '') : d.desc;
+        tag = owned ? t('levelup.weaponUp', { from: owned, to: o.toLevel }) : t('levelup.newWeapon', { n: slots.weapons + 1, max: MAX_WEAPON_SLOTS });
+        name = weaponName(d.id);
+        line = weaponLevelText(d.id, o.toLevel);
+        sub = owned ? (o.toLevel === 5 ? evolutionHint(d.id) : '') : weaponDesc(d.id);
         color = d.color;
         iconId = d.id;
         pips = levelPips(o.toLevel, 5, true);
       } else if (o.kind === OFFER_PASSIVE) {
         const d = PASSIVES[o.id];
         const owned = ownedLevels(o);
-        tag = owned ? `Passif · niveau ${owned} → ${o.toLevel}` : `Nouveau passif · ${slots.passives + 1}/${MAX_PASSIVE_SLOTS}`;
-        name = d.name;
-        line = d.effect;
-        sub = owned ? `Total : ${passiveTotal(d, o.toLevel)}` : d.desc;
+        tag = owned ? t('levelup.passiveUp', { from: owned, to: o.toLevel }) : t('levelup.newPassive', { n: slots.passives + 1, max: MAX_PASSIVE_SLOTS });
+        name = passiveName(d.id);
+        line = passiveEffect(d.id);
+        sub = owned ? t('levelup.total', { total: passiveTotal(d, o.toLevel) }) : passiveDesc(d.id);
         color = d.color;
         kind = 'passive';
         iconId = d.id;
         pips = levelPips(o.toLevel, 5, true);
       } else if (o.kind === OFFER_SWAP) {
         const d = ALL_WEAPONS[o.id];
-        tag = d.fusion ? 'Échange · évolution' : `Échange · niveau ${o.toLevel}`;
-        name = d.name;
-        line = d.fusion ? d.levelText[0] : d.levelText[Math.max(0, o.toLevel - 1)];
-        sub = swapping ? `Remplace ${swapping.name}` : '';
+        tag = d.fusion ? t('levelup.swapEvolution') : t('levelup.swapLevel', { n: o.toLevel });
+        name = weaponName(d.id);
+        line = weaponLevelText(d.id, d.fusion ? 1 : o.toLevel);
+        sub = swapping ? t('levelup.replaces', { name: swapping.name }) : '';
         color = d.color;
         iconId = d.id;
         if (!d.fusion) pips = levelPips(o.toLevel, 5, true);
       } else if (o.kind === OFFER_FUSION) {
         const f = FUSION_TABLE[o.id];
         const r = weaponDef(f.result);
-        tag = 'Évolution';
-        name = r.name;
-        line = r.levelText[0];
-        sub = `${weaponDef(f.weapon).name} + ${fusionPartner(o.id).name}`;
+        tag = t('common.evolution');
+        name = weaponName(r.id);
+        line = weaponLevelText(r.id, 1);
+        sub = `${weaponName(weaponDef(f.weapon).id)} + ${passiveName(fusionPartner(o.id).id)}`;
         color = r.color;
         iconId = r.id;
       } else {
-        tag = 'Équipement complet';
-        name = PICKUPS[0].name;
-        line = PICKUPS[0].desc;
+        tag = t('levelup.full');
+        name = pickupName(PICKUPS[0].id);
+        line = pickupDesc(PICKUPS[0].id);
         color = PICKUPS[0].color;
         kind = 'pickup';
         iconId = 'heal';
@@ -103,7 +105,7 @@ export function showLevelUp(
   let n = offers.length;
   let bar = '';
   if (swapping) {
-    bar = `<div class="swapbar"><button class="swap-cancel pick" data-i="${n++}">Annuler l’échange</button></div>`;
+    bar = `<div class="swapbar"><button class="swap-cancel pick" data-i="${n++}">${t('levelup.cancelSwap')}</button></div>`;
   } else if (swap.weapons.length > 0) {
     const btns = swap.weapons
       .map((w, k) => {
@@ -112,15 +114,12 @@ export function showLevelUp(
           <span class="icon" data-kind="weapon" data-id="${w.id}"></span></button>`;
       })
       .join('');
-    const label =
-      swap.charges > 0
-        ? `Échanger une arme · <b>${swap.charges}</b> charge${swap.charges > 1 ? 's' : ''}`
-        : 'Échanger une arme · bats un boss pour gagner une charge';
+    const label = swap.charges > 0 ? tn('levelup.swapCharges', swap.charges) : t('levelup.swapNoCharge');
     bar = `<div class="swapbar ${swap.charges > 0 ? '' : 'empty'}"><span class="swap-label">${label}</span>${btns}</div>`;
   }
   const head = swapping
-    ? heading(`Échanger ${swapping.name}`, SCREEN_COLOR.swap, 'Choisis l’arme qui la remplace, au même niveau.')
-    : heading(`Niveau ${level}`, SCREEN_COLOR.levelup, 'Choisis une amélioration : <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, flèches + <kbd>Entrée</kbd> ou clic');
+    ? heading(t('levelup.swapTitle', { name: swapping.name }), SCREEN_COLOR.swap, t('levelup.swapSub'))
+    : heading(t('levelup.title', { n: level }), SCREEN_COLOR.levelup, t('levelup.sub'));
   const el = ui.mount('levelup', `${head}<div class="cards">${cards}</div>${bar}`, true);
   el.querySelectorAll<HTMLElement>('.icon').forEach((s) => {
     const px = s.closest('.swap-btn') ? 34 : 60;

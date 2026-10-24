@@ -51,7 +51,8 @@ describe('save migration', () => {
     const save = migrate(structuredClone(V2_SAVE));
     expect(save.version).toBe(SAVE_VERSION);
     expect(save.difficulty).toBe(2);
-    expect(save.settings).toEqual(V2_SAVE.settings);
+    // Saves older than the language setting read as French.
+    expect(save.settings).toEqual({ ...V2_SAVE.settings, language: 'fr' });
 
     expect(save.scores).toHaveLength(3);
     for (const s of save.scores) expect(s).not.toHaveProperty('tempsSurvecu');
@@ -106,5 +107,16 @@ describe('save migration', () => {
     expect(Object.keys(LEGACY_WEAPON_IDS)).toHaveLength(ALL_WEAPONS.length);
     expect(Object.keys(LEGACY_PASSIVE_IDS)).toHaveLength(PASSIVES.length);
     expect(Object.keys(LEGACY_ENEMY_IDS)).toHaveLength(ENEMIES.length);
+  });
+});
+
+describe('language setting', () => {
+  it('kept when valid, French when missing or unknown (no save version bump)', () => {
+    const v3 = migrate(structuredClone(V2_SAVE));
+    expect(migrate({ ...v3, settings: { ...v3.settings, language: 'en' } }).settings.language).toBe('en');
+    expect(migrate({ ...v3, settings: { ...v3.settings, language: 'de' } }).settings.language).toBe('fr');
+    const { language: _drop, ...noLanguage } = v3.settings;
+    expect(migrate({ ...v3, settings: noLanguage }).settings.language).toBe('fr');
+    expect(SAVE_VERSION).toBe(3);
   });
 });

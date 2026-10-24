@@ -3,6 +3,7 @@ import type { GameState } from '../sim';
 import { COLORS } from './palette';
 import { formatTime, glowText, FONT } from './hud';
 import type { RenderView } from './view';
+import { t } from '../i18n';
 
 /** Fin de partie : l'écran s'assombrit proprement et un GAME OVER s'allume. */
 export function drawGameOver(view: RenderView, s: GameState, W: number, H: number, f: number, time: number): void {
@@ -11,20 +12,20 @@ export function drawGameOver(view: RenderView, s: GameState, W: number, H: numbe
   ctx.fillStyle = `rgba(7,6,15,${0.8 * e})`;
   ctx.fillRect(0, 0, W, H);
   // Lignes de balayage CRT
-  const t = Math.max(0, (f - 0.25) / 0.75);
-  if (t <= 0) return;
+  const k = Math.max(0, (f - 0.25) / 0.75);
+  if (k <= 0) return;
   // Allumage façon néon : quelques clignotements avant de rester allumé.
-  const on = t > 0.45 || Math.floor(time * 18) % 3 !== 0;
+  const on = k > 0.45 || Math.floor(time * 18) % 3 !== 0;
   if (!on) return;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const size = Math.round(Math.min(88, W / 9));
   ctx.font = `700 ${size}px ${FONT}`;
-  ctx.globalAlpha = Math.min(1, t * 2);
-  glowText(ctx, 'GAME OVER', W / 2, H / 2 - 10, COLORS.hp, '#ffe3ec');
+  ctx.globalAlpha = Math.min(1, k * 2);
+  glowText(ctx, t('hud.gameOver'), W / 2, H / 2 - 10, COLORS.hp, '#ffe3ec');
   ctx.font = `600 20px ${FONT}`;
   ctx.fillStyle = COLORS.muted;
-  ctx.fillText(`Tenu ${formatTime(s.tick / 60)}`, W / 2, H / 2 + size * 0.75 + 10);
+  ctx.fillText(t('hud.held', { time: formatTime(s.tick / 60) }), W / 2, H / 2 + size * 0.75 + 10);
   ctx.globalAlpha = 1;
 }
 

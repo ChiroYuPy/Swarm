@@ -30,6 +30,7 @@ import { AudioEngine, START_RISE } from '../audio/audio';
 import { InputManager, type UiAction } from '../input/input';
 import { UI, type AppApi, type BuildInfo, type DeathInfo, type RunInfo } from '../ui/ui';
 import { randomSeed } from '../ui/seeds';
+import { isLocale, setLocale } from '../i18n';
 import { bestScore, loadSave, recordScore, writeSave, type SandboxSetup, type SaveData, type Settings } from '../storage/storage';
 import { MenuDemo } from './demo';
 import { buildInfo, ownedLevel, runInfo, swapInfo } from './info';
@@ -92,6 +93,10 @@ export class App implements AppApi {
     // Le canvas n'utilise une police que si elle est déjà chargée : on la précharge pour le HUD.
     for (const f of ['500 13px "Chakra Petch"', '600 13px "Chakra Petch"', '700 30px "Chakra Petch"']) void document.fonts?.load(f).catch(() => {});
     if (params.get('fps') === '1') this.save.settings.showFps = true;
+    // ?lang=en: language override (kept like any other setting once the options are touched).
+    const langParam = params.get('lang');
+    if (isLocale(langParam)) this.save.settings.language = langParam;
+    // Applies the language too, before the first screen is drawn.
     this.applySettings(this.save.settings, false);
 
     // Partie de démonstration jouée par le bot derrière le menu, préparée pendant l'intro.
@@ -263,6 +268,8 @@ export class App implements AppApi {
   applySettings(s: Settings, persist = true): void {
     const qualityChanged = s.quality !== this.save.settings.quality;
     this.save.settings = s;
+    setLocale(s.language);
+    document.documentElement.lang = s.language;
     this.audio.setVolume(s.volume);
     this.audio.setMusicVolume(s.music);
     this.audio.setSfxVolume(s.sfx);

@@ -8,22 +8,24 @@ import { DIFFICULTIES } from '../../data/difficulty';
 import { formatTime, pad7 } from '../../render/hud';
 import { FIRST_BOSS } from '../describe';
 import { esc, fillIcons, num } from '../html';
+import { t } from '../../i18n';
+import { difficultyName, passiveName, weaponName } from '../../i18n/content';
 import type { BuildInfo, DeathInfo } from '../types';
 import type { UI } from '../ui';
 
-/** Une phrase courte sur la partie, choisie selon ce qui s'est passé. */
+/** A short line about the run, picked from what happened. */
 function deathLine(d: DeathInfo): string {
-  const t = d.record.survivedSec;
+  const time = d.record.survivedSec;
   const k = d.record.kills;
-  if (d.isReplay) return 'Fin de la relecture.';
-  if (d.sandbox) return 'Partie sandbox : rien n’est enregistré dans les records.';
-  if (d.rank === 1 && d.bestBefore > 0) return 'Nouveau record. Tu progresses.';
-  if (t < 60) return 'Moins d’une minute… on respire et on y retourne.';
-  if (d.bossKills >= 2) return `${d.bossKills} boss vaincus. Respect.`;
-  if (d.bossKills === 1) return 'Le Trapèze est tombé. Pas toi… enfin, pas tout de suite.';
-  if (k >= 1000) return `${num(k)} formes éliminées avant de céder.`;
-  if (t >= FIRST_BOSS - 20 && t < FIRST_BOSS) return 'Si près du boss…';
-  return `Submergé après ${formatTime(t)}. La prochaine sera la bonne.`;
+  if (d.isReplay) return t('death.lines.replay');
+  if (d.sandbox) return t('death.lines.sandbox');
+  if (d.rank === 1 && d.bestBefore > 0) return t('death.lines.newRecord');
+  if (time < 60) return t('death.lines.underMinute');
+  if (d.bossKills >= 2) return t('death.lines.bosses', { n: d.bossKills });
+  if (d.bossKills === 1) return t('death.lines.firstBoss');
+  if (k >= 1000) return t('death.lines.kills', { n: num(k) });
+  if (time >= FIRST_BOSS - 20 && time < FIRST_BOSS) return t('death.lines.nearBoss');
+  return t('death.lines.overwhelmed', { time: formatTime(time) });
 }
 
 /** Équipement en ligne, icônes à nu (fin de partie). */
@@ -31,14 +33,16 @@ function buildHtml(b: BuildInfo): string {
   const w = b.weapons
     .map((x) => {
       const d = ALL_WEAPONS.find((y) => y.id === x.id)!;
-      const lvl = x.fusion ? '<span class="lv max">Évolution</span>' : `<span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span>`;
-      return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="weapon" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b>${lvl}</span></div>`;
+      const lvl = x.fusion
+        ? `<span class="lv max">${t('common.evolution')}</span>`
+        : `<span class="lv ${x.level >= 5 ? 'max' : ''}">${t('common.lvl', { n: `${x.level}/5` })}</span>`;
+      return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="weapon" data-id="${x.id}"></span><span class="txt"><b>${esc(weaponName(d.id))}</b>${lvl}</span></div>`;
     })
     .join('');
   const p = b.passives
     .map((x) => {
       const d = PASSIVES.find((y) => y.id === x.id)!;
-      return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="passive" data-id="${x.id}"></span><span class="txt"><b>${esc(d.name)}</b><span class="lv ${x.level >= 5 ? 'max' : ''}">niv. ${x.level}/5</span></span></div>`;
+      return `<div class="item" style="--c:${d.color}"><span class="icon" data-kind="passive" data-id="${x.id}"></span><span class="txt"><b>${esc(passiveName(d.id))}</b><span class="lv ${x.level >= 5 ? 'max' : ''}">${t('common.lvl', { n: `${x.level}/5` })}</span></span></div>`;
     })
     .join('');
   return `<div class="items">${w}${p}</div>`;
@@ -57,10 +61,10 @@ export function showDeath(ui: UI, d: DeathInfo): void {
   const badge = d.isReplay || record
     ? ''
     : d.sandbox
-      ? '<span class="badge">Sandbox · non classé</span>'
+      ? `<span class="badge">${t('death.unranked')}</span>`
     : d.rank > 0
-      ? `<span class="badge">${d.rank}<sup>e</sup> meilleure partie</span>`
-      : `<span class="badge">Record à battre : <b>${pad7(d.bestBefore)}</b></span>`;
+      ? `<span class="badge">${t('death.rank', { n: d.rank })}</span>`
+      : `<span class="badge">${t('death.toBeat', { score: pad7(d.bestBefore) })}</span>`;
   const reveal = (i: number) => `reveal" style="--i:${i}`;
   const el = ui.mount(
     'death',
@@ -68,25 +72,25 @@ export function showDeath(ui: UI, d: DeathInfo): void {
     <div class="banner ${variant}">
       <div class="banner-band"></div>
       <div class="banner-content">
-        <h2 class="go">${d.isReplay ? 'Relecture terminée' : d.sandbox && d.survived ? 'Fin du test' : 'Game over'}</h2>
-        <div class="go-score"><small>Score · ${d.sandbox ? 'Sandbox · ' : ''}<span style="color:${diff.color}">${esc(diff.name)}</span></small><b id="count">${pad7(0)}</b></div>
+        <h2 class="go">${t(d.isReplay ? 'death.replayDone' : d.sandbox && d.survived ? 'death.testDone' : 'death.gameOver')}</h2>
+        <div class="go-score"><small>${t('run.score')} · ${d.sandbox ? `${t('common.sandbox')} · ` : ''}<span style="color:${diff.color}">${esc(difficultyName(diff.id))}</span></small><b id="count">${pad7(0)}</b></div>
       </div>
-      ${record ? '<span class="stamp">Nouveau record</span>' : ''}
+      ${record ? `<span class="stamp">${t('death.stamp')}</span>` : ''}
     </div>
     <p class="sub ${reveal(0)}">${esc(deathLine(d))}</p>
     ${badge ? `<div class="${reveal(1)}">${badge}</div>` : ''}
     <div class="stats ${reveal(2)}">
-      <div><small>Temps</small><b>${formatTime(r.survivedSec)}</b></div>
-      <div><small>Éliminés</small><b>${num(r.kills)}</b></div>
-      <div><small>Niveau</small><b>${r.level}</b></div>
-      <div><small>Boss vaincus</small><b>${d.bossKills}</b></div>
+      <div><small>${t('run.time')}</small><b>${formatTime(r.survivedSec)}</b></div>
+      <div><small>${t('run.kills')}</small><b>${num(r.kills)}</b></div>
+      <div><small>${t('run.level')}</small><b>${r.level}</b></div>
+      <div><small>${t('run.bossKills')}</small><b>${d.bossKills}</b></div>
     </div>
-    <div class="build final-build ${reveal(3)}"><h3>Équipement final</h3>${buildHtml(d.build)}</div>
+    <div class="build final-build ${reveal(3)}"><h3>${t('death.finalBuild')}</h3>${buildHtml(d.build)}</div>
     <footer class="actions ${reveal(4)}">
-      <button class="btn nav primary" id="retry">Rejouer</button>
-      ${d.sandbox ? '<button class="btn nav" id="edit">Modifier</button>' : ''}
-      ${d.canReplay ? '<button class="btn nav" id="watch">Revoir la partie</button>' : ''}
-      <button class="btn nav" id="menu">Menu</button>
+      <button class="btn nav primary" id="retry">${t('death.retry')}</button>
+      ${d.sandbox ? `<button class="btn nav" id="edit">${t('death.edit')}</button>` : ''}
+      ${d.canReplay ? `<button class="btn nav" id="watch">${t('death.watch')}</button>` : ''}
+      <button class="btn nav" id="menu">${t('common.menu')}</button>
     </footer>
   `,
     true,

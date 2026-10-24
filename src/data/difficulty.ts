@@ -3,9 +3,8 @@
  * nouveaux types (pace : multiplicateur des dates d'apparition des phases de vagues).
  */
 export interface DifficultyDef {
+  /** Name and description live in src/i18n/locales, keyed by this id. */
   id: string;
-  name: string;
-  desc: string;
   color: string;
   /** multiplicateurs ennemis */
   hp: number;
@@ -21,8 +20,6 @@ export interface DifficultyDef {
 export const DIFFICULTIES: DifficultyDef[] = [
   {
     id: 'easy',
-    name: 'Facile',
-    desc: 'Ennemis plus lents, moins nombreux et moins coriaces. Les nouveaux types arrivent tranquillement.',
     color: '#39ff7a',
     hp: 0.55,
     dmg: 0.45,
@@ -32,8 +29,6 @@ export const DIFFICULTIES: DifficultyDef[] = [
   },
   {
     id: 'normal',
-    name: 'Normal',
-    desc: 'L’expérience prévue : la pression monte régulièrement.',
     color: '#38f6ff',
     hp: 0.92,
     dmg: 0.82,
@@ -43,8 +38,6 @@ export const DIFFICULTIES: DifficultyDef[] = [
   },
   {
     id: 'hard',
-    name: 'Difficile',
-    desc: 'Plus nombreux, plus solides, plus tôt. Pour les habitués.',
     color: '#ff3d6e',
     hp: 1.42,
     dmg: 1.42,

@@ -1,7 +1,5 @@
 /** Le héros et la courbe d'XP. Valeurs librement modifiables. */
 export const HERO = {
-  name: 'Octo',
-  title: 'Octogone néon',
   maxHp: 100,
   /** unités monde / seconde (une case = 64 unités) */
   speed: 150,

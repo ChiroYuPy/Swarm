@@ -6,6 +6,7 @@
 import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { HERO } from '../data/hero';
+import { DEFAULT_LOCALE, isLocale, type Locale } from '../i18n';
 import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, upgradeId } from './legacy-ids';
 
 export const SAVE_KEY = 'swarm.save';
@@ -28,6 +29,8 @@ export interface Settings {
   showFps: boolean;
   /** met la partie en pause quand la fenêtre perd le focus */
   autoPause: boolean;
+  /** UI language (saves without it read as the default, French) */
+  language: Locale;
 }
 
 export interface SaveData {
@@ -79,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   damageNumbers: true,
   showFps: false,
   autoPause: true,
+  language: DEFAULT_LOCALE,
 };
 
 export function defaultSave(): SaveData {
@@ -114,9 +118,12 @@ export function migrate(raw: unknown): SaveData {
   }
   if (version > SAVE_VERSION) return base; // sauvegarde d'une version future : on ne la casse pas, on l'ignore
   const d = typeof data.difficulty === 'number' ? data.difficulty : DEFAULT_DIFFICULTY;
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) };
+  // No save version bump for the language: a missing (older save) or unknown value reads as the default.
+  if (!isLocale(settings.language)) settings.language = DEFAULT_LOCALE;
   return {
     version: SAVE_VERSION,
-    settings: { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) },
+    settings,
     difficulty: Math.max(0, Math.min(DIFFICULTIES.length - 1, d)),
     scores: Array.isArray(data.scores) ? (data.scores as ScoreRecord[]).filter(isScore) : [],
     sandbox: readSandbox(data.sandbox),

@@ -7,6 +7,7 @@ import { PASSIVES } from '../../data/passives';
 import { FUSIONS } from '../../data/fusions';
 import { codexDetail, codexItems, codexRules, type CodexTab } from '../codex-data';
 import { SCREEN_COLOR, cascade, esc, heading, keys, paintIcons, reveal } from '../html';
+import { t } from '../../i18n';
 import type { NavDir } from '../types';
 import type { UI } from '../ui';
 
@@ -19,12 +20,12 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
   }
   ui.codexTab = tab;
   const cats: [CodexTab, string, number, string][] = [
-    ['rules', 'Comment jouer', 0, '#f2eaff'],
-    ['weapons', 'Armes', BASE_WEAPONS.length, '#38f6ff'],
-    ['evolutions', 'Évolutions', FUSIONS.length, '#ffd23a'],
-    ['passives', 'Passifs', PASSIVES.length, '#39ff7a'],
-    ['items', 'Objets', codexItems('items').length, '#ff9b3d'],
-    ['enemies', 'Ennemis', codexItems('enemies').length, '#ff3d6e'],
+    ['rules', t('codex.tabs.rules'), 0, '#f2eaff'],
+    ['weapons', t('codex.tabs.weapons'), BASE_WEAPONS.length, '#38f6ff'],
+    ['evolutions', t('codex.tabs.evolutions'), FUSIONS.length, '#ffd23a'],
+    ['passives', t('codex.tabs.passives'), PASSIVES.length, '#39ff7a'],
+    ['items', t('codex.tabs.items'), codexItems('items').length, '#ff9b3d'],
+    ['enemies', t('codex.tabs.enemies'), codexItems('enemies').length, '#ff3d6e'],
   ];
   // Onglets soulignés, comme les records : la catégorie ouverte prend sa couleur.
   const side = cats
@@ -51,14 +52,14 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
   const el = ui.mount(
     'codex',
     `
-    ${heading('Codex', SCREEN_COLOR.codex)}
+    ${heading(t('codex.title'), SCREEN_COLOR.codex)}
     <nav class="tabs cats ${cascade(1)}">${side}</nav>
     <div class="codex ${items.length ? '' : 'solo'} ${cascade(2)}">
       ${items.length ? `<div class="panel list">${center}</div>` : ''}
       <article class="panel detail">${items.length ? '' : codexRules()}</article>
     </div>
-    ${keys([[['↑', '↓'], 'catégorie'], [['←', '→'], 'élément'], [['Échap'], 'retour']])}
-    <footer class="actions ${cascade(3)}"><button class="btn nav" id="back">Retour</button></footer>
+    ${keys([[['↑', '↓'], t('hints.category')], [['←', '→'], t('hints.item')], [[t('keys.esc')], t('hints.back')]])}
+    <footer class="actions ${cascade(3)}"><button class="btn nav" id="back">${t('common.back')}</button></footer>
   `,
     ui.codexOverlay,
   );
@@ -76,13 +77,13 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
     paintIcons(detail, 72);
     detail.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) =>
       b.addEventListener('click', () => {
-        const [t, id] = b.dataset.goto!.split(':');
-        const idx = codexItems(t as CodexTab).findIndex((x) => x.id === id);
-        ui.showCodex(t as CodexTab, Math.max(0, idx));
+        const [tab, id] = b.dataset.goto!.split(':');
+        const idx = codexItems(tab as CodexTab).findIndex((x) => x.id === id);
+        ui.showCodex(tab as CodexTab, Math.max(0, idx));
       }),
     );
   };
-  tiles.forEach((t) => t.addEventListener('focus', () => select(Number(t.dataset.i))));
+  tiles.forEach((tile) => tile.addEventListener('focus', () => select(Number(tile.dataset.i))));
   el.querySelectorAll<HTMLButtonElement>('.cat').forEach((b) =>
     b.addEventListener('click', () => {
       ui.showCodex(b.dataset.tab as CodexTab);

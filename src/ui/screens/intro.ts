@@ -4,6 +4,7 @@
  * attract state itself lives on the UI instance (ui.intro, ui.attract, ui.lastActivity).
  */
 import { INTRO_TIMING } from '../../audio/audio';
+import { t } from '../../i18n';
 import { reducedMotion } from '../html';
 import type { UI } from '../ui';
 
@@ -74,7 +75,7 @@ export function showIntro(ui: UI): void {
     if (ui.intro !== intro || intro.stage !== 'standby') return;
     const sb = document.createElement('div');
     sb.className = 'standby';
-    sb.innerHTML = '<i class="led"></i><p>Appuie pour allumer</p>';
+    sb.innerHTML = `<i class="led"></i><p>${t('intro.standby')}</p>`;
     body.appendChild(sb);
   });
 }
@@ -274,7 +275,7 @@ export function idleTick(ui: UI, now: number): void {
   (document.activeElement as HTMLElement | null)?.blur();
   const hud = document.createElement('div');
   hud.className = 'attract-hud';
-  hud.innerHTML = '<p class="attract-tag">Démo · appuie sur une touche</p>';
+  hud.innerHTML = `<p class="attract-tag">${t('intro.attract')}</p>`;
   document.body.appendChild(hud);
   document.body.classList.add('attract');
 }

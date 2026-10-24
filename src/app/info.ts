@@ -12,6 +12,7 @@ import {
 } from '../sim';
 import { PASSIVES } from '../data/passives';
 import { statDetails } from '../render/hud';
+import { weaponName } from '../i18n/content';
 import { bestScore, type SaveData } from '../storage/storage';
 import type { BuildInfo, RunInfo } from '../ui/ui';
 
@@ -26,10 +27,14 @@ export function runInfo(s: GameState, save: SaveData, sandbox: boolean): RunInfo
 
 export function buildInfo(s: GameState): BuildInfo {
   const p = s.players[0];
+  const tick = s.tick;
   return {
     weapons: p.weapons.map((w) => ({ id: weaponDef(w.def).id, level: w.level, fusion: !!weaponDef(w.def).fusion })),
     passives: p.passives.map((x) => ({ id: PASSIVES[x.def].id, level: x.level })),
-    stats: statDetails(p, s.tick),
+    // Getter: built when read, in the current language (the pause screen is redrawn after a language change).
+    get stats() {
+      return statDetails(p, tick);
+    },
     might: p.stats.might,
     cooldownMul: p.stats.cooldownMul,
   };
@@ -49,7 +54,7 @@ export function swapInfo(p: Player) {
     slot: p.swapSlot,
     weapons: p.weapons.map((w, k) => {
       const d = weaponDef(w.def);
-      return { id: d.id, name: d.name, color: d.color, can: canSwap(p, k) };
+      return { id: d.id, name: weaponName(d.id), color: d.color, can: canSwap(p, k) };
     }),
   };
 }

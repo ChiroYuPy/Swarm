@@ -40,6 +40,8 @@ import {
   type PlayerStats,
   type SandboxRules,
 } from '../sim';
+import { t } from '../i18n';
+import { difficultyName, passiveName, pickupName } from '../i18n/content';
 import { COLORS } from './palette';
 import { iconCanvas } from './icons';
 import { enemyPreview } from './sprites';
@@ -361,26 +363,32 @@ function pips(ctx: Ctx, x: number, y: number, w: number, level: number, max: num
   }
 }
 
-/** Nombre à la française, sans zéros inutiles (0,35 / 1,5 / 2). */
+/** Number without useless zeros, with the locale's decimal separator (fr: 0,35 / 1,5 / 2). */
 export function dec(v: number, digits = 2): string {
-  return String(Number(v.toFixed(digits))).replace('.', ',');
+  return String(Number(v.toFixed(digits))).replace('.', t('format.decimal'));
 }
 
-const rate = (v: number) => `${Math.round(v * 100)} %`;
+/** « 45 % » (fr) / "45%" (en). */
+export const percent = (n: number | string) => t('format.percent', { n });
+/** « 8 s » (fr) / "8s" (en). */
+export const seconds = (n: number | string) => t('format.seconds', { n });
+
+const rate = (v: number) => percent(Math.round(v * 100));
+const hpPerSec = (n: string) => t('stats.hpPerSec', { n });
 
 type StatKey = 'might' | 'cooldown' | 'area' | 'speed' | 'magnet' | 'armor' | 'luck' | 'regen' | 'maxHp';
 
-/** Les stats du héros, dans l'ordre d'affichage. */
-const STATS: { key: StatKey; label: string; hint: string; value: (st: PlayerStats) => string; on: (st: PlayerStats) => boolean }[] = [
-  { key: 'might', label: 'Dégâts', hint: 'Multiplie les dégâts de toutes tes armes.', value: (st) => rate(st.might), on: (st) => st.might !== 1 },
-  { key: 'cooldown', label: 'Recharge', hint: 'Temps de recharge des armes (plus bas = tirs plus fréquents).', value: (st) => rate(st.cooldownMul), on: (st) => st.cooldownMul !== 1 },
-  { key: 'area', label: 'Zone', hint: 'Taille des projectiles, rayons et explosions.', value: (st) => rate(st.area), on: (st) => st.area !== 1 },
-  { key: 'speed', label: 'Vitesse', hint: 'Vitesse de déplacement (unités/s).', value: (st) => String(Math.round(st.speed)), on: (st) => st.speed !== HERO.speed },
-  { key: 'magnet', label: 'Collecte', hint: 'Rayon d’attraction de l’XP et des objets.', value: (st) => String(Math.round(st.magnet)), on: (st) => st.magnet !== HERO.magnet },
-  { key: 'armor', label: 'Armure', hint: 'Part des dégâts reçus annulée (max 60 %).', value: (st) => rate(st.armor), on: (st) => st.armor > 0 },
-  { key: 'luck', label: 'Chance', hint: 'Probabilité que les ennemis lâchent des objets.', value: (st) => rate(st.luck), on: (st) => st.luck !== 1 },
-  { key: 'regen', label: 'Régén.', hint: 'PV rendus chaque seconde.', value: (st) => `${dec(st.regen)} PV/s`, on: (st) => st.regen > HERO.regen + 1e-6 },
-  { key: 'maxHp', label: 'PV max', hint: 'Points de vie maximum.', value: (st) => String(Math.round(st.maxHp)), on: (st) => st.maxHp > HERO.maxHp },
+/** Hero stats, in display order (label and hint: stats.<key> in the locales). */
+const STATS: { key: StatKey; value: (st: PlayerStats) => string; on: (st: PlayerStats) => boolean }[] = [
+  { key: 'might', value: (st) => rate(st.might), on: (st) => st.might !== 1 },
+  { key: 'cooldown', value: (st) => rate(st.cooldownMul), on: (st) => st.cooldownMul !== 1 },
+  { key: 'area', value: (st) => rate(st.area), on: (st) => st.area !== 1 },
+  { key: 'speed', value: (st) => String(Math.round(st.speed)), on: (st) => st.speed !== HERO.speed },
+  { key: 'magnet', value: (st) => String(Math.round(st.magnet)), on: (st) => st.magnet !== HERO.magnet },
+  { key: 'armor', value: (st) => rate(st.armor), on: (st) => st.armor > 0 },
+  { key: 'luck', value: (st) => rate(st.luck), on: (st) => st.luck !== 1 },
+  { key: 'regen', value: (st) => hpPerSec(dec(st.regen)), on: (st) => st.regen > HERO.regen + 1e-6 },
+  { key: 'maxHp', value: (st) => String(Math.round(st.maxHp)), on: (st) => st.maxHp > HERO.maxHp },
 ];
 
 export interface StatDetail {
@@ -388,37 +396,44 @@ export interface StatDetail {
   value: string;
   on: boolean;
   hint: string;
-  /** d'où vient la valeur : base, passifs, bonus temporaires, plafonds */
+  /** where the value comes from: base, passives, timed bonuses, caps */
   sources: string[];
 }
 
-/** Stats détaillées pour l'écran de pause : valeur réelle et provenance de chaque bonus. */
+/** Detailed stats for the pause screen: real value and where each bonus comes from. */
 export function statDetails(p: Player, tick: number): StatDetail[] {
-  const secs = (until: number) => `${Math.ceil((until - tick) / TICK_RATE)} s`;
+  const secs = (until: number) => seconds(Math.ceil((until - tick) / TICK_RATE));
+  const buff = (pickup: number, n: string | number, until: number) => t('stats.buff', { name: pickupName(PICKUPS[pickup].id), n, left: secs(until) });
   return STATS.map((d) => {
     const sources: string[] = [];
-    if (d.key === 'speed') sources.push(`Base ${HERO.speed}`);
-    if (d.key === 'magnet') sources.push(`Base ${HERO.magnet}`);
-    if (d.key === 'regen') sources.push(`Base ${dec(HERO.regen)} PV/s`);
-    if (d.key === 'maxHp') sources.push(`Base ${HERO.maxHp}`);
+    if (d.key === 'speed') sources.push(t('stats.base', { n: HERO.speed }));
+    if (d.key === 'magnet') sources.push(t('stats.base', { n: HERO.magnet }));
+    if (d.key === 'regen') sources.push(t('stats.base', { n: hpPerSec(dec(HERO.regen)) }));
+    if (d.key === 'maxHp') sources.push(t('stats.base', { n: HERO.maxHp }));
     for (const inst of p.passives) {
       const def = PASSIVES[inst.def];
       const v = def.perLevel[d.key];
       if (!v) continue;
       const total = v * inst.level;
       const amount =
-        d.key === 'maxHp' ? `+${total}` : d.key === 'regen' ? `+${dec(total)} PV/s` : d.key === 'cooldown' ? `−${Math.round(total * 100)} %` : `+${Math.round(total * 100)} %`;
-      sources.push(`${def.name} niv. ${inst.level} : ${amount}`);
+        d.key === 'maxHp'
+          ? `+${total}`
+          : d.key === 'regen'
+            ? `+${hpPerSec(dec(total))}`
+            : d.key === 'cooldown'
+              ? `−${percent(Math.round(total * 100))}`
+              : `+${percent(Math.round(total * 100))}`;
+      sources.push(t('stats.passive', { name: passiveName(def.id), level: inst.level, amount }));
     }
-    if (d.key === 'might' && p.mightMul !== 1) sources.push(`Sandbox : ×${dec(p.mightMul)}`);
-    if (d.key === 'might' && p.rageUntil > tick) sources.push(`Rage : ×2 (${secs(p.rageUntil)})`);
-    if (d.key === 'cooldown' && p.frenzyUntil > tick) sources.push(`Frénésie : ×0,5 (${secs(p.frenzyUntil)})`);
-    if (d.key === 'speed' && p.turboUntil > tick) sources.push(`Turbo : ×1,5 (${secs(p.turboUntil)})`);
-    if (d.key === 'magnet' && p.feverUntil > tick) sources.push(`Fièvre d’XP : ×${LOOT.feverMagnet} (${secs(p.feverUntil)})`);
-    if (d.key === 'cooldown' && p.base.cooldownMul <= 0.35) sources.push('Plafond atteint (−65 %)');
-    if (d.key === 'armor' && p.base.armor >= 0.6) sources.push('Plafond atteint (60 %)');
-    if (!sources.length) sources.push('Aucun bonus');
-    return { label: d.label, value: d.value(p.stats), on: d.on(p.stats), hint: d.hint, sources };
+    if (d.key === 'might' && p.mightMul !== 1) sources.push(t('stats.sandbox', { n: dec(p.mightMul) }));
+    if (d.key === 'might' && p.rageUntil > tick) sources.push(buff(PK_RAGE, 2, p.rageUntil));
+    if (d.key === 'cooldown' && p.frenzyUntil > tick) sources.push(buff(PK_FRENZY, dec(0.5), p.frenzyUntil));
+    if (d.key === 'speed' && p.turboUntil > tick) sources.push(buff(PK_TURBO, dec(1.5), p.turboUntil));
+    if (d.key === 'magnet' && p.feverUntil > tick) sources.push(buff(PK_FEVER, LOOT.feverMagnet, p.feverUntil));
+    if (d.key === 'cooldown' && p.base.cooldownMul <= 0.35) sources.push(t('stats.capCooldown'));
+    if (d.key === 'armor' && p.base.armor >= 0.6) sources.push(t('stats.capArmor'));
+    if (!sources.length) sources.push(t('stats.none'));
+    return { label: t(`stats.${d.key}.label`), value: d.value(p.stats), on: d.on(p.stats), hint: t(`stats.${d.key}.hint`), sources };
   });
 }
 
@@ -466,11 +481,11 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   glowText(ctx, pad7(score.score), lx, 30, '#ffe14d');
   ctx.font = `700 14px ${FONT}`;
   ctx.fillStyle = opt.difficulty.color;
-  const mode = opt.difficulty.name;
+  const mode = difficultyName(opt.difficulty.id);
   ctx.fillText(mode, lx + 1, 60);
   if (opt.sandbox) {
     ctx.fillStyle = COLORS.sandbox;
-    ctx.fillText(opt.sandbox.invincible ? '· Sandbox invincible' : '· Sandbox', lx + ctx.measureText(mode).width + 8, 60);
+    ctx.fillText(t(opt.sandbox.invincible ? 'hud.sandboxInvincible' : 'hud.sandbox'), lx + ctx.measureText(mode).width + 8, 60);
   }
 
   // ---------- Bas centre : barre principale (PV, XP, armes, objet, passifs) ----------
@@ -493,16 +508,16 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const low = hpF < 0.3;
   const barX = x0 + 50;
   const barW = PW - 50 - 16;
-  label(ctx, 'PV', x0 + 16, top + 22, 'left', COLORS.hp);
+  label(ctx, t('hud.hp'), x0 + 16, top + 22, 'left', COLORS.hp);
   bar(ctx, barX, top + 12, barW, 20, hpF, low && blink ? '#ffffff' : COLORS.hp, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`);
   // XP + niveau
-  label(ctx, `Niv. ${p.level}`, x0 + 16, top + 46, 'left', COLORS.xp);
+  label(ctx, t('common.lvlCap', { n: p.level }), x0 + 16, top + 46, 'left', COLORS.xp);
   bar(ctx, barX + 8, top + 40, barW - 8, 12, p.xp / p.xpNext, COLORS.xp, '');
 
   const ry = top + 76;
   let x = x0 + 16;
   // Armes
-  label(ctx, `Armes ${p.weapons.length}/${MAX_WEAPON_SLOTS}`, x, ry - 10);
+  label(ctx, t('hud.weapons', { n: p.weapons.length, max: MAX_WEAPON_SLOTS }), x, ry - 10);
   for (let i = 0; i < MAX_WEAPON_SLOTS; i++) {
     const sx = x + i * (ws + gap);
     const w = p.weapons[i];
@@ -521,12 +536,12 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const ay = ry - 3;
   slot(ctx, x, ay, as, act >= 0 ? PICKUPS[act].color : null);
   if (act >= 0) ctx.drawImage(icon('pickup', PICKUPS[act].id), x + 4, ay + 4, as - 8, as - 8);
-  label(ctx, act >= 0 ? PICKUPS[act].name : 'Objet', x + as / 2, ry - 10, 'center', act >= 0 ? PICKUPS[act].color : COLORS.muted);
-  label(ctx, 'Espace', x + as / 2, ay + as + 8, 'center', act >= 0 ? '#ffffff' : COLORS.muted);
+  label(ctx, act >= 0 ? pickupName(PICKUPS[act].id) : t('hud.item'), x + as / 2, ry - 10, 'center', act >= 0 ? PICKUPS[act].color : COLORS.muted);
+  label(ctx, t('keys.space'), x + as / 2, ay + as + 8, 'center', act >= 0 ? '#ffffff' : COLORS.muted);
   x += as + sep;
   // Passifs
   const py = ry + (ws - ps);
-  label(ctx, `Passifs ${p.passives.length}/${MAX_PASSIVE_SLOTS}`, x, ry - 10);
+  label(ctx, t('hud.passives', { n: p.passives.length, max: MAX_PASSIVE_SLOTS }), x, ry - 10);
   for (let i = 0; i < MAX_PASSIVE_SLOTS; i++) {
     const sx = x + i * (ps + gap);
     const it = p.passives[i];
@@ -553,13 +568,13 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.font = TEXT;
     ctx.textAlign = 'center';
     ctx.fillStyle = b.left < 0 ? def.color : '#ffffff';
-    ctx.fillText(b.left < 0 ? 'Prêt' : `${Math.ceil(b.left / TICK_RATE)} s`, bx + bs / 2, by - 10);
+    ctx.fillText(b.left < 0 ? t('hud.ready') : seconds(Math.ceil(b.left / TICK_RATE)), bx + bs / 2, by - 10);
     bx += bs + 8;
   }
 
   // Relecture
   if (opt.replay) {
-    label(ctx, `Relecture ×${opt.replay.speed} · 1 / 2 / 4 : vitesse · Échap : quitter`, W / 2, top - 92, 'center', '#ffe14d');
+    label(ctx, t('hud.replay', { speed: opt.replay.speed }), W / 2, top - 92, 'center', '#ffe14d');
     bar(ctx, W / 2 - 200, top - 80, 400, 4, opt.replay.progress, '#ffe14d', '');
   }
 
@@ -567,6 +582,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.textAlign = 'right';
     ctx.font = '12px monospace';
     ctx.fillStyle = opt.fps >= 55 ? '#39ff7a' : opt.fps >= 40 ? '#ffe14d' : '#ff3d6e';
-    ctx.fillText(`${opt.fps.toFixed(0)} fps · rés. ${Math.round((opt.resolution ?? 1) * 100)} % · ${s.enemyCount} ennemis · ${s.projCount} proj · ${s.gemCount} gemmes`, W - 16, H - 12);
+    const fps = { fps: opt.fps.toFixed(0), res: Math.round((opt.resolution ?? 1) * 100), enemies: s.enemyCount, proj: s.projCount, gems: s.gemCount };
+    ctx.fillText(t('hud.fps', fps), W - 16, H - 12);
   }
 }

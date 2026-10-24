@@ -31,7 +31,7 @@ describe('contenu', () => {
     // Le champ de force grandit à chaque niveau.
     const aura = weaponId('force_field');
     for (let l = 2; l <= 5; l++) expect(weaponLevel(aura, l).radius!).toBeGreaterThan(weaponLevel(aura, l - 1).radius!);
-    expect(BASE_WEAPONS.every((w) => w.levels.length === 5 && w.levelText.length === 5)).toBe(true);
+    expect(BASE_WEAPONS.every((w) => w.levels.length === 5)).toBe(true);
   });
 
   it('les orbes en jeu sont aussi nombreux que le niveau', () => {

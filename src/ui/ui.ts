@@ -20,8 +20,8 @@ import * as screens from './screens';
 export type { AppApi, BuildInfo, DeathInfo, LevelUpSwap, NavDir, RunInfo } from './types';
 export { passiveTotal } from './describe';
 
-/** Écrans à onglets : changer d'onglet redessine l'écran sans transition d'écran. */
-const TAB_SCREENS = new Set(['codex', 'scores']);
+/** Screens redrawn in place without a screen transition: tabbed screens (codex, records) and the options (language change). */
+const TAB_SCREENS = new Set(['codex', 'scores', 'settings']);
 /** Profondeur de navigation : aller plus profond glisse vers la gauche, revenir glisse vers la droite. */
 const DEPTH: Record<string, number> = { difficulty: 1, sandbox: 1, codex: 1, scores: 1, settings: 1 };
 const depth = (name: string) => DEPTH[name] ?? 0;
@@ -42,6 +42,8 @@ export class UI {
   levelFocus = 0;
   levelCount = 0;
   settingsReturn: () => void = () => {};
+  /** options opened from the pause: shown over the run */
+  settingsOverlay = false;
   codexReturn: () => void = () => this.showMenu();
   /** codex ouvert depuis la pause : affiché par-dessus la partie */
   codexOverlay = false;

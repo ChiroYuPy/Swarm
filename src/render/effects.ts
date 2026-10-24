@@ -2,10 +2,12 @@
  * Effets visuels côté rendu : particules, nombres de dégâts, éclairs, ondes, secousses.
  * Alimentés par les événements de la sim. Utilisent le flux COSMETIC : ils ne touchent jamais la sim.
  */
-import { ENEMIES, bossName } from '../data/enemies';
+import { ENEMIES } from '../data/enemies';
 import { ALL_WEAPONS, type Behavior } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { LOOT, PICKUPS, type PickupDef, type PickupKind } from '../data/loot';
+import { t, tn } from '../i18n';
+import { bossName, enemyName, passiveName, pickupName, weaponName } from '../i18n/content';
 import {
   Rng,
   STREAM,
@@ -107,15 +109,15 @@ const MAXT = 36;
 const MAXL = 128;
 const MAXR = 48;
 
-/** Message au ramassage : bonus = effet immédiat, activable = rangé (Espace pour l'utiliser). */
+/** Pickup message: bonus = instant effect, usable = stored (Space to use it). Built on the fly, in the current locale. */
 const PICKUP_TOAST: Record<PickupKind, (d: PickupDef) => string> = {
-  active: (d) => `${d.name} en réserve · Espace`,
-  timed: (d) => `${d.name} · ${d.duration} s`,
-  instant: (d) => `${d.name} +30 % PV`,
-  relic: (d) => `${d.name} : il te ramènera une fois`,
+  active: (d) => t('toasts.pickupActive', { name: pickupName(d.id) }),
+  timed: (d) => t('toasts.pickupTimed', { name: pickupName(d.id), duration: d.duration ?? 0 }),
+  instant: (d) => t('toasts.pickupInstant', { name: pickupName(d.id) }),
+  relic: (d) => t('toasts.pickupRelic', { name: pickupName(d.id) }),
   chest: () => '',
 };
-const PICKUP_TOASTS = PICKUPS.map((d) => PICKUP_TOAST[d.kind](d));
+const pickupToast = (k: number) => (PICKUPS[k] ? PICKUP_TOAST[PICKUPS[k].kind](PICKUPS[k]) : '');
 
 /** firing sound of each weapon behavior */
 const SHOT_SFX: Record<Behavior, SfxName> = {
@@ -319,7 +321,7 @@ export class Effects {
           h.sfx('ring');
           break;
         case EV_BOSS_SPAWN:
-          h.toast(`⚠ BOSS : ${bossName(e.v)}`, ENEMIES[e.k].color);
+          h.toast(t('toasts.boss', { name: bossName(e.v) }), ENEMIES[e.k].color);
           h.sfx('boss');
           this.addShake(6);
           this.flash = 0.25;
@@ -330,7 +332,7 @@ export class Effects {
           this.burst(e.x, e.y, 4, ENEMY_COL[e.k], 150, 0.5, 2);
           break;
         case EV_WAVE:
-          h.toast(`Vague ${e.v}`, '#f2eaff');
+          h.toast(t('toasts.wave', { n: e.v }), '#f2eaff');
           h.sfx('wave');
           break;
         case EV_HATCH:
@@ -350,23 +352,23 @@ export class Effects {
           this.addShake(14);
           this.flash = 0.35;
           this.flashColor = '#ffffff';
-          h.toast('Boss vaincu ! Ramasse le coffre', '#ffd23a');
+          h.toast(t('toasts.bossDead'), '#ffd23a');
           h.sfx('bossDead');
           break;
         case EV_CHEST:
           h.sfx('chest');
           this.burst(e.x, e.y, 40, 11, 300, 0.8, 4);
-          if (e.k !== 1) h.toast(e.v > 0 ? `Coffre : ${e.v} amélioration${e.v > 1 ? 's' : ''}` : 'Coffre : soin', '#ffd23a');
+          if (e.k !== 1) h.toast(e.v > 0 ? tn('toasts.chest', e.v) : t('toasts.chestHeal'), '#ffd23a');
           break;
         case EV_CHOICE:
-          if (e.y2 === 1) h.toast(`+ ${offerLabel(e.k, e.v, e.x2)}`, '#ffd23a');
+          if (e.y2 === 1) h.toast(t('toasts.bonusOffer', { label: offerLabel(e.k, e.v, e.x2) }), '#ffd23a');
           break;
         case EV_FUSION:
           this.flash = 0.5;
           this.flashColor = '#ffffff';
           this.ring(e.x, e.y, 220, 0, 0.8);
           this.burst(e.x, e.y, 60, WEAPON_COL[e.v] ?? 0, 380, 0.9, 4);
-          h.toast(`★ FUSION : ${weaponDef(e.v).name}`, '#ffffff');
+          h.toast(t('toasts.fusion', { name: weaponName(weaponDef(e.v).id) }), '#ffffff');
           h.sfx('fusion');
           break;
         case EV_HEAL:
@@ -377,17 +379,17 @@ export class Effects {
           break;
         case EV_PICKUP:
           h.sfx('pickup');
-          if (e.k !== PK_CHEST) h.toast(PICKUP_TOASTS[e.k] ?? '', PICKUPS[e.k]?.color ?? '#ffffff');
+          if (e.k !== PK_CHEST) h.toast(pickupToast(e.k), PICKUPS[e.k]?.color ?? '#ffffff');
           break;
         case EV_MAP_ITEM:
           this.ring(e.x, e.y, 70, PICKUP_COL[e.k], 0.6);
           break;
         case EV_NEW_ENEMY:
-          h.toast(`Nouvel ennemi : ${ENEMIES[e.k].name}`, ENEMIES[e.k].color);
+          h.toast(t('toasts.newEnemy', { name: enemyName(ENEMIES[e.k].id) }), ENEMIES[e.k].color);
           h.sfx('alert');
           break;
         case EV_ACTIVATE:
-          h.toast(PICKUPS[e.k].name, PICKUPS[e.k].color);
+          h.toast(pickupName(PICKUPS[e.k].id), PICKUPS[e.k].color);
           if (e.k === PK_VACUUM) {
             this.ring(e.x, e.y, 500, 1, 0.7);
             h.sfx('magnet');
@@ -465,11 +467,11 @@ export class Effects {
           break;
         case EV_SWARM:
           // k > 0 : horde (k = type + 1)
-          if (e.k > 0) h.toast(`Horde : ${ENEMIES[e.k - 1].name} !`, ENEMIES[e.k - 1].color);
+          if (e.k > 0) h.toast(t('toasts.horde', { name: enemyName(ENEMIES[e.k - 1].id) }), ENEMIES[e.k - 1].color);
           h.sfx('alert');
           break;
         case EV_RING_WAVE:
-          h.toast('Encerclement !', '#ff3366');
+          h.toast(t('toasts.ring'), '#ff3366');
           h.sfx('alert');
           break;
         case EV_FUSE:
@@ -552,10 +554,10 @@ export class Effects {
 }
 
 export function offerLabel(kind: number, id: number, toLevel: number): string {
-  if (kind === OFFER_WEAPON) return `${ALL_WEAPONS[id].name} niv. ${toLevel}`;
-  if (kind === OFFER_PASSIVE) return `${PASSIVES[id].name} niv. ${toLevel}`;
-  if (kind === OFFER_FUSION) return `Évolution : ${ALL_WEAPONS[FUSION_TABLE[id].result].name}`;
-  return PICKUPS[0].name;
+  if (kind === OFFER_WEAPON) return t('toasts.offerLevel', { name: weaponName(ALL_WEAPONS[id].id), n: toLevel });
+  if (kind === OFFER_PASSIVE) return t('toasts.offerLevel', { name: passiveName(PASSIVES[id].id), n: toLevel });
+  if (kind === OFFER_FUSION) return t('toasts.offerEvolution', { name: weaponName(ALL_WEAPONS[FUSION_TABLE[id].result].id) });
+  return pickupName(PICKUPS[0].id);
 }
 
 export { FX_COLORS };

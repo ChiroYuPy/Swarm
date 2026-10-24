@@ -3,7 +3,8 @@ import { createGame, step, TICK_RATE, EV_FLEE, EV_WAVE, PJ_FIRE, type GameState 
 import { spawnEnemy } from '../src/sim/entities';
 import { BOSS_PATTERNS, BOSS_TICKS, BOSS_TYPES, MIX_TICKS, WAVE_TICKS, enemyId } from '../src/sim/registry';
 import { damageEnemy } from '../src/sim/combat';
-import { TRAPEZOID_BOSS, BOSS_ORDER, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM_QUEEN_BOSS, bossName } from '../src/data/enemies';
+import { TRAPEZOID_BOSS, BOSS_ORDER, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM_QUEEN_BOSS } from '../src/data/enemies';
+import { bossName } from '../src/i18n/content';
 import { defaultSandbox } from '../src/storage/storage';
 
 /** Partie vide (aucune apparition automatique, pas de boss). */

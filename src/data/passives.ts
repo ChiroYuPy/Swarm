@@ -1,11 +1,8 @@
 /** Bonus passifs. Chaque niveau ajoute `perLevel` aux stats du héros (max 5 niveaux). */
 
 export interface PassiveDef {
+  /** Name, description and per-level effect live in src/i18n/locales, keyed by this id. */
   id: string;
-  name: string;
-  desc: string;
-  /** effet d'un niveau, en clair */
-  effect: string;
   color: string;
   perLevel: {
     /** réduction de recharge (0.06 = -6 %) */
@@ -33,65 +30,41 @@ export interface PassiveDef {
 export const PASSIVES: PassiveDef[] = [
   {
     id: 'might',
-    name: 'Puissance',
-    desc: 'Toutes tes armes font plus mal.',
-    effect: 'Dégâts +8 %',
     color: '#ff9a3d',
     perLevel: { might: 0.08 },
   },
   {
     id: 'overclock',
-    name: 'Surcadence',
-    desc: 'Toutes tes armes se rechargent plus vite.',
-    effect: 'Recharge −6 %',
     color: '#c08457',
     perLevel: { cooldown: 0.06 },
   },
   {
     id: 'amplifier',
-    name: 'Amplificateur',
-    desc: 'Zones, explosions, orbes et projectiles plus grands.',
-    effect: 'Zone +8 %',
     color: '#d0d0ff',
     perLevel: { area: 0.08 },
   },
   {
     id: 'thrusters',
-    name: 'Propulseurs',
-    desc: 'Tu te déplaces plus vite.',
-    effect: 'Vitesse +6 %',
     color: '#4dd2ff',
     perLevel: { speed: 0.06 },
   },
   {
     id: 'magnet',
-    name: 'Aimant',
-    desc: 'Tu ramasses l’XP de plus loin.',
-    effect: 'Rayon de collecte +25 %',
     color: '#ff5a5a',
     perLevel: { magnet: 0.25 },
   },
   {
     id: 'vitality',
-    name: 'Vitalité',
-    desc: 'Plus de vie et une régénération continue.',
-    effect: 'PV max +15, régén. +0,15 PV/s',
     color: '#8dff8d',
     perLevel: { maxHp: 15, regen: 0.15 },
   },
   {
     id: 'armor',
-    name: 'Blindage',
-    desc: 'Tu encaisses mieux les coups.',
-    effect: 'Dégâts subis −5 %',
     color: '#a0b4ff',
     perLevel: { armor: 0.05 },
   },
   {
     id: 'luck',
-    name: 'Chance',
-    desc: 'Les ennemis lâchent plus souvent des bonus et des objets.',
-    effect: 'Objets +20 %',
     color: '#ffd23a',
     perLevel: { luck: 0.2 },
   },
