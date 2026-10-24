@@ -1,6 +1,6 @@
 /* Sandbox screen: settings form next to the starting loadout tiles, slot counters, foe and boss duel tiles. */
 
-/* ---------- Sandbox : réglages | équipement de départ ---------- */
+/* ---------- Sandbox: settings | starting gear ---------- */
 .screen-sandbox {
   width: min(1180px, 100%);
 }
@@ -89,7 +89,7 @@
 .foes {
   margin: 6px 0 2px;
 }
-/* boss à affronter d'emblée, sous « Commencer à » */
+/* boss to fight right away, under "Start at" */
 .tiles.duels {
   grid-template-columns: repeat(5, 1fr);
   margin: 4px 0 8px;

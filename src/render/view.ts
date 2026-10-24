@@ -4,7 +4,7 @@
  */
 import { SpriteBank, type Sprite } from './sprites';
 
-/** Pseudo-aléa décoratif stable (0..1) pour les flammes et braises. */
+/** Stable decorative pseudo-random value (0..1) for flames and embers. */
 export function hash01(n: number): number {
   const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
@@ -33,24 +33,24 @@ export class RenderView {
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) throw new Error('Canvas 2D indisponible');
+    if (!ctx) throw new Error('Canvas 2D unavailable');
     this.ctx = ctx;
   }
 
-  /** Transformation monde -> écran (caméra). */
+  /** World -> screen transform (camera). */
   worldTransform(): void {
     const sc = this.scale;
     this.ctx.setTransform(sc, 0, 0, sc, this.cw / 2 - this.camX * sc, this.ch / 2 - this.camY * sc);
   }
 
-  /** Sprite non orienté : réutilise la transformation monde courante (pas de setTransform). */
+  /** Unrotated sprite: reuses the current world transform (no setTransform). */
   spriteAt(sp: Sprite, x: number, y: number, scale = 1): void {
     const w = sp.w * scale;
     const h = sp.h * scale;
     this.ctx.drawImage(sp.img, x - w / 2, y - h / 2, w, h);
   }
 
-  /** Dessine un sprite centré en (x, y), orienté selon le vecteur unitaire (dx, dy). */
+  /** Draws a sprite centered on (x, y), oriented along the unit vector (dx, dy). */
   sprite(sp: Sprite, x: number, y: number, dx: number, dy: number, scale = 1): void {
     const sc = this.scale;
     const X = this.cw / 2 + (x - this.camX) * sc;
@@ -61,7 +61,7 @@ export class RenderView {
     this.ctx.drawImage(sp.img, -w / 2, -h / 2, w, h);
   }
 
-  /** Lueur néon : trait large translucide puis trait fin. */
+  /** Neon glow: wide translucent stroke, then a thin one. */
   glow(color: string, width: number): void {
     const ctx = this.ctx;
     ctx.strokeStyle = color;
@@ -89,7 +89,7 @@ export class RenderView {
     ctx.closePath();
   }
 
-  /** Disque flou d'une couleur (dégradé radial), mis en cache : brique des flammes. */
+  /** Soft disc of one color (radial gradient), cached: the building block of flames. */
   softPuff(color: string): CanvasImageSource {
     let img = this.puffs.get(color);
     if (!img) {
@@ -104,7 +104,7 @@ export class RenderView {
       g.fillRect(0, 0, 32, 32);
       img = cv;
       this.puffs.set(color, img);
-      // Comme les sprites : une texture ImageBitmap se dessine bien plus vite qu'un canvas.
+      // Like the sprites: an ImageBitmap texture draws much faster than a canvas.
       if (typeof createImageBitmap === 'function') createImageBitmap(cv).then((bmp) => this.puffs.set(color, bmp), () => {});
     }
     return img;

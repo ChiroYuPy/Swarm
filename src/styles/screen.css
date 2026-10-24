@@ -1,6 +1,6 @@
 /* Screen container (#ui), its fading backdrop, slide-in / slide-out transitions between screens, and the menu title neon. */
 
-/* ---------- Conteneur des écrans ---------- */
+/* ---------- Screen container ---------- */
 #ui {
   position: fixed;
   inset: 0;
@@ -15,11 +15,11 @@
   align-items: center;
   justify-content: center;
 }
-/* pendant la sortie, la partie a déjà repris : on ne capte plus la souris */
+/* during the exit, the run has already resumed: stop catching the mouse */
 #ui.closing {
   pointer-events: none;
 }
-/* Fond des écrans sur un calque à part, pour qu'il puisse apparaître et s'effacer en fondu. */
+/* Screen backdrop on its own layer, so it can fade in and out. */
 #ui::before {
   content: '';
   position: fixed;
@@ -30,11 +30,11 @@
 #ui.menu::before {
   background: radial-gradient(ellipse at center, rgba(7, 6, 15, 0.94) 0%, rgba(7, 6, 15, 0.84) 60%, rgba(7, 6, 15, 0.6) 100%);
 }
-/* Menu principal : voile seulement derrière le logo et les boutons, l'essaim reste visible autour. */
+/* Main menu: veil only behind the logo and the buttons, the swarm stays visible around them. */
 #ui.on-menu::before {
   background: radial-gradient(ellipse 380px 340px at center, rgba(7, 6, 15, 0.82) 0%, rgba(7, 6, 15, 0.5) 65%, rgba(7, 6, 15, 0.12) 100%);
 }
-/* Mode démo : le menu s'efface, la démo prend tout l'écran. */
+/* Attract mode: the menu fades out, the demo takes the whole screen. */
 #ui {
   transition: opacity 0.6s ease-in-out;
 }
@@ -62,9 +62,9 @@ body.attract #ui {
 }
 
 /*
- * Transitions d'écran « push » : l'écran sortant file entièrement d'un côté pendant que l'entrant
- * arrive de l'autre, avec la même courbe et exactement un écran d'écart : ils ne se chevauchent jamais.
- * fwd = l'ancien part à gauche, le nouveau vient de la droite ; back = l'inverse.
+ * "Push" screen transitions: the leaving screen flies fully off one side while the entering one
+ * comes in from the other, with the same curve and exactly one screen apart: they never overlap.
+ * fwd = the old one leaves to the left, the new one comes from the right; back = the reverse.
  */
 #ui {
   --push: 110vw;
@@ -118,7 +118,7 @@ body.attract #ui {
   }
 }
 
-/* Menu : le titre s'allume comme un néon une fois arrivé (pas au retour d'un sous-menu). */
+/* Menu: the title lights up like a neon sign once arrived (not when coming back from a sub-menu). */
 .screen-menu:not(.enter-back):not(.intro):not(.intro-out) .title {
   animation: neon-on 0.9s var(--push-time) steps(1, end) both;
 }

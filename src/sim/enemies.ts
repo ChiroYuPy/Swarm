@@ -1,4 +1,4 @@
-/** IA des ennemis, du boss, séparation, contact avec les joueurs. */
+/** Enemy and boss AI, separation, contact with players. */
 import { TRAPEZOID_BOSS, ENEMIES, RICOCHET_STAR_BOSS, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM_QUEEN_BOSS, type BossPhaseKind } from '../data/enemies';
 import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
@@ -41,16 +41,16 @@ import {
 const SEP_STRENGTH = 95;
 const KB_DECAY = 0.82;
 
-/** Direction souhaitée (sortie des fonctions de pilotage), sans allocation. */
+/** Desired direction (output of the steering functions), without allocation. */
 let DX = 0;
 let DY = 0;
 
-/** index du joueur pour lequel le champ de navigation est calculé ce tick (-1 : aucun) */
+/** index of the player the navigation field is computed for this tick (-1: none) */
 let navPlayer = -1;
 
 /**
- * Direction vers le joueur : tout droit s'il est en vue, sinon en suivant le champ de navigation
- * (chemin le plus court autour des obstacles). Évitement local en dernier recours.
+ * Direction toward the player: straight if in sight, otherwise following the navigation field
+ * (shortest path around obstacles). Local avoidance as a last resort.
  */
 function pathDir(s: GameState, e: Enemy, dx: number, dy: number, dist: number): void {
   if (dist < 0.001) {
@@ -82,7 +82,7 @@ function pathDir(s: GameState, e: Enemy, dx: number, dy: number, dist: number): 
   DY = uy;
 }
 
-/** `breakable` : balle de Tireur, que les armes du joueur peuvent détruire (b.a = 1). */
+/** `breakable`: Shooter bullet, which the player's weapons can destroy (b.a = 1). */
 function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, speed: number, damage: number, breakable = false): void {
   const b = spawnProjectile(s);
   if (!b) return;
@@ -98,7 +98,7 @@ function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, spee
   b.life = 4 * TICK_RATE;
 }
 
-/** Garde ses distances : s'approche, recule, ou tourne autour du joueur entre `keepMin` et `keepMax`. */
+/** Keeps its distance: approaches, backs off, or circles the player between `keepMin` and `keepMax`. */
 function keepAway(s: GameState, e: Enemy, dx: number, dy: number, dist: number, keepMin: number, keepMax: number): void {
   if (dist > keepMax) pathDir(s, e, dx, dy, dist);
   else if (dist < keepMin) {
@@ -111,7 +111,7 @@ function keepAway(s: GameState, e: Enemy, dx: number, dy: number, dist: number, 
   }
 }
 
-/** Meneur : galvanise les ennemis autour de lui jusqu'au tick suivant (l'effet tombe avec lui). */
+/** Leader: rallies the enemies around it until the next tick (the effect dies with it). */
 function boostAround(s: GameState, e: Enemy, self: number, R: number): void {
   const until = s.tick + 2;
   const n = s.grid.query(s.enemies, e.x, e.y, R);
@@ -135,7 +135,7 @@ export function updateEnemies(s: GameState): void {
   const enemies = s.enemies;
   const lost2 = WAVES.lostDistance * WAVES.lostDistance;
   const despawn2 = WAVES.props.despawn * WAVES.props.despawn;
-  // Horloge : tout le reste du monde avance au ralenti (déplacements et minuteurs).
+  // Clock: the whole rest of the world runs in slow motion (movement and timers).
   const tf = s.clockUntil > tick ? LOOT.clockFactor : 1;
   navPlayer = -1;
   for (const p of s.players) {
@@ -152,7 +152,7 @@ export function updateEnemies(s: GameState): void {
     e.py = e.y;
     const beh = ENEMY_BEHAVIOR[e.type];
     if (beh === BEHAVIOR.PROP) {
-      // Caisse oubliée loin derrière : elle disparaît (monde infini).
+      // Crate left far behind: it disappears (infinite world).
       const pi = nearestPlayer(s, e.x, e.y);
       if (pi >= 0) {
         const q = s.players[pi];
@@ -163,7 +163,7 @@ export function updateEnemies(s: GameState): void {
       continue;
     }
     if (beh === BEHAVIOR.WALL) {
-      // Mur : il monte (pas encore solide), tient, puis tombe tout seul.
+      // Wall: it rises (not solid yet), holds, then falls on its own.
       e.timer -= tf;
       if (e.ai === 0 && e.timer <= e.aux) e.ai = 1;
       if (e.timer <= 0) e.alive = false;
@@ -175,7 +175,7 @@ export function updateEnemies(s: GameState): void {
       if (e.timer <= 0) hatch(s, e);
       continue;
     }
-    // Gelé : figé sur place (y compris sa mèche et ses tirs).
+    // Frozen: locked in place (including its fuse and its shots).
     if (e.frozenUntil > tick) continue;
 
     let ti = e.target;
@@ -195,7 +195,7 @@ export function updateEnemies(s: GameState): void {
       continue;
     }
     if (d2 > lost2) {
-      // Semé : loin de tous les joueurs, il disparaît (sans gemme ni score). Sinon il change de cible.
+      // Lost: far from every player, it disappears (no gem, no score). Otherwise it switches target.
       const ni = nearestPlayer(s, e.x, e.y);
       const q = s.players[ni];
       if (ni === ti || (q.x - e.x) * (q.x - e.x) + (q.y - e.y) * (q.y - e.y) > lost2) {
@@ -232,7 +232,7 @@ export function updateEnemies(s: GameState): void {
       }
       case BEHAVIOR.SHOOTER: {
         keepAway(s, e, dx, dy, dist, d.keepMin ?? 240, d.keepMax ?? 340);
-        // Il pivote vers toi peu à peu (aux = son cap) et ne tire que droit devant lui.
+        // It turns toward you little by little (aux = its heading) and only shoots straight ahead.
         if (e.ai === 0) {
           e.aux = datan2(dy, dx);
           e.ai = 1;
@@ -280,7 +280,7 @@ export function updateEnemies(s: GameState): void {
         boostAround(s, e, i, d.auraRadius ?? 170);
         break;
       case BEHAVIOR.ORBITER: {
-        // Spirale qui se resserre : surtout de côté, un peu vers l'intérieur ; tout près, il plonge.
+        // Tightening spiral: mostly sideways, a little inward; when very close, it dives in.
         if (dist > 420 || dist < 70) pathDir(s, e, dx, dy, dist);
         else {
           const side = e.id & 1 ? 1 : -1;
@@ -292,7 +292,7 @@ export function updateEnemies(s: GameState): void {
         break;
       }
       case BEHAVIOR.BLINKER: {
-        // ai 0 : avance lentement. ai 1 : le sol est marqué en (aux, aux2), il y apparaît au bout de `fuse`.
+        // ai 0: moves slowly. ai 1: the ground is marked at (aux, aux2), it appears there after `fuse`.
         if (e.ai === 0) {
           pathDir(s, e, dx, dy, dist);
           e.timer -= tf;
@@ -336,10 +336,10 @@ export function updateEnemies(s: GameState): void {
       }
     }
 
-    // Séparation douce entre ennemis voisins (grille construite en début de tick).
+    // Soft separation between neighbouring enemies (grid built at the start of the tick).
     let sx = 0;
     let sy = 0;
-    // murs solides : on en ressort entièrement (pas de séparation douce)
+    // solid walls: get fully pushed out of them (no soft separation)
     let hx = 0;
     let hy = 0;
     let checks = 0;
@@ -392,7 +392,7 @@ export function updateEnemies(s: GameState): void {
     e.kbx *= KB_DECAY;
     e.kby *= KB_DECAY;
     if (beh === BEHAVIOR.SHOOTER) {
-      // Le Tireur regarde là où il vise, pas là où il marche.
+      // The Shooter faces where it aims, not where it walks.
       e.vx = dcos(e.aux);
       e.vy = dsin(e.aux);
     } else if (DX !== 0 || DY !== 0) {
@@ -402,17 +402,17 @@ export function updateEnemies(s: GameState): void {
   }
 }
 
-/** vitesse de pivot du Tireur (radians par seconde) et demi-angle dans lequel il tire */
+/** Shooter turn speed (radians per second) and half-angle within which it shoots */
 const SHOOTER_TURN = 2.2;
 const SHOOTER_CONE = 0.12;
 
-/** Vitesse voulue du boss ce tick (sortie des phases). */
+/** Desired boss velocity this tick (output of the phases). */
 let VX = 0;
 let VY = 0;
 
 /**
- * Boss : une séquence de phases qui boucle (data/enemies.ts). Chaque phase a une entrée (visée, cage,
- * renforts…) et un comportement par tick. Le boss plane au-dessus des obstacles.
+ * Boss: a looping sequence of phases (data/enemies.ts). Each phase has an entry (aim, cage,
+ * reinforcements…) and a per-tick behavior. The boss hovers over obstacles.
  */
 function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, dist: number, tf: number): void {
   const pat = BOSS_PATTERNS[e.type];
@@ -448,7 +448,7 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       break;
     }
     case 'charge':
-      // Ligne d'avertissement, puis il fonce jusqu'au bout de la ligne (e.ax : distance parcourue).
+      // Warning line, then it charges to the end of the line (e.ax: distance travelled).
       if (elapsed >= Math.round(TRAPEZOID_BOSS.chargeTelegraph * TICK_RATE) && e.ax < TRAPEZOID_BOSS.chargeLength) {
         VX = dcos(e.aux) * TRAPEZOID_BOSS.chargeSpeed;
         VY = dsin(e.aux) * TRAPEZOID_BOSS.chargeSpeed;
@@ -506,14 +506,14 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
     case 'aim':
     case 'focus':
     case 'lay':
-      // immobile (tout se passe à l'entrée de la phase)
+      // motionless (everything happens on phase entry)
       break;
     default: {
       const unhandled: never = ph.kind;
       throw new Error(`Unhandled boss phase ${unhandled}`);
     }
   }
-  // Horloge : ses phases continuent, mais il se traîne.
+  // Clock: its phases go on, but it crawls.
   e.x += VX * DT * tf;
   e.y += VY * DT * tf;
   if (VX !== 0 || VY !== 0) {
@@ -536,13 +536,13 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
       buildCage(s, e, p);
       break;
     case 'aim':
-      // Étoile : direction de la ruée, et boîte de rebond centrée sur le joueur.
+      // Ricochet star: dash direction, and bounce box centred on the player.
       e.aux = datan2(dy, dx);
       e.ax = p.x;
       e.ay = p.y;
       break;
     case 'focus': {
-      // Œil : le cône va d'un bord à l'autre en passant par le joueur, dans un sens puis dans l'autre.
+      // Laser eye: the cone goes from one edge to the other through the player, one way then the other.
       const c = datan2(dy, dx);
       const dir = e.ai & 2 ? -1 : 1;
       e.ax = c - (dir * LASER_EYE_BOSS.arc) / 2;
@@ -580,7 +580,7 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
   }
 }
 
-/** Étoile : fonce, rebondit sur les bords de sa boîte, sème des flammes. */
+/** Ricochet star: dashes, bounces off the edges of its box, drops flames. */
 function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
   const H = RICOCHET_STAR_BOSS.box;
   let ux = dcos(e.aux);
@@ -611,7 +611,7 @@ function dash(s: GameState, e: Enemy, elapsed: number, dm: number): void {
   }
 }
 
-/** Œil : le rayon tourne de e.ax à e.ay ; il blesse qui se trouve dessus (une fois, grâce à l'invulnérabilité). */
+/** Laser eye: the beam turns from e.ax to e.ay; it hurts whoever is on it (once, thanks to invulnerability). */
 function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
   e.aux = e.ax + (e.ay - e.ax) * Math.min(1, f);
   const ux = dcos(e.aux);
@@ -627,8 +627,8 @@ function sweep(s: GameState, e: Enemy, f: number, dm: number): void {
 }
 
 /**
- * Hexagone bâtisseur : une cage hexagonale de murs autour du joueur (ils montent, puis deviennent solides),
- * un cycle sur `cageEvery`, avec une sortie au milieu de deux côtés opposés. `ax` = cages déjà tentées.
+ * Builder hexagon: a hexagonal cage of walls around the player (they rise, then become solid),
+ * one cycle in `cageEvery`, with an exit in the middle of two opposite sides. `ax` = cages already attempted.
  */
 function buildCage(s: GameState, e: Enemy, p: Player): void {
   e.ax++;
@@ -638,7 +638,7 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
   const life = Math.round(BUILDER_HEXAGON_BOSS.wallLife * TICK_RATE);
   const solid = Math.round((BUILDER_HEXAGON_BOSS.wallLife - BUILDER_HEXAGON_BOSS.wallRise) * TICK_RATE);
   const hm = hpMul(s);
-  // Les sorties changent de côtés d'une cage à l'autre.
+  // The exits change sides from one cage to the next.
   const gapSide = ((e.ax - 1) / BUILDER_HEXAGON_BOSS.cageEvery) % 3;
   const g0 = Math.floor((n - BUILDER_HEXAGON_BOSS.gapWalls) / 2) + 1;
   for (let side = 0; side < 6; side++) {
@@ -662,12 +662,12 @@ function buildCage(s: GameState, e: Enemy, p: Player): void {
   emit(s, EV_CAGE, p.x, p.y, R, e.type);
 }
 
-/** Reine : pond un œuf (trois de temps en temps) là où elle est. */
+/** Queen: lays an egg (three now and then) where she stands. */
 function layEggs(s: GameState, e: Enemy): void {
   if (s.sandbox && !s.sandbox.summons) return;
   let eggs = 0;
   for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === EGG_TYPE) eggs++;
-  // ay = pontes déjà faites (aux sert à la spirale de dards)
+  // ay = layings already done (aux is used by the dart spiral)
   e.ay++;
   const n = Math.min(SWARM_QUEEN_BOSS.maxEggs - eggs, e.ay % SWARM_QUEEN_BOSS.bigEvery === 0 ? 3 : 1);
   const hm = hpMul(s);
@@ -679,7 +679,7 @@ function layEggs(s: GameState, e: Enemy): void {
   }
 }
 
-/** Œuf : il éclot en Essaim. */
+/** Egg: it hatches into Swarm. */
 function hatch(s: GameState, egg: Enemy): void {
   egg.alive = false;
   egg.hp = 0;
@@ -691,7 +691,7 @@ function hatch(s: GameState, egg: Enemy): void {
   emit(s, EV_HATCH, egg.x, egg.y, n);
 }
 
-/** Renforts : un gros paquet d'un seul type, sauf s'il y a déjà du monde (il faut pouvoir taper le boss). */
+/** Reinforcements: a big pack of a single type, unless there are already plenty (the boss must stay hittable). */
 function summon(s: GameState, boss: Enemy, p: Player): void {
   const sm = BOSS_SUMMONS[boss.type];
   if (!sm || (s.sandbox && !s.sandbox.summons)) return;
@@ -717,7 +717,7 @@ function summon(s: GameState, boss: Enemy, p: Player): void {
   if (!self) emit(s, EV_RING_WAVE, p.x, p.y, n);
 }
 
-/** Dégâts de contact d'un boss : bien plus forts quand il fonce (charge du Trapèze, ruée de l'Étoile). */
+/** Boss contact damage: much stronger when it rushes (Trapezoid charge, Ricochet star dash). */
 function bossContactMul(e: Enemy): number {
   const kind = BOSS_PATTERNS[e.type][e.ai]?.kind;
   if (kind === 'charge' && e.ax > 0 && e.ax < TRAPEZOID_BOSS.chargeLength) return TRAPEZOID_BOSS.chargeDamage;
@@ -725,7 +725,7 @@ function bossContactMul(e: Enemy): number {
   return 1;
 }
 
-/** Les murs de l'Hexagone bloquent les joueurs (glissement le long, comme contre un obstacle). */
+/** The Builder hexagon's walls block players (sliding along, as against an obstacle). */
 export function pushOutOfWalls(s: GameState, p: Player): void {
   if (!p.alive) return;
   for (let i = 0; i < s.enemyCount; i++) {
@@ -742,7 +742,7 @@ export function pushOutOfWalls(s: GameState, p: Player): void {
   }
 }
 
-/** Dégâts de contact ennemis -> joueurs. */
+/** Enemy -> player contact damage. */
 export function updateContacts(s: GameState): void {
   const tick = s.tick;
   const grid = s.grid;

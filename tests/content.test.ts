@@ -22,19 +22,19 @@ import { BASE_WEAPONS } from '../src/data/weapons';
 import { ENEMIES } from '../src/data/enemies';
 import { botInput } from '../src/ai/bot';
 
-describe('contenu', () => {
-  it('un niveau = une instance de plus pour les armes à instances', () => {
+describe('content', () => {
+  it('one level = one more instance for instance-based weapons', () => {
     for (const id of ['blaster', 'orbs', 'mines', 'boomerang', 'electric_arc', 'shockwave', 'whip', 'flamethrower', 'turret', 'drone', 'ricochet', 'mortar']) {
       const w = weaponId(id);
-      for (let l = 1; l <= 5; l++) expect(weaponLevel(w, l).count, `${id} niv. ${l}`).toBe(l);
+      for (let l = 1; l <= 5; l++) expect(weaponLevel(w, l).count, `${id} lvl ${l}`).toBe(l);
     }
-    // Le champ de force grandit à chaque niveau.
+    // The force field grows at every level.
     const aura = weaponId('force_field');
     for (let l = 2; l <= 5; l++) expect(weaponLevel(aura, l).radius!).toBeGreaterThan(weaponLevel(aura, l - 1).radius!);
     expect(BASE_WEAPONS.every((w) => w.levels.length === 5)).toBe(true);
   });
 
-  it('les orbes en jeu sont aussi nombreux que le niveau', () => {
+  it('there are as many orbs in play as the weapon level', () => {
     const s = createGame({ seed: 'ORBES' });
     const p = s.players[0];
     const w = addWeapon(p, weaponId('orbs'));
@@ -45,14 +45,14 @@ describe('contenu', () => {
     }
   });
 
-  it('les types d’ennemis arrivent progressivement, plus tôt en difficile', () => {
+  it('enemy types arrive gradually, earlier on hard', () => {
     const firstSeen = (difficulty: number, seconds: number) => {
       const s = createGame({ seed: 'ARRIVEES', difficulty });
       s.players[0].base.maxHp = 1e9;
       s.players[0].hp = 1e9;
       s.players[0].base.magnet = 0;
       const seen = new Map<string, number>();
-      // Temps des vagues (l'horloge s'arrête pendant les boss : on les abat dès qu'ils arrivent).
+      // Wave time (the clock stops during bosses: kill them as soon as they arrive).
       while (s.clock < seconds * TICK_RATE && !s.over) {
         step(s, [s.players[0].offers.length ? 200 : 0]);
         for (let k = 0; k < s.eventCount; k++) {
@@ -73,14 +73,14 @@ describe('contenu', () => {
     };
     const normal = firstSeen(1, 380);
     const hard = firstSeen(2, 200);
-    // Au début, uniquement des Chasseurs ; les autres sont annoncés plus tard.
+    // At first, only Hunters; the other types are announced later.
     expect(normal.get('rusher')).toBeGreaterThan(60);
     expect(normal.has('block')).toBe(true);
     expect(hard.get('rusher')!).toBeLessThan(normal.get('rusher')!);
     expect(spawnRate(30 * TICK_RATE, 0).rate).toBeLessThan(spawnRate(30 * TICK_RATE, 2).rate);
   });
 
-  it('les bonus temporaires s’appliquent puis expirent', () => {
+  it('temporary bonuses apply, then expire', () => {
     const s = createGame({ seed: 'BONUS' });
     const p = s.players[0];
     const base = p.stats.might;
@@ -95,7 +95,7 @@ describe('contenu', () => {
     expect(p.stats.might).toBe(base * 2);
     for (let i = 0; i < 9 * TICK_RATE; i++) step(s, [0]);
     expect(p.stats.might).toBe(base);
-    // Bouclier : aucun dégât reçu.
+    // Shield: no damage taken.
     p.shieldUntil = s.tick + 100;
     const hp = p.hp;
     for (let i = 0; i < s.enemyCount; i++) s.enemies[i].x = p.x;
@@ -104,7 +104,7 @@ describe('contenu', () => {
     expect(PK_SHIELD).toBeGreaterThan(PK_RAGE);
   });
 
-  it('utiliser un activable est un pas « zéro » rejoué à l’identique', () => {
+  it('using an active item is a zero-time step, replayed identically', () => {
     const s = createGame({ seed: 'ACTIVABLE' });
     const codes: number[] = [];
     for (let i = 0; i < 40 * TICK_RATE; i++) {
@@ -112,21 +112,21 @@ describe('contenu', () => {
       codes.push(c);
       step(s, [c]);
     }
-    s.players[0].activable = PK_CLOCK;
+    s.players[0].activeItem = PK_CLOCK;
     const tick = s.tick;
     codes.push(INPUT_USE);
     step(s, [INPUT_USE]);
     expect(s.tick).toBe(tick);
-    expect(s.players[0].activable).toBe(-1);
+    expect(s.players[0].activeItem).toBe(-1);
     expect(s.clockUntil).toBeGreaterThan(tick);
-    // La relecture doit refaire exactement la même chose... à condition d'avoir le même objet en réserve :
-    // on rejoue donc une partie où l'objet a été obtenu en jeu (le bot s'en sert tout seul).
+    // The replay must do exactly the same thing... provided the same item is in reserve:
+    // so replay a game where the item was picked up in play (the bot uses it on its own).
     const g = createGame({ seed: 'ACTIVABLE-4' });
     const log: number[] = [];
     let used = 0;
     for (let i = 0; i < 300 * TICK_RATE && !g.over; i++) {
       const c = botInput(g, 0);
-      if (c === INPUT_USE && g.players[0].activable >= 0) used++;
+      if (c === INPUT_USE && g.players[0].activeItem >= 0) used++;
       log.push(c);
       step(g, [c]);
     }
@@ -135,7 +135,7 @@ describe('contenu', () => {
     expect(used).toBeGreaterThan(0);
   });
 
-  it('la difficulté change la partie mais reste déterministe', () => {
+  it('difficulty changes the game but stays deterministic', () => {
     const run = (difficulty: number) => {
       const s = createGame({ seed: 'DIFF', difficulty });
       for (let i = 0; i < 60 * TICK_RATE; i++) step(s, [botInput(s, 0)]);

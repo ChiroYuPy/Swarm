@@ -1,25 +1,25 @@
 /**
- * Codage des entrées et du journal de partie.
+ * Encoding of inputs and of the game log.
  *
- * Une entrée = 1 octet par pas de simulation :
- *   0         immobile
- *   1..64     déplacement plein régime dans la direction (code-1) × 360°/64
- *   65..128   déplacement à mi-régime (stick analogique peu incliné)
- *   130       revenir à la visée automatique (pas « zéro »)
- *   131..194  viser dans la direction (code-131) × 360°/64 (pas « zéro », enregistré quand la visée change)
- *   200..202  choix de la proposition 0, 1 ou 2 au level-up (pas « zéro », le temps n'avance pas)
- *   210       utiliser l'objet activable (pas « zéro »)
- *   220..224  au level-up, échanger l'arme de l'emplacement (code-220) ; 229 annuler (pas « zéro »)
+ * One input = 1 byte per simulation step:
+ *   0         idle
+ *   1..64     full-speed move in direction (code-1) × 360°/64
+ *   65..128   half-speed move (analog stick slightly tilted)
+ *   130       back to auto aim ("zero-time" step)
+ *   131..194  aim in direction (code-131) × 360°/64 ("zero-time" step, recorded when the aim changes)
+ *   200..202  pick offer 0, 1 or 2 at level-up ("zero-time" step, time does not advance)
+ *   210       use the active item ("zero-time" step)
+ *   220..224  at level-up, swap the weapon in slot (code-220); 229 cancel ("zero-time" step)
  *
- * Journal : RLE (octet valeur + longueur en varint LEB128), puis base64, préfixé par la version du format.
- * Une partie de 10 minutes au clavier tient en quelques Ko.
+ * Log: RLE (value byte + length as LEB128 varint), then base64, prefixed with the format version.
+ * A 10-minute keyboard game fits in a few KB.
  */
 import { INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_SWAP_BASE } from './constants';
 import { TWO_PI, datan2 } from './dmath';
 
 export const LOG_FORMAT = 'N1';
 
-/** Convertit un vecteur d'entrée (clavier ou stick) en code. */
+/** Converts an input vector (keyboard or stick) into a code. */
 export function encodeMove(x: number, y: number): number {
   const m2 = x * x + y * y;
   if (m2 < 0.04) return 0;
@@ -29,13 +29,13 @@ export function encodeMove(x: number, y: number): number {
   return m2 < 0.36 ? INPUT_DIRS + 1 + d : 1 + d;
 }
 
-/** Direction de visée (0..63) la plus proche de l'angle `a` (radians). */
+/** Aim direction (0..63) closest to angle `a` (radians). */
 export function aimDir(a: number): number {
   const d = Math.round((a / TWO_PI) * INPUT_DIRS) % INPUT_DIRS;
   return d < 0 ? d + INPUT_DIRS : d;
 }
 
-/** Code de visée : direction 0..63, ou -1 pour la visée automatique. */
+/** Aim code: direction 0..63, or -1 for auto aim. */
 export function aimCode(dir: number): number {
   return dir < 0 ? INPUT_AIM_AUTO : INPUT_AIM_BASE + dir;
 }
@@ -52,12 +52,12 @@ export function isChoiceCode(c: number): boolean {
   return c >= INPUT_CHOICE_BASE && c < INPUT_CHOICE_BASE + 3;
 }
 
-/** Pas « zéro » : ne fait pas avancer le temps (visée, choix de level-up, objet activable). */
+/** "Zero-time" step: does not advance time (aim, level-up choice, active item). */
 export function isZeroTimeCode(c: number): boolean {
   return c >= INPUT_AIM_AUTO;
 }
 
-/** Journal d'entrées extensible (un octet par pas). */
+/** Growable input log (one byte per step). */
 export class InputLog {
   private buf = new Uint8Array(8192);
   length = 0;
@@ -133,7 +133,7 @@ export function encodeLog(codes: Uint8Array): string {
 
 export function decodeLog(str: string): Uint8Array {
   const parts = str.split('.');
-  if (parts.length !== 3 || parts[0] !== LOG_FORMAT) throw new Error('Journal de partie invalide');
+  if (parts.length !== 3 || parts[0] !== LOG_FORMAT) throw new Error('Invalid game log');
   const total = Number(parts[1]);
   const bytes = fromBase64(parts[2]);
   const out = new Uint8Array(total);
@@ -152,6 +152,6 @@ export function decodeLog(str: string): Uint8Array {
     out.fill(v, o, Math.min(total, o + run));
     o += run;
   }
-  if (o !== total) throw new Error('Journal de partie tronqué');
+  if (o !== total) throw new Error('Truncated game log');
   return out;
 }

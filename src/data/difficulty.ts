@@ -1,19 +1,19 @@
 /**
- * Niveaux de difficulté. Ils jouent sur la puissance des ennemis ET sur le rythme d'arrivée des
- * nouveaux types (pace : multiplicateur des dates d'apparition des phases de vagues).
+ * Difficulty levels. They affect enemy strength AND the arrival pace of
+ * new types (pace: multiplier of the wave phases' appearance times).
  */
 export interface DifficultyDef {
   /** Name and description live in src/i18n/locales, keyed by this id. */
   id: string;
   color: string;
-  /** multiplicateurs ennemis */
+  /** enemy multipliers */
   hp: number;
   dmg: number;
-  /** multiplicateur de vitesse de déplacement des ennemis (hors boss) */
+  /** enemy movement speed multiplier (bosses excluded) */
   speed: number;
-  /** multiplicateur du débit d'apparition */
+  /** spawn rate multiplier */
   rate: number;
-  /** multiplicateur des dates d'arrivée des nouveaux types d'ennemis (> 1 = plus lent) */
+  /** multiplier of the arrival times of new enemy types (> 1 = slower) */
   pace: number;
 }
 

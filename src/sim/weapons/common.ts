@@ -30,7 +30,7 @@ export function target(s: GameState, x: number, y: number, range: number): numbe
   return s.grid.nearest(s.enemies, x, y, range, undefined, 0, true);
 }
 
-/** Angle vers la dernière cible trouvée par `aim`. */
+/** Angle toward the last target found by `aim`. */
 export let AIM = 0;
 
 export function setAim(a: number): void {
@@ -38,8 +38,8 @@ export function setAim(a: number): void {
 }
 
 /**
- * Visée manuelle : la direction choisie, que des ennemis y soient ou non.
- * Sinon, vise l'ennemi le plus proche à portée. Renvoie false s'il n'y a personne (l'arme ne tire pas).
+ * Manual aim: the chosen direction, whether or not there are enemies there.
+ * Otherwise, aims at the nearest enemy in range. Returns false if there is nobody (the weapon does not fire).
  */
 export function aim(s: GameState, p: Player, range: number): boolean {
   if (p.aim >= 0) {
@@ -53,12 +53,12 @@ export function aim(s: GameState, p: Player, range: number): boolean {
   return true;
 }
 
-/** Personne à portée : l'arme reste chargée et réessaie bientôt. */
+/** Nobody in range: the weapon stays loaded and retries soon. */
 export const RETRY_TICKS = 6;
 
 export const ticks = (sec: number | undefined, def: number) => Math.max(1, Math.round((sec ?? def) * TICK_RATE));
 
-/** L'ennemi (dx, dy) depuis le joueur est-il dans le cône d'axe `a`, de demi-angle `arc` et de longueur `len` ? */
+/** Is the enemy at (dx, dy) from the player inside the cone of axis `a`, half-angle `arc` and length `len`? */
 export function inCone(dx: number, dy: number, r: number, a: number, arc: number, len: number): boolean {
   const d2 = dx * dx + dy * dy;
   const reach = len + r;
@@ -72,7 +72,7 @@ export function inCone(dx: number, dy: number, r: number, a: number, arc: number
   return Math.abs(diff) <= arc + r / d;
 }
 
-/** Direction « devant toi » : la visée manuelle, sinon le sens de la marche. */
+/** "In front of you" direction: the manual aim, otherwise the walking direction. */
 export function facing(p: Player): number {
   return p.aim >= 0 ? (p.aim * TWO_PI) / INPUT_DIRS : datan2(p.faceY, p.faceX);
 }

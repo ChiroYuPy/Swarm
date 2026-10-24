@@ -1,5 +1,5 @@
 {
-  "//": "Garde-fou d'architecture : la simulation et les données compilent SANS la lib DOM. Toute référence à window/document/canvas dans src/sim ou src/data casse ce typecheck.",
+  "//": "Architecture guardrail: the simulation and the data compile WITHOUT the DOM lib. Any reference to window/document/canvas in src/sim or src/data breaks this typecheck.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

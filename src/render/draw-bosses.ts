@@ -64,25 +64,25 @@ function enemyPath(view: RenderView, e: Enemy, type: number, x: number, y: numbe
       ctx.moveTo(x + r * 0.2, y + r * 0.4);
       ctx.lineTo(x + r * 0.45, y + r * 0.4);
       break;
-    case 'trapeze': {
+    case 'trapezoid': {
       ctx.moveTo(x - r * 1.1, y + r * 0.7);
       ctx.lineTo(x + r * 1.1, y + r * 0.7);
       ctx.lineTo(x + r * 0.6, y - r * 0.8);
       ctx.lineTo(x - r * 0.6, y - r * 0.8);
       ctx.closePath();
-      // moustache de tonton
+      // uncle's mustache
       ctx.moveTo(x - r * 0.5, y + r * 0.2);
       ctx.quadraticCurveTo(x - r * 0.25, y + r * 0.05, x, y + r * 0.2);
       ctx.quadraticCurveTo(x + r * 0.25, y + r * 0.05, x + r * 0.5, y + r * 0.2);
       break;
     }
     case 'hexagon':
-      // Deux hexagones qui tournent en sens contraire.
+      // Two hexagons rotating in opposite directions.
       view.polygon(x, y, 6, r, time * 0.5);
       view.polygon(x, y, 6, r * 0.5, -time * 0.9);
       break;
     case 'star': {
-      // Elle tourbillonne quand elle fonce.
+      // It spins when it dashes.
       const spin = BOSS_PATTERNS[e.type][e.ai]?.kind === 'dash' ? time * 9 : time * 1.2;
       for (let k = 0; k < 10; k++) {
         const a = spin + (k * Math.PI) / 5;
@@ -121,12 +121,12 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
   const total = ph ? Math.round(ph.duration * TICK_RATE) : 1;
   const elapsed = total - boss.timer;
 
-  // Avertissements, sous le boss.
+  // Warnings, under the boss.
   if (ph?.kind === 'charge' && elapsed < TRAPEZOID_BOSS.chargeTelegraph * TICK_RATE) {
     dangerLine(view, x, y, boss.aux, TRAPEZOID_BOSS.chargeLength, boss.r * 1.6, time);
   }
   if (ph?.kind === 'aim' || ph?.kind === 'dash') {
-    // Étoile : la boîte de rebond, et sa direction pendant qu'elle vise.
+    // Star: the bounce box, and its direction while it aims.
     const H = RICOCHET_STAR_BOSS.box;
     ctx.beginPath();
     ctx.rect(boss.ax - H, boss.ay - H, H * 2, H * 2);
@@ -140,7 +140,7 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
     if (ph.kind === 'aim') dangerLine(view, x, y, boss.aux, 700, boss.r * 1.4, time);
   }
   if (ph?.kind === 'focus' || ph?.kind === 'sweep') {
-    // Œil : le cône que le rayon va balayer, puis le rayon.
+    // Eye: the cone the beam will sweep, then the beam.
     const L = LASER_EYE_BOSS.beamLength;
     const a0 = Math.min(boss.ax, boss.ay);
     const a1 = Math.max(boss.ax, boss.ay);
@@ -179,7 +179,7 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
   enemyPath(view, boss, boss.type, x, y, time);
   view.glow(s.tick - boss.hitTick < 4 ? '#ffffff' : color, 3.5);
 
-  // Regard : l'Œil a une pupille (vers le joueur, ou le long du rayon), les autres deux petits yeux.
+  // Gaze: the Eye has a pupil (towards the player, or along the beam), the others two small eyes.
   ctx.beginPath();
   if (ENEMIES[boss.type].shape === 'eye') {
     let fx = 1;
@@ -219,7 +219,7 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
   ctx.fill();
 }
 
-/** Ligne d'avertissement rouge en pointillés (charge, ruée). */
+/** Dashed red warning line (charge, dash). */
 function dangerLine(view: RenderView, x: number, y: number, a: number, len: number, width: number, time: number): void {
   const ctx = view.ctx;
   ctx.beginPath();

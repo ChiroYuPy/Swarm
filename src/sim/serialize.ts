@@ -1,8 +1,8 @@
 /**
- * Sérialisation et empreinte de l'état.
- * - `hashState` : empreinte compacte de tout l'état logique (sert aux tests de déterminisme
- *   et, plus tard, à vérifier qu'un client et un serveur sont synchronisés).
- * - `serializeState` / `deserializeState` : instantané JSON complet, restaurable.
+ * State serialization and fingerprint.
+ * - `hashState`: compact fingerprint of the whole logical state (used by determinism tests
+ *   and, later, to check that a client and a server are in sync).
+ * - `serializeState` / `deserializeState`: full, restorable JSON snapshot.
  */
 import { createGame } from './game';
 import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState, type SandboxRules } from './state';
@@ -171,9 +171,9 @@ export function serializeState(s: GameState): string {
 
 export function deserializeState(json: string): GameState {
   const snap = JSON.parse(json) as Snapshot;
-  if (snap.format !== SNAPSHOT_FORMAT && (snap.format as string) !== LEGACY_SNAPSHOT_FORMAT) throw new Error('Instantané invalide');
+  if (snap.format !== SNAPSHOT_FORMAT && (snap.format as string) !== LEGACY_SNAPSHOT_FORMAT) throw new Error('Invalid snapshot');
   const s = createGame({ seed: snap.seedLabel, difficulty: snap.difficulty, players: snap.playerCount });
-  if (snap.version !== s.version) throw new Error(`Version de sim incompatible (${snap.version} ≠ ${s.version})`);
+  if (snap.version !== s.version) throw new Error(`Incompatible sim version (${snap.version} ≠ ${s.version})`);
   const c = snap.core;
   s.tick = c.tick as number;
   s.over = c.over as boolean;

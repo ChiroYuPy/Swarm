@@ -1,7 +1,7 @@
 /* Neon cursor (see ui/cursor.ts). */
 
-/* ---------- Curseur néon (voir ui/cursor.ts) ---------- */
-/* Le curseur système est masqué partout : c'est #cursor qui le remplace. */
+/* ---------- Neon cursor (see ui/cursor.ts) ---------- */
+/* The system cursor is hidden everywhere: #cursor replaces it. */
 *,
 *::before,
 *::after {
@@ -22,7 +22,7 @@
   overflow: visible;
   filter: drop-shadow(0 0 3px rgba(56, 246, 255, 0.85));
 }
-/* Même structure pour la flèche et le point (pointe = centre du point) : le passage de l'un à l'autre est un morphing. */
+/* Same structure for the arrow and the dot (tip = dot center): switching between them is a morph. */
 #cursor path {
   d: path('M 5 1 C 6.66 1 8 2.34 8 4 C 8 5.66 6.66 7 5 7 C 3.34 7 2 5.66 2 4 C 2 2.34 3.34 1 5 1 Z');
   fill: var(--accent);
@@ -48,7 +48,7 @@
 #cursor[data-state='hover'] path {
   fill: color-mix(in srgb, var(--accent) 55%, rgba(7, 6, 15, 0.85));
 }
-/* Viser (clic maintenu en partie) : le point s'ouvre en anneau, centré sur le même point. */
+/* Aiming (button held in game): the dot opens into a ring, centered on the same point. */
 #cursor[data-state='aim'] path {
   d: path('M 5 -4 C 9.42 -4 13 -0.42 13 4 C 13 8.42 9.42 12 5 12 C 0.58 12 -3 8.42 -3 4 C -3 -0.42 0.58 -4 5 -4 Z');
   fill: rgba(56, 246, 255, 0.12);

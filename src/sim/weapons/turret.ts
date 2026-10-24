@@ -8,7 +8,7 @@ import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_TURRET, emit, type GameState, type Player, type WeaponInst } from '../state';
 import { RETRY_TICKS, cdTicks, target, ticks } from './common';
 
-/** Tourelle / Bastion : posée là où tu es, elle tire seule (voir projectiles.ts). */
+/** Turret / Bastion: dropped where you stand, it shoots on its own (see projectiles.ts). */
 export function turret(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;

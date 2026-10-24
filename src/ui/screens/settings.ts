@@ -136,7 +136,7 @@ function setSetting<K extends keyof Settings>(ui: UI, key: K, value: Settings[K]
   if (row) paintSetting(ui, row);
 }
 
-/** Left / right (or click) on a row: slider ±5 %, switch flipped, next / previous choice. */
+/** Left / right (or click) on a row: slider ±5%, switch flipped, next / previous choice. */
 function stepSetting(ui: UI, row: HTMLElement, delta: number): void {
   const def = settingDef(row);
   const cur = ui.app.save.settings;

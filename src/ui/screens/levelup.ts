@@ -138,7 +138,7 @@ export function showLevelUp(
   else ui.syncPointer(document.elementFromPoint(ui.pointer.x, ui.pointer.y));
 }
 
-/** Carte sélectionnée au level-up (-1 : aucune, la souris est ailleurs). */
+/** Selected card on level-up (-1: none, the mouse is elsewhere). */
 export function focusCard(ui: UI, i: number): void {
   if (ui.current !== 'levelup') return;
   ui.levelFocus = i < 0 ? -1 : (i + ui.levelCount) % ui.levelCount;
@@ -154,13 +154,13 @@ export function moveCard(ui: UI, d: number): void {
 export function confirmCard(ui: UI): void {
   ui.setKbd(true);
   if (ui.current !== 'levelup') return;
-  // Rien de sélectionné : la touche fait d'abord apparaître la sélection.
+  // Nothing selected: the key first makes the selection appear.
   if (ui.levelFocus < 0) {
     ui.app.uiSound('uiMove');
     ui.focusCard(0);
     return;
   }
-  // Garde-fou : une touche tenue au moment où l'écran s'ouvre ne choisit pas à la place du joueur.
+  // Safeguard: a key held down when the screen opens does not choose for the player.
   if (performance.now() - ui.levelOpenedAt <= 350) return;
   ui.screenEl?.querySelectorAll<HTMLButtonElement>('.pick')[ui.levelFocus]?.click();
 }

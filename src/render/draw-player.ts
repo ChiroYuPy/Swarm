@@ -33,7 +33,7 @@ export function drawPlayer(view: RenderView, s: GameState, alpha: number, time: 
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = inv ? 0.45 : 1;
     neon(ctx, hurt ? '#ff3d6e' : p.rageUntil > s.tick ? '#ff6a3d' : COLORS.player, 3.2);
-    // Yeux qui regardent où l'on vise (visée manuelle), sinon où l'on va
+    // Eyes look where the player aims (manual aim), otherwise where they are going
     ctx.beginPath();
     const aimA = (p.aim * Math.PI * 2) / INPUT_DIRS;
     const ex = (p.aim >= 0 ? Math.cos(aimA) : p.faceX) * r * 0.22;
@@ -45,7 +45,7 @@ export function drawPlayer(view: RenderView, s: GameState, alpha: number, time: 
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.globalAlpha = 1;
-    // Bonus temporaires visibles sur le héros
+    // Temporary buffs shown on the hero
     if (p.shieldUntil > s.tick) {
       ctx.beginPath();
       ctx.arc(x, y, r * 2, 0, Math.PI * 2);
@@ -63,7 +63,7 @@ export function drawPlayer(view: RenderView, s: GameState, alpha: number, time: 
       view.glow('#ff3d6e', 2);
       ctx.globalAlpha = 1;
     }
-    // Anneau d'aimant très discret
+    // Very faint magnet ring
     ctx.beginPath();
     ctx.arc(x, y, p.stats.magnet, 0, Math.PI * 2);
     ctx.strokeStyle = COLORS.player;
@@ -75,23 +75,23 @@ export function drawPlayer(view: RenderView, s: GameState, alpha: number, time: 
 }
 
 /**
- * Chute du héros au lancement : une cible se resserre au sol pendant que le héros, vu de haut,
- * descend vers elle (plus gros à l'écran au début, il retrouve sa taille en touchant le sol).
+ * Hero's fall at run start: a target closes in on the ground while the hero, seen from above,
+ * comes down towards it (bigger on screen at first, back to normal size when touching the ground).
  */
 export function drawDrop(view: RenderView, s: GameState, k: number, zoom: number, time: number): void {
   const ctx = view.ctx;
   const p = s.players[0];
   const r = p.r * 1.15;
-  // Cible au sol, en pointillés qui tournent, de plus en plus nette.
+  // Ground target, rotating dashes, sharper and sharper.
   ctx.beginPath();
   ctx.arc(p.x, p.y, (r * (1.6 + 3 * (1 - k))) / zoom, 0, Math.PI * 2);
-  // Tailles divisées par le zoom : la cible garde la même allure à l'écran pendant toute la plongée.
+  // Sizes divided by the zoom: the target keeps the same on-screen look during the whole dive.
   ctx.setLineDash([12 / zoom, 10 / zoom]);
   ctx.lineDashOffset = (-time * 60) / zoom;
   ctx.globalAlpha = 0.25 + 0.6 * k;
   view.glow(COLORS.player, 2.5 / zoom);
   ctx.setLineDash([]);
-  // Le héros : taille à l'écran 1,8× au départ, 1× à l'atterrissage.
+  // The hero: on-screen size 1.8× at the start, 1× on landing.
   const h = (1 + 0.8 * (1 - k)) / zoom;
   ctx.beginPath();
   for (let i = 0; i < 8; i++) {
@@ -119,7 +119,7 @@ export function drawDrop(view: RenderView, s: GameState, k: number, zoom: number
   ctx.fill();
 }
 
-/** Clone : silhouette du héros en hologramme turquoise, qui grésille avant de disparaître. */
+/** Clone: the hero's silhouette as a turquoise hologram that flickers before vanishing. */
 function drawClone(view: RenderView, s: GameState, p: Player, x: number, y: number, time: number): void {
   const ctx = view.ctx;
   const left = p.expires - s.tick;
@@ -134,7 +134,7 @@ function drawClone(view: RenderView, s: GameState, p: Player, x: number, y: numb
   ctx.closePath();
   ctx.globalAlpha = 0.7;
   neon(ctx, '#5cf2d6', 2.6);
-  // lignes de balayage d'hologramme
+  // hologram scanlines
   ctx.beginPath();
   const off = (time * 30) % 6;
   for (let yy = -r + off; yy < r; yy += 6) {

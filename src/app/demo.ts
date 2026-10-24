@@ -3,9 +3,9 @@ import { createGame, step, TICK_RATE, sandboxStartTick, type GameState, type San
 import { botInput } from '../ai/bot';
 
 /**
- * Démo derrière le menu : le bot joue une partie « bac à sable » déjà lancée (minute 6, ennemis plus
- * nombreux, héros équipé et invincible) pour qu'il y ait tout de suite un vrai essaim à l'écran.
- * Sans excès : elle tourne derrière les menus, qui doivent rester fluides (le curseur en dépend).
+ * Demo behind the menu: the bot plays a sandbox game that is already under way (minute 6, more
+ * enemies, hero equipped and invincible) so a real swarm is on screen right away.
+ * Kept moderate: it runs behind the menus, which must stay smooth (the cursor depends on it).
  */
 const DEMO_SANDBOX: SandboxConfig = {
   invincible: true,
@@ -31,19 +31,19 @@ const DEMO_SANDBOX: SandboxConfig = {
   ],
   item: null,
 };
-/** la démo est d'abord avancée de 15 s (hors écran, par petits bouts) pour que l'essaim soit déjà là */
+/** the demo is first advanced by 15 s (off screen, in small slices) so the swarm is already there */
 const DEMO_WARMUP = 15 * TICK_RATE;
-/** au-delà, l'essaim devient trop dense : on en prépare une nouvelle */
+/** past this, the swarm gets too dense: a new one is prepared */
 const DEMO_LIFETIME = 3 * 60 * TICK_RATE;
-/** temps de calcul accordé par image à la préparation d'une démo (ms) */
+/** compute time granted per frame to preparing a demo (ms) */
 const DEMO_BUDGET_MS = 4;
 
 const newDemo = (seed: string): GameState => createGame({ seed, difficulty: 1, sandbox: DEMO_SANDBOX });
 
 export class MenuDemo {
-  /** partie de démonstration (gardée pendant les parties : le menu la reprend où elle en était) */
+  /** demo game (kept during runs: the menu resumes it where it left off) */
   state: GameState;
-  /** démo en préparation et pas de simulation qu'il lui reste avant d'être montrée */
+  /** demo being prepared and the simulation steps it has left before being shown */
   next: { state: GameState; left: number } | null;
   private swapping = false;
 
@@ -54,8 +54,8 @@ export class MenuDemo {
   }
 
   /**
-   * Prépare la démo par petits bouts (quelques ms par image) : la première pendant l'intro, puis une
-   * nouvelle quand l'essaim de la démo en cours devient trop dense. La relève arrive en fondu.
+   * Prepares the demo in small slices (a few ms per frame): the first one during the intro, then a
+   * new one when the current demo's swarm gets too dense. The replacement fades in.
    */
   prepare(time: number): void {
     const cur = this.state;
@@ -73,7 +73,7 @@ export class MenuDemo {
       this.next = null;
       return;
     }
-    // Relève : la démo s'efface (transition d'opacité de #game), on échange, elle revient.
+    // Swap: the demo fades out (#game opacity transition), we swap, it fades back in.
     this.swapping = true;
     document.body.classList.add('demo-swap');
     setTimeout(() => {

@@ -1,0 +1,8 @@
+{
+  "//": "Type-checks tests/ and scripts/ (with the src/ files they import). Node types for node:fs, node:path, __dirname, process.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "tests", "scripts"]
+}

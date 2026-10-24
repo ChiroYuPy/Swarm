@@ -9,7 +9,7 @@ import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_BULLET, emit, type GameState, type Player, type Projectile, type WeaponInst } from '../state';
 import { AIM, RETRY_TICKS, aim, cdTicks } from './common';
 
-/** Balle du joueur `p`, partant de (ox, oy) (par défaut, du joueur). */
+/** Bullet of player `p`, starting from (ox, oy) (by default, from the player). */
 export function spawnBullet(
   s: GameState,
   p: Player,

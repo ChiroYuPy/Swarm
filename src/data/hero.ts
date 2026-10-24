@@ -1,25 +1,25 @@
-/** Le héros et la courbe d'XP. Valeurs librement modifiables. */
+/** The hero and the XP curve. Values can be tweaked freely. */
 export const HERO = {
   maxHp: 100,
-  /** unités monde / seconde (une case = 64 unités) */
+  /** world units / second (one cell = 64 units) */
   speed: 150,
-  /** rayon d'attraction des gemmes */
+  /** gem pickup radius */
   magnet: 72,
-  /** PV / seconde */
+  /** HP / second */
   regen: 0.2,
   radius: 14,
-  /** invulnérabilité après un coup (secondes) */
+  /** invulnerability after a hit (seconds) */
   iframes: 0.2,
   startWeapon: 'blaster',
 };
 
-/** XP nécessaire pour passer du niveau `level` au suivant. */
+/** XP needed to go from level `level` to the next one. */
 export function xpForLevel(level: number): number {
   const n = level - 1;
   return Math.floor(5 + n * 2.5 + n * n * 0.15);
 }
 
-/** Score = secondes survécues × 10 + kills + bonus par boss vaincu. */
+/** Score = seconds survived × 10 + kills + bonus per boss defeated. */
 export const SCORE = {
   perSecond: 10,
   perKill: 1,

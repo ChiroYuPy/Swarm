@@ -41,7 +41,7 @@ export function spawnMine(
 export function mine(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
-  // Les mines sont des pièges : on en pose dès que des ennemis approchent, pas dans le vide.
+  // Mines are traps: drop them as soon as enemies come close, not into the void.
   if (target(s, p.x, p.y, 400) < 0) {
     w.timer = RETRY_TICKS;
     return;

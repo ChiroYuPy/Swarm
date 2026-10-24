@@ -1,12 +1,12 @@
 /* First-load intro: standby LED, CRT power-on lines, particle swarm canvas, letter neon and the menu unroll that follows. */
 
-/* ---------- Intro du premier chargement ---------- */
-/* Rien ne s'affiche avant l'allumage (seule la veille est visible). */
+/* ---------- First-load intro ---------- */
+/* Nothing shows before power-on (only standby is visible). */
 body.booting #game,
 body.booting #ui {
   visibility: hidden;
 }
-/* 0. Veille : écran noir, un voyant rouge au centre (il deviendra le point lumineux), l'invitation dessous. */
+/* 0. Standby: black screen, a red LED in the center (it will become the bright dot), the prompt below. */
 .standby {
   position: fixed;
   inset: 0;
@@ -48,10 +48,10 @@ body.booting #ui {
   animation: fade-in 0.8s 0.4s ease-out backwards;
 }
 /*
- * 1. Allumage cathodique, en deux temps (durées alignées sur CRT_MS dans ui.ts) :
- *  - 0 → 0,45 s : un point lumineux au centre, qui s'étire en un trait sur toute la largeur ;
- *  - 0,45 → 1,05 s : le trait se dédouble, une ligne monte, l'autre descend. Seul l'espace entre les
- *    deux est visible (masque sur le jeu et l'interface, même courbe que les lignes) : au-delà, noir.
+ * 1. CRT power-on, in two steps (durations matching CRT_MS in ui/screens/intro.ts):
+ *  - 0 → 0.45 s: a bright dot in the center, stretching into a line across the full width;
+ *  - 0.45 → 1.05 s: the line splits, one line goes up, the other down. Only the space between the
+ *    two is visible (mask over the game and the UI, same curve as the lines): beyond it, black.
  */
 body.booting,
 body.crt-on {
@@ -84,7 +84,7 @@ body.crt-on #ui {
     0 0 14px #38f6ff,
     0 0 42px #38f6ff;
 }
-/* le point (un trait réduit à quelques pixels) qui s'étire sur toute la largeur, puis passe le relais */
+/* the dot (a line shrunk to a few pixels) stretching across the full width, then handing over */
 .crt-line {
   animation: crt-dot 0.45s cubic-bezier(0.5, 0, 0.2, 1) forwards;
 }
@@ -103,7 +103,7 @@ body.crt-on #ui {
     opacity: 0;
   }
 }
-/* les deux lignes : invisibles jusqu'au dédoublement, puis elles filent au bord et s'éteignent */
+/* the two lines: invisible until the split, then they race to the edges and go out */
 .crt-edge {
   opacity: 0;
 }
@@ -140,9 +140,9 @@ body.crt-on #ui {
   }
 }
 /*
- * 2. Logo seul, plus grand, centré pile en hauteur. L'essaim (canvas .swarm-intro, voir swarmLogo dans
- *    ui.ts) le dessine de 1,05 s à 2,65 s, puis les lettres s'allument une par une (délais alignés sur
- *    INTRO_TIMING dans audio.ts).
+ * 2. Logo alone, larger, vertically centered. The swarm (.swarm-intro canvas, see swarmLogo in
+ *    ui/screens/intro.ts) draws it from 1.05 s to 2.65 s, then the letters light up one by one (delays matching
+ *    INTRO_TIMING in audio/audio.ts).
  */
 .swarm-intro {
   position: fixed;
@@ -191,7 +191,7 @@ body.crt-on #ui {
     text-shadow: 0 0 18px rgba(56, 246, 255, 0.55);
   }
 }
-/* 3. Le logo remonte (animé en JS), les boutons se déroulent de haut en bas, un par un. */
+/* 3. The logo moves up (animated in JS), the buttons unroll from top to bottom, one by one. */
 .screen-menu.intro-out .stack {
   animation: unroll-clip 0.6s 0.3s cubic-bezier(0.65, 0, 0.35, 1) backwards;
 }
@@ -199,7 +199,7 @@ body.crt-on #ui {
   transform-origin: 50% 0;
   animation: unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
-/* le bouton sélectionné garde son déroulé en plus du balayage (délais : règles nth-child ci-dessous) */
+/* the selected button keeps its unroll on top of the sweep (delays: nth-child rules below) */
 .screen-menu.intro-out .stack .btn:focus {
   animation:
     unroll-btn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards,

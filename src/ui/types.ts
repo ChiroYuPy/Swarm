@@ -1,12 +1,12 @@
 /**
- * Data shapes exchanged between main.ts and the UI: the app callbacks the screens call (AppApi), and
- * what main.ts hands to the level-up, pause and game over screens. Re-exported from ui.ts.
+ * Data shapes exchanged between the app (app/app.ts) and the UI: the app callbacks the screens call (AppApi), and
+ * what the app hands to the level-up, pause and game over screens. Re-exported from ui.ts.
  */
 import type { ScoreRecord } from '../sim';
 import type { StatDetail } from '../render/hud';
 import type { SandboxSetup, SaveData, Settings } from '../storage/storage';
 
-/** Échange d'arme au level-up : charges, emplacement en cours d'échange (-1), armes du joueur. */
+/** Weapon swap on level-up: charges, slot being swapped (-1), player weapons. */
 export interface LevelUpSwap {
   charges: number;
   slot: number;
@@ -19,7 +19,7 @@ export interface AppApi {
   playSandbox(setup: SandboxSetup): void;
   retry(): void;
   pickOffer(i: number): void;
-  /** échange d'arme au level-up : ouvrir pour l'emplacement `slot`, ou annuler */
+  /** weapon swap on level-up: open it for slot `slot`, or cancel */
   startSwap(slot: number): void;
   cancelSwap(): void;
   resume(): void;
@@ -36,17 +36,17 @@ export interface BuildInfo {
   weapons: { id: string; level: number; fusion: boolean }[];
   passives: { id: string; level: number }[];
   stats: StatDetail[];
-  /** multiplicateurs actuels, pour afficher les vrais chiffres des armes */
+  /** current multipliers, to show the real weapon numbers */
   might: number;
   cooldownMul: number;
 }
 
-/** Partie en cours, pour le résumé de la pause. */
+/** Current run, for the pause summary. */
 export interface RunInfo {
-  /** score, temps, niveau, éliminés et difficulté, comme ils seraient enregistrés maintenant */
+  /** score, time, level, kills and difficulty, as they would be recorded now */
   record: ScoreRecord;
   bossKills: number;
-  /** meilleur score de la difficulté avant cette partie (0 : aucun) */
+  /** best score in the difficulty before this run (0: none) */
   best: number;
   sandbox: boolean;
 }
@@ -54,14 +54,14 @@ export interface RunInfo {
 export interface DeathInfo {
   record: ScoreRecord;
   bossKills: number;
-  /** meilleur score de la difficulté avant cette partie */
+  /** best score in the difficulty before this run */
   bestBefore: number;
-  /** rang obtenu dans le top 10 de la difficulté (0 = hors classement) */
+  /** rank reached in the difficulty's top 10 (0 = unranked) */
   rank: number;
   build: BuildInfo;
   canReplay: boolean;
   isReplay: boolean;
-  /** partie de bac à sable (non classée) ; `survived` : terminée sans mourir */
+  /** sandbox run (unranked); `survived`: ended without dying */
   sandbox: boolean;
   survived: boolean;
 }

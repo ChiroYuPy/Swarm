@@ -33,7 +33,7 @@ function emitRing(s: GameState, p: Player, w: WeaponInst, slot: number, L: Weapo
   spawnRing(s, p, slot, w.def, p.x, p.y, L);
 }
 
-/** Onde de choc du joueur `p` centrée en (x, y). */
+/** Shockwave of player `p` centred on (x, y). */
 export function spawnRing(s: GameState, p: Player, slot: number, def: number, x: number, y: number, L: WeaponLevel): void {
   const b = spawnProjectile(s);
   if (!b) return;

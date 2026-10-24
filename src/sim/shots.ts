@@ -1,6 +1,6 @@
 /**
- * Balles de Tireur cassables : les armes du joueur (explosions, ondes, aura, orbes, laser) les détruisent.
- * Une balle abattue est marquée (life = 0) et retirée au début de la mise à jour des projectiles.
+ * Breakable Shooter bullets: the player's weapons (explosions, waves, aura, orbs, laser) destroy them.
+ * A shot-down bullet is marked (life = 0) and removed at the start of the projectile update.
  */
 import { EV_SHOT_DOWN, PJ_EBULLET, emit, type GameState, type Projectile } from './state';
 
@@ -11,7 +11,7 @@ function shoot(s: GameState, b: Projectile): void {
   emit(s, EV_SHOT_DOWN, b.x, b.y);
 }
 
-/** Détruit les balles cassables dans un disque. */
+/** Destroys breakable bullets inside a disc. */
 export function clearShotsIn(s: GameState, x: number, y: number, r: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
@@ -23,7 +23,7 @@ export function clearShotsIn(s: GameState, x: number, y: number, r: number): voi
   }
 }
 
-/** Détruit les balles cassables le long d'un rayon (origine, direction unitaire, longueur, demi-largeur). */
+/** Destroys breakable bullets along a ray (origin, unit direction, length, half-width). */
 export function clearShotsOnLine(s: GameState, x: number, y: number, ux: number, uy: number, len: number, w: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];

@@ -1,10 +1,10 @@
 /* Design tokens (CSS variables), global reset and the #game canvas states (intro, demo, death, pause filters). */
 
 /*
- * Système visuel unique, celui de la fin de partie : une police (Chakra Petch), une échelle de tailles,
- * un titre néon souligné en tête de chaque écran, du contenu à nu séparé par des filets (pas de cadres),
- * des chiffres « libellé / valeur », des onglets soulignés, et une arrivée en cascade.
- * Les lueurs sont réservées aux titres et aux scores.
+ * A single visual system, the one of the end-of-run screen: one font (Chakra Petch), one size scale,
+ * an underlined neon title at the top of each screen, bare content separated by rules (no frames),
+ * "label / value" figures, underlined tabs, and a cascading entrance.
+ * Glows are reserved for titles and scores.
  */
 :root {
   --bg: #07060f;
@@ -21,7 +21,7 @@
   --red: #ff3d6e;
   --violet: #b48cff;
   --font: 'Chakra Petch', 'Trebuchet MS', system-ui, sans-serif;
-  /* Échelle de tailles */
+  /* Size scale */
   --fs-s: 12px;
   --fs-m: 14px;
   --fs-l: 16px;
@@ -55,7 +55,7 @@ body {
     filter 0.5s,
     opacity 1s ease-in-out;
 }
-/* Intro : fond uni, la démo reste cachée (et figée) jusqu'à l'arrivée du menu. */
+/* Intro: plain background, the demo stays hidden (and frozen) until the menu arrives. */
 body.intro-bg #game {
   opacity: 0;
 }
@@ -65,12 +65,12 @@ body.intro-bg #ui.menu::before {
 body.demo #game {
   filter: saturate(0.85) brightness(0.5);
 }
-/* Menu principal et mode démo : la démo reste bien visible, sous un simple filtre léger. */
+/* Main menu and attract mode: the demo stays clearly visible, under a light filter. */
 body.demo.menu-home #game,
 body.demo.attract #game {
   filter: saturate(0.95) brightness(0.85);
 }
-/* Relève de la démo : elle s'efface le temps d'échanger (voir prepareDemo dans main.ts). */
+/* Demo swap: it fades out while being swapped (see MenuDemo.prepare in app/demo.ts). */
 body.demo-swap #game {
   opacity: 0;
 }

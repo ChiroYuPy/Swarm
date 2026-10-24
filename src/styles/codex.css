@@ -1,6 +1,6 @@
 /* Codex screen: category tabs, item tile grid, detail sheet, rows, evolution recipes, chips and rules page. */
 
-/* ---------- Codex : onglets, grille | fiche ---------- */
+/* ---------- Codex: tabs, grid | sheet ---------- */
 .screen-codex {
   width: min(1180px, 100%);
   gap: 16px;
@@ -30,7 +30,7 @@
 .list {
   padding-right: 18px;
 }
-/* La fiche : séparée de la grille par un simple filet. */
+/* The sheet: separated from the grid by a simple rule. */
 .detail {
   padding: 2px 6px 0 26px;
   border-left: 1px solid var(--line);
@@ -50,7 +50,7 @@
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 6px;
 }
-/* Tuile : icône et nom à nu ; un cadre teinté seulement sur l'élément choisi. */
+/* Tile: bare icon and name; a tinted frame only on the selected item. */
 .tile {
   --c: #fff;
   display: flex;
@@ -96,7 +96,7 @@
 .detail h3 {
   margin: 18px 0 8px;
 }
-/* En-tête de fiche : l'icône dans un halo, le nom, et un filet à la couleur de l'élément. */
+/* Sheet header: the icon in a halo, the name, and a rule in the item's color. */
 .dhead {
   position: relative;
   display: flex;
@@ -166,7 +166,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-/* Recette d'évolution : arme + passif → évolution, en grand. */
+/* Evolution recipe: weapon + passive → evolution, large. */
 .recipe {
   display: flex;
   flex-wrap: wrap;
@@ -174,7 +174,7 @@
   gap: 8px;
   margin-bottom: 8px;
 }
-/* le résultat sur sa propre ligne : « A + B », puis « → C » */
+/* the result on its own line: "A + B", then "→ C" */
 .recipe .res {
   display: flex;
   flex-basis: 100%;

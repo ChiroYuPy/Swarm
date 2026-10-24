@@ -1,6 +1,6 @@
 /**
- * Structures de l'état de jeu. Tout est préalloué (pools) pour ne rien allouer dans la boucle chaude.
- * Les tableaux actifs sont compacts : les entités vivantes occupent [0, count).
+ * Game state structures. Everything is preallocated (pools) so nothing is allocated in the hot loop.
+ * Active arrays are compact: living entities occupy [0, count).
  */
 import { HERO } from '../data/hero';
 import {
@@ -28,7 +28,7 @@ export class Enemy {
   y = 0;
   px = 0;
   py = 0;
-  /** direction de déplacement (pour l'orientation au rendu) */
+  /** movement direction (for orientation when rendering) */
   vx = 0;
   vy = 0;
   hp = 0;
@@ -43,21 +43,21 @@ export class Enemy {
   slowUntil = 0;
   slowFactor = 0;
   stunUntil = 0;
-  /** gelé (objet Gel) jusqu'à ce tick : immobile, fragile, éclate à sa mort */
+  /** frozen (Freeze item) until this tick: motionless, fragile, shatters on death */
   frozenUntil = 0;
-  /** galvanisé par un Meneur jusqu'à ce tick (plus rapide) */
+  /** rallied by a Leader until this tick (faster) */
   boostUntil = 0;
   hitTick = -1000;
   attackReady = 0;
-  /** état d'IA (phase), minuteur et variables auxiliaires */
+  /** AI state (phase), timer and auxiliary variables */
   ai = 0;
   timer = 0;
   aux = 0;
   aux2 = 0;
-  /** boss : point d'ancrage (Étoile : centre de la boîte de rebond) ou angles (Œil : début et fin du balayage) */
+  /** boss: anchor point (Ricochet star: centre of the bounce box) or angles (Laser eye: start and end of the sweep) */
   ax = 0;
   ay = 0;
-  /** joueur ciblé (pour le multi) */
+  /** targeted player (for multiplayer) */
   target = 0;
   immune = new Int32Array(IMMUNE_SLOTS);
 }
@@ -67,26 +67,26 @@ export const PJ_EBULLET = 1;
 export const PJ_MINE = 2;
 export const PJ_BOOMERANG = 3;
 export const PJ_RING = 4;
-/** flamme au sol laissée par l'Étoile ricochet : a = dégâts par seconde */
+/** ground flame left by the Ricochet star: a = damage per second */
 export const PJ_FIRE = 5;
-/** tourelle posée (immobile) : a = ticks avant le prochain tir, d = ticks avant l'onde, (vx, vy) = canon, lv = niveau */
+/** placed turret (motionless): a = ticks before the next shot, d = ticks before the wave, (vx, vy) = barrel, lv = level */
 export const PJ_TURRET = 6;
-/** disque ricochet : a = rebonds restants, c = index de la cible suivie (ty = son id) */
+/** ricochet disc: a = bounces left, c = index of the tracked target (ty = its id) */
 export const PJ_RICOCHET = 7;
-/** flamme au sol du joueur (brûle les ennemis) : a = dégâts par seconde */
+/** player's ground flame (burns enemies): a = damage per second */
 export const PJ_BLAZE = 8;
-/** drone autonome : a = ticks avant son tir, b = PV, c = index de sa cible (-1 = aucune, ty = son id), d = rang dans l'escadron, tx = dégagement restant */
+/** autonomous drone: a = ticks before its shot, b = HP, c = index of its target (-1 = none, ty = its id), d = rank in the squad, tx = break-away left */
 export const PJ_DRONE = 9;
-/** obus en vol de (vx, vy) vers (tx, ty) : a = durée du vol, b = rayon, c = météore (1) */
+/** shell flying from (vx, vy) to (tx, ty): a = flight duration, b = radius, c = meteor (1) */
 export const PJ_SHELL = 10;
-/** Phénix : a = 0 aller / 1 retour, b = portée, c = distance parcourue, d = secondes depuis le demi-tour, (vx, vy) = cap */
+/** Phoenix: flies straight, (vx, vy) = unit heading */
 export const PJ_PHOENIX = 11;
 
 export class Projectile {
   kind = 0;
   owner = 0;
   slot = 0;
-  /** index de la définition d'arme (couleur au rendu) */
+  /** weapon definition index (colour when rendering) */
   weapon = 0;
   x = 0;
   y = 0;
@@ -96,20 +96,20 @@ export class Projectile {
   vy = 0;
   r = 4;
   damage = 0;
-  /** ticks restants */
+  /** ticks left */
   life = 0;
   age = 0;
-  /** ennemis traversables restants (-1 = infini) */
+  /** enemies it can still pierce (-1 = infinite) */
   pierce = 0;
   knock = 0;
   hitIds = new Int32Array(8);
   hitCount = 0;
-  /** niveau de l'arme qui l'a créé (tourelles) */
+  /** level of the weapon that created it (turrets) */
   lv = 1;
-  /** cible : point d'arrivée d'un obus, ou id de l'ennemi visé (drones, disques) */
+  /** target: landing point of a shell, or id of the targeted enemy (drones, discs) */
   tx = 0;
   ty = 0;
-  /** données propres au type de projectile */
+  /** data specific to the projectile kind */
   a = 0;
   b = 0;
   c = 0;
@@ -127,7 +127,7 @@ export class Gem {
   speed = 0;
 }
 
-/** Codes d'objets : index dans data/loot.ts PICKUPS. */
+/** Pickup codes: index into data/loot.ts PICKUPS. */
 export const PK_HEAL = 0;
 export const PK_RAGE = 1;
 export const PK_FRENZY = 2;
@@ -149,9 +149,9 @@ export class Pickup {
   x = 0;
   y = 0;
   kind = 0;
-  /** ticks restants avant disparition (-1 = permanent) */
+  /** ticks left before it disappears (-1 = permanent) */
   life = 0;
-  /** attiré vers le joueur (Aspirateur) */
+  /** pulled toward the player (Vacuum) */
   magnet = false;
   speed = 0;
 }
@@ -166,7 +166,7 @@ export class WeaponInst {
   burstTimer = 0;
   activeTicks = 0;
   tickTimer = 0;
-  // Valeurs calculées pour le rendu (orbites, aura, rayons).
+  // Values computed for rendering (orbits, aura, beams).
   vR = 0;
   vS = 0;
   vN = 0;
@@ -188,9 +188,9 @@ export interface PlayerStats {
   might: number;
   area: number;
   cooldownMul: number;
-  /** réduction des dégâts subis (0..0.6) */
+  /** damage taken reduction (0..0.6) */
   armor: number;
-  /** multiplicateur de chance d'obtenir des objets */
+  /** item drop chance multiplier */
   luck: number;
 }
 
@@ -208,19 +208,19 @@ export function baseStats(): PlayerStats {
   };
 }
 
-/** Proposition de level-up. */
+/** Level-up offer. */
 export const OFFER_WEAPON = 0;
 export const OFFER_PASSIVE = 1;
 export const OFFER_FUSION = 2;
-export const OFFER_PIZZA = 3;
-/** échange de l'arme en cours d'échange (Player.swapSlot) contre l'arme `id`, au niveau `toLevel` */
+export const OFFER_HEAL = 3;
+/** swaps the weapon being swapped (Player.swapSlot) for weapon `id`, at level `toLevel` */
 export const OFFER_SWAP = 4;
 
 export interface Offer {
   kind: number;
-  /** index d'arme / passif / fusion */
+  /** weapon / passive / evolution index */
   id: number;
-  /** niveau atteint si on choisit cette offre (0 = nouvel objet niveau 1) */
+  /** level reached if this offer is picked (0 = new item at level 1) */
   toLevel: number;
 }
 
@@ -241,35 +241,35 @@ export class Player {
   damageDealt = 0;
   weapons: WeaponInst[] = [];
   passives: PassiveInst[] = [];
-  /** armes de base consommées par une fusion (ne peuvent plus être proposées) */
+  /** base weapons consumed by an evolution (can no longer be offered) */
   banned: number[] = [];
   pendingLevels = 0;
   offers: Offer[] = [];
   offerLevel = 0;
-  /** charges d'échange d'arme (une de plus par boss vaincu) */
+  /** weapon swap charges (one more per boss defeated) */
   swaps = 0;
-  /** emplacement d'arme en cours d'échange au level-up (-1 = aucun) */
+  /** weapon slot being swapped at level-up (-1 = none) */
   swapSlot = -1;
-  /** stats issues des bonus passifs */
+  /** stats from passive bonuses */
   base: PlayerStats = baseStats();
-  /** stats effectives (passifs + bonus temporaires), recalculées à chaque pas */
+  /** effective stats (passives + timed buffs), recomputed every step */
   stats: PlayerStats = baseStats();
-  /** fins des bonus temporaires (tick) */
+  /** timed buff end times (tick) */
   rageUntil = 0;
   frenzyUntil = 0;
   turboUntil = 0;
   shieldUntil = 0;
   feverUntil = 0;
-  /** Totem en réserve (0 ou 1) : se déclenche tout seul à la mort */
+  /** Totem held (0 or 1): triggers on its own at death */
   totem = 0;
-  /** clone : index du joueur copié (-1 = vrai joueur) et tick de disparition */
+  /** clone: index of the copied player (-1 = real player) and expiry tick */
   master = -1;
   expires = 0;
-  /** objet activable en réserve (code PK_*, -1 = aucun) */
-  activable = -1;
-  /** visée manuelle : direction 0..63 (voir INPUT_AIM_BASE), -1 = visée automatique */
+  /** held active item (PK_* code, -1 = none) */
+  activeItem = -1;
+  /** manual aim: direction 0..63 (see INPUT_AIM_BASE), -1 = auto aim */
   aim = -1;
-  /** dernière direction regardée */
+  /** last facing direction */
   faceX = 1;
   faceY = 0;
   moveX = 0;
@@ -277,7 +277,7 @@ export class Player {
   hurtTick = -1000;
   invulnUntil = 0;
   deathTick = -1;
-  /** multiplicateur de dégâts fixe (réglage du bac à sable, 1 sinon) */
+  /** fixed damage multiplier (sandbox setting, 1 otherwise) */
   mightMul = 1;
 }
 
@@ -305,36 +305,36 @@ export const EV_WALL_HIT = 21;
 export const EV_SWARM = 22;
 export const EV_RING_WAVE = 23;
 export const EV_FUSE = 24;
-/** nouveau type d'ennemi annoncé (k = type) */
+/** new enemy type announced (k = type) */
 export const EV_NEW_ENEMY = 25;
-/** objet activable utilisé (k = code PK_*) */
+/** active item used (k = PK_* code) */
 export const EV_ACTIVATE = 26;
-/** caisse bonus apparue */
+/** bonus crate appeared */
 export const EV_PROP = 27;
-/** balle de Tireur détruite par une arme */
+/** Shooter bullet destroyed by a weapon */
 export const EV_SHOT_DOWN = 28;
-/** ennemi gelé qui éclate (v = rayon) */
+/** frozen enemy shattering (v = radius) */
 export const EV_SHATTER = 29;
-/** le Totem ramène le joueur */
+/** the Totem brings the player back */
 export const EV_REVIVE = 30;
-/** le clone disparaît */
+/** the clone disappears */
 export const EV_CLONE_END = 31;
-/** Téléporteur : x, y = arrivée, v = rayon de l'impact */
+/** Teleporter: x, y = arrival, v = impact radius */
 export const EV_BLINK = 32;
-/** ennemi chassé par l'arrivée d'un boss : x, y, v = rayon, k = type */
+/** enemy driven off by a boss arrival: x, y, v = radius, k = type */
 export const EV_FLEE = 33;
-/** début de vague : v = numéro (1 = la première) */
+/** wave start: v = number (1 = the first) */
 export const EV_WAVE = 34;
-/** œuf éclos : x, y, v = nombre d'Essaim */
+/** egg hatched: x, y, v = number of Swarm */
 export const EV_HATCH = 35;
-/** l'Œil commence à balayer : x, y = l'Œil */
+/** the Laser eye starts sweeping: x, y = the eye */
 export const EV_LASER = 36;
-/** l'Hexagone bâtisseur pose sa cage : x, y = centre, v = rayon */
+/** the Builder hexagon sets its cage: x, y = centre, v = radius */
 export const EV_CAGE = 37;
-/** un objet apparaît seul dans l'arène : x, y, k = code PK_* */
+/** an item appears on its own in the arena: x, y, k = PK_* code */
 export const EV_MAP_ITEM = 38;
 
-/** Événement émis par la sim pour le rendu et l'audio. Purement informatif : la sim ne les relit jamais. */
+/** Event emitted by the sim for rendering and audio. Purely informative: the sim never reads them back. */
 export class SimEvent {
   type = 0;
   x = 0;
@@ -346,19 +346,19 @@ export class SimEvent {
   p = 0;
 }
 
-/** Règles du bac à sable appliquées pendant la partie (voir sandbox.ts). */
+/** Sandbox rules applied during the game (see sandbox.ts). */
 export interface SandboxRules {
   invincible: boolean;
-  /** multiplicateur du nombre d'ennemis (0 = aucun) */
+  /** enemy count multiplier (0 = none) */
   enemyMul: number;
-  /** types d'ennemis autorisés (index), null = progression normale */
+  /** allowed enemy types (indices), null = normal progression */
   enemies: number[] | null;
   bosses: boolean;
-  /** les boss appellent-ils leurs renforts (et la Reine pond-elle) ? */
+  /** do bosses call their reinforcements (and does the Queen lay eggs)? */
   summons: boolean;
-  /** duel : rang du boss à faire venir au premier pas (comme le k-ième boss d'une partie), -1 = aucun */
+  /** duel: rank of the boss to bring in on the first step (like a game's k-th boss), -1 = none */
   duel: number;
-  /** multiplicateur de l'XP ramassée */
+  /** collected XP multiplier */
   xp: number;
 }
 
@@ -366,11 +366,11 @@ export interface GameState {
   version: number;
   seed: number;
   seedLabel: string;
-  /** index dans data/difficulty.ts */
+  /** index into data/difficulty.ts */
   difficulty: number;
   tick: number;
   over: boolean;
-  /** champ d'obstacles infini (dérivé de la seed, non sérialisé) */
+  /** infinite obstacle field (derived from the seed, not serialized) */
   map: WorldMap;
   players: Player[];
   enemies: Enemy[];
@@ -387,22 +387,22 @@ export interface GameState {
   rngLoot: Rng;
   spawnBudget: number;
   bossSpawned: number;
-  /** id de l'ennemi boss vivant, -1 sinon */
+  /** id of the living boss enemy, -1 otherwise */
   bossId: number;
-  /** horloge des vagues (ticks) : avance sauf pendant un boss et le calme qui suit */
+  /** wave clock (ticks): advances except during a boss and the calm that follows */
   clock: number;
-  /** calme après un boss jusqu'à ce tick (ni vague ni horloge) */
+  /** calm after a boss until this tick (no wave, no clock) */
   calmUntil: number;
   chestCount: number;
   totalKills: number;
-  /** monde ralenti (Horloge) jusqu'à ce tick */
+  /** world slowed down (Clock) until this tick */
   clockUntil: number;
-  /** règles du bac à sable (null = partie normale) */
+  /** sandbox rules (null = normal game) */
   sandbox: SandboxRules | null;
-  // Caches dérivés (non sérialisés, reconstruits à la volée).
+  // Derived caches (not serialized, rebuilt on the fly).
   grid: SpatialGrid;
   nav: NavField;
-  /** éclats de Gel en attente (x, y, dégâts, joueur crédité), vidée dans le même pas */
+  /** pending Freeze shatters (x, y, damage, credited player), emptied within the same step */
   shatters: number[];
   events: SimEvent[];
   eventCount: number;

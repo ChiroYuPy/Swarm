@@ -1,7 +1,7 @@
 /**
- * Bac à sable : une partie aux réglages libres (invincibilité, niveau et équipement de départ, ennemis
- * choisis…), jamais classée. Les réglages font partie de la configuration de la partie : elle reste
- * déterministe et rejouable comme une autre.
+ * Sandbox: a game with free settings (invincibility, starting level and loadout, chosen
+ * enemies…), never ranked. The settings are part of the game configuration: it stays
+ * deterministic and replayable like any other.
  */
 import { BOSS_ORDER } from '../data/enemies';
 import { xpForLevel } from '../data/hero';
@@ -14,28 +14,28 @@ import { PassiveInst, type GameState, type Player, type SandboxRules } from './s
 
 export interface SandboxConfig {
   invincible: boolean;
-  /** niveau de départ du héros */
+  /** hero's starting level */
   level: number;
-  /** vague de départ (1 = la première) : les ennemis sont aussi forts et variés qu'à ce moment-là */
+  /** starting wave (1 = the first): enemies are as strong and varied as at that point */
   startWave: number;
-  /** multiplicateur du nombre d'ennemis (0 = aucun) */
+  /** enemy count multiplier (0 = none) */
   enemyMul: number;
-  /** types d'ennemis autorisés (ids), null = progression normale */
+  /** allowed enemy types (ids), null = normal progression */
   enemies: string[] | null;
   bosses: boolean;
-  /** duel : ce boss (id) arrive dès le début, seul, avec la force de son passage n° `duelMark` (1 = Mk I) */
+  /** duel: this boss (id) arrives right at the start, alone, with the strength of its appearance no. `duelMark` (1 = Mk I) */
   duel: string | null;
   duelMark: number;
-  /** renforts des boss (et œufs de la Reine) */
+  /** boss reinforcements (and the Queen's eggs) */
   summons: boolean;
-  /** multiplicateur des dégâts du héros */
+  /** hero damage multiplier */
   might: number;
-  /** multiplicateur de l'XP ramassée */
+  /** collected XP multiplier */
   xp: number;
-  /** équipement de départ (remplace l'arme de départ) */
+  /** starting loadout (replaces the starting weapon) */
   weapons: { id: string; level: number }[];
   passives: { id: string; level: number }[];
-  /** objet activable en réserve au départ (id de data/loot.ts), null = aucun */
+  /** active item held at the start (id from data/loot.ts), null = none */
   item: string | null;
 }
 
@@ -55,26 +55,26 @@ export function compileSandbox(c: SandboxConfig): SandboxRules {
   };
 }
 
-/** Rang du boss du duel parmi les boss d'une partie (Mk II de l'Étoile = son 2e passage), -1 = aucun. */
+/** Rank of the duel boss among a game's bosses (Ricochet star Mk II = its 2nd appearance), -1 = none. */
 function duelRank(c: SandboxConfig): number {
   const i = c.duel ? BOSS_ORDER.indexOf(c.duel) : -1;
   return i < 0 ? -1 : (clamp(Math.round(c.duelMark), 1, MAX_DUEL_MARK) - 1) * BOSS_ORDER.length + i;
 }
 export const MAX_DUEL_MARK = 5;
 
-/** Premier tick de la vague de départ. */
+/** First tick of the starting wave. */
 export function sandboxStartTick(c: SandboxConfig): number {
   return (clamp(Math.round(c.startWave), 1, MAX_START_WAVE) - 1) * MIX_TICKS;
 }
 export const MAX_START_WAVE = 40;
 
-/** Prépare le héros et l'horloge selon les réglages. Les ids inconnus (vieille sauvegarde) sont ignorés. */
+/** Sets up the hero and the clock from the settings. Unknown ids (old save) are ignored. */
 export function applySandbox(s: GameState, c: SandboxConfig): void {
   s.sandbox = compileSandbox(c);
   const startTick = sandboxStartTick(c);
   s.tick = startTick;
   s.clock = startTick;
-  // Les boss déjà « passés » comptent : le prochain a la force (et le rang) qu'il aurait eus à ce moment.
+  // Bosses already "past" count: the next one has the strength (and rank) it would have had at that point.
   s.bossSpawned = Math.floor(startTick / BOSS_TICKS);
   for (const p of s.players) applyLoadout(p, c);
 }
@@ -86,7 +86,7 @@ function applyLoadout(p: Player, c: SandboxConfig): void {
     if (def === undefined || p.weapons.length >= MAX_WEAPON_SLOTS || p.weapons.some((x) => x.def === def)) continue;
     addWeapon(p, def).level = clamp(Math.round(w.level), 1, weaponMaxLevel(def));
   }
-  // Une évolution déjà en main : son arme d'origine n'est plus proposée (comme après une vraie évolution).
+  // An evolution already held: its base weapon is no longer offered (as after a real evolution).
   for (const f of FUSION_TABLE) {
     if (!p.weapons.some((x) => x.def === f.result)) continue;
     if (!p.weapons.some((x) => x.def === f.weapon) && !p.banned.includes(f.weapon)) p.banned.push(f.weapon);
@@ -103,7 +103,7 @@ function applyLoadout(p: Player, c: SandboxConfig): void {
   p.level = clamp(Math.round(c.level), 1, 200);
   p.xpNext = xpForLevel(p.level);
   const item = PICKUPS.findIndex((k) => k.id === c.item && k.kind === 'active');
-  p.activable = item;
+  p.activeItem = item;
   p.mightMul = clamp(c.might, 0.1, 100);
   computeStats(p);
   p.hp = p.stats.maxHp;

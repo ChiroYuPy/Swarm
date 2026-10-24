@@ -1,7 +1,7 @@
 /**
- * Sauvegarde locale versionnée (localStorage, toujours sous try/catch) : réglages, dernière difficulté,
- * classement local (top 10 par difficulté), derniers réglages du bac à sable.
- * Pour faire évoluer le format : incrémenter SAVE_VERSION et ajouter une étape dans `migrate`.
+ * Versioned local save (localStorage, always inside try/catch): settings, last difficulty,
+ * local leaderboard (top 10 per difficulty), last sandbox settings.
+ * To evolve the format: bump SAVE_VERSION and add a step in `migrate`.
  */
 import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
@@ -16,18 +16,18 @@ export const SAVE_VERSION = 3;
 export const TOP_PER_DIFFICULTY = 10;
 
 export interface Settings {
-  /** volume général 0..1 */
+  /** master volume 0..1 */
   volume: number;
-  /** volume de la musique 0..1 */
+  /** music volume 0..1 */
   music: number;
-  /** volume des effets sonores 0..1 */
+  /** sound effects volume 0..1 */
   sfx: number;
   muted: boolean;
   quality: 'high' | 'low';
   shake: boolean;
   damageNumbers: boolean;
   showFps: boolean;
-  /** met la partie en pause quand la fenêtre perd le focus */
+  /** pauses the game when the window loses focus */
   autoPause: boolean;
   /** UI language (saves without it read as the default, French) */
   language: Locale;
@@ -36,15 +36,15 @@ export interface Settings {
 export interface SaveData {
   version: number;
   settings: Settings;
-  /** dernière difficulté choisie */
+  /** last chosen difficulty */
   difficulty: number;
-  /** meilleurs scores, au plus TOP_PER_DIFFICULTY par difficulté */
+  /** best scores, at most TOP_PER_DIFFICULTY per difficulty */
   scores: ScoreRecord[];
-  /** derniers réglages du bac à sable */
+  /** last sandbox settings */
   sandbox: SandboxSetup;
 }
 
-/** Une partie de bac à sable : difficulté de base + réglages. */
+/** A sandbox game: base difficulty + settings. */
 export interface SandboxSetup {
   difficulty: number;
   rules: SandboxConfig;
@@ -89,7 +89,7 @@ export function defaultSave(): SaveData {
   return { version: SAVE_VERSION, settings: { ...DEFAULT_SETTINGS }, difficulty: DEFAULT_DIFFICULTY, scores: [], sandbox: defaultSandbox() };
 }
 
-/** Migre n'importe quelle version connue vers la version courante. */
+/** Migrates any known version to the current one. */
 export function migrate(raw: unknown): SaveData {
   const base = defaultSave();
   if (!raw || typeof raw !== 'object') return base;
@@ -97,12 +97,12 @@ export function migrate(raw: unknown): SaveData {
   let version = typeof r.version === 'number' ? r.version : 0;
   let data: Record<string, unknown> = { ...r };
   if (version === 0) {
-    // v0 (prototype) : { pseudo, best: ScoreRecord[] }
+    // v0 (prototype): { pseudo, best: ScoreRecord[] }
     data = { scores: Array.isArray(r.best) ? r.best : [], settings: r.settings };
     version = 1;
   }
   if (version === 1) {
-    // v1 : pseudo, seedBests, replays, défi du jour. On ne garde que les réglages et les scores (en Normal).
+    // v1: pseudo, seedBests, replays, daily challenge. Only the settings and the scores are kept (as Normal).
     const old = Array.isArray(data.scores) ? (data.scores as Record<string, unknown>[]) : [];
     data = {
       settings: data.settings,
@@ -116,7 +116,7 @@ export function migrate(raw: unknown): SaveData {
     data = { ...data, scores: Array.isArray(data.scores) ? data.scores.map(upgradeScore) : [], sandbox: upgradeSandbox(data.sandbox) };
     version = 3;
   }
-  if (version > SAVE_VERSION) return base; // sauvegarde d'une version future : on ne la casse pas, on l'ignore
+  if (version > SAVE_VERSION) return base; // save from a future version: do not break it, ignore it
   const d = typeof data.difficulty === 'number' ? data.difficulty : DEFAULT_DIFFICULTY;
   const settings: Settings = { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) };
   // No save version bump for the language: a missing (older save) or unknown value reads as the default.
@@ -157,7 +157,7 @@ function upgradeSandbox(raw: unknown): unknown {
   return { ...setup, rules };
 }
 
-/** Réglages du bac à sable relus avec prudence : tout champ manquant ou invalide reprend sa valeur par défaut. */
+/** Sandbox settings read back carefully: any missing or invalid field falls back to its default value. */
 function readSandbox(raw: unknown): SandboxSetup {
   const def = defaultSandbox();
   if (!raw || typeof raw !== 'object') return def;
@@ -184,7 +184,7 @@ function isScore(x: unknown): x is ScoreRecord {
   return !!r && typeof r.score === 'number' && typeof r.difficulty === 'number';
 }
 
-/** Sauvegarde écrite par une version plus récente du jeu : on l'ignore et, surtout, on ne l'écrase pas. */
+/** Save written by a newer version of the game: ignore it and, above all, do not overwrite it. */
 let futureSaveDetected = false;
 
 /** Raw save text, moving a legacy-key save to SAVE_KEY if that is all there is. */
@@ -226,7 +226,7 @@ export function writeSave(data: SaveData): boolean {
 
 const byScore = (a: ScoreRecord, b: ScoreRecord) => b.score - a.score || b.survivedSec - a.survivedSec;
 
-/** Classement d'une difficulté, du meilleur au moins bon. */
+/** Leaderboard of a difficulty, from best to worst. */
 export function topScores(data: SaveData, difficulty: number): ScoreRecord[] {
   return data.scores.filter((s) => s.difficulty === difficulty).sort(byScore);
 }
@@ -235,7 +235,7 @@ export function bestScore(data: SaveData, difficulty: number): number {
   return topScores(data, difficulty)[0]?.score ?? 0;
 }
 
-/** Enregistre un score. Renvoie son rang dans sa difficulté (1 = premier, 0 = hors du top). */
+/** Records a score. Returns its rank within its difficulty (1 = first, 0 = outside the top). */
 export function recordScore(data: SaveData, rec: ScoreRecord): number {
   const list = [...topScores(data, rec.difficulty), rec].sort(byScore).slice(0, TOP_PER_DIFFICULTY);
   data.scores = [...data.scores.filter((s) => s.difficulty !== rec.difficulty), ...list];

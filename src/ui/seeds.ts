@@ -1,4 +1,4 @@
-/** Seeds internes lisibles (jamais affichées : elles servent à rejouer une partie). L'aléa ici n'a aucun impact sur la sim. */
+/** Readable internal seeds (never displayed: they are used to replay a run). The randomness here has no impact on the sim. */
 
 const NOUNS = [
   'TOFU', 'FLAN', 'CROISSANT', 'PANDA', 'RADIS', 'KIWI', 'YAOURT', 'PNEU', 'CORNICHON', 'RACLETTE',

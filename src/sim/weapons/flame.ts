@@ -10,8 +10,8 @@ import { EV_SHOOT, emit, type GameState, type Player, type WeaponInst } from '..
 import { AIM, RETRY_TICKS, aim, cdTicks, inCone, ticks } from './common';
 
 /**
- * Lance-flammes : des jets côte à côte, centrés là où tu vises, figés dans leur direction de départ (comme le laser).
- * Tornade de feu : des jets répartis tout autour, qui tournent sans arrêt.
+ * Flamethrower: side-by-side jets, centred where you aim, locked in their starting direction (like the laser).
+ * Fire tornado: jets spread all around, spinning nonstop.
  */
 export function flame(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   const len = (L.length ?? 135) * p.stats.area;

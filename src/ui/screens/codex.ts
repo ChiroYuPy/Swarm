@@ -12,7 +12,7 @@ import type { NavDir } from '../types';
 import type { UI } from '../ui';
 
 // ---------- Codex ----------
-/** Catégories : à gauche. Grille d'icônes au centre. Fiche détaillée de l'élément sélectionné à droite. */
+/** Categories: on the left. Icon grid in the center. Detail sheet of the selected item on the right. */
 export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): void {
   if (onBack) {
     ui.codexReturn = onBack;
@@ -27,7 +27,7 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
     ['items', t('codex.tabs.items'), codexItems('items').length, '#ff9b3d'],
     ['enemies', t('codex.tabs.enemies'), codexItems('enemies').length, '#ff3d6e'],
   ];
-  // Onglets soulignés, comme les records : la catégorie ouverte prend sa couleur.
+  // Underlined tabs, like the records: the open category takes its color.
   const side = cats
     .map(
       ([id, label, n, c]) =>
@@ -70,7 +70,7 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
     if (!items[i]) return;
     tiles.forEach((t, k) => t.classList.toggle('on', k === i));
     detail.innerHTML = codexDetail(items[i]);
-    // relance le petit fondu de la fiche à chaque changement d'élément
+    // restarts the sheet's small fade on every item change
     detail.classList.remove('swap');
     void detail.offsetWidth;
     detail.classList.add('swap');
@@ -100,8 +100,8 @@ export function showCodex(ui: UI, tab: CodexTab, sel = 0, onBack?: () => void): 
 }
 
 /**
- * Codex au clavier / à la manette : haut et bas changent de catégorie, gauche et droite
- * changent d'élément. Les deux bouclent.
+ * Codex with keyboard / gamepad: up and down change category, left and right
+ * change item. Both wrap around.
  */
 export function codexNav(ui: UI, dir: NavDir): boolean {
   if (!ui.screenEl) return false;

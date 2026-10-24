@@ -1,19 +1,19 @@
 /**
- * PRNG déterministe (mulberry32) + dérivation de flux indépendants depuis la seed.
- * Aucun appel à Math.random ici : tout est reproductible bit à bit.
+ * Deterministic PRNG (mulberry32) + derivation of independent streams from the seed.
+ * No Math.random call here: everything is bit-for-bit reproducible.
  */
 
-/** Identifiants de flux. Chaque flux a sa propre suite, ils ne s'influencent pas. */
+/** Stream ids. Each stream has its own sequence; they do not influence each other. */
 export const STREAM = {
   MAP: 1,
   WAVES: 2,
   LOOT: 3,
   LEVELUP: 4,
-  /** Réservé au rendu (particules...). Ne doit JAMAIS être lu par la simulation. */
+  /** Reserved for rendering (particles...). Must NEVER be read by the simulation. */
   COSMETIC: 5,
 } as const;
 
-/** Finaliseur murmur3 : mélange 32 bits. */
+/** murmur3 finalizer: 32-bit mix. */
 export function mix32(h: number): number {
   h ^= h >>> 16;
   h = Math.imul(h, 0x85ebca6b);
@@ -23,7 +23,7 @@ export function mix32(h: number): number {
   return h >>> 0;
 }
 
-/** Hash FNV-1a d'une chaîne, puis mélange. Sert à transformer une seed texte en entier 32 bits. */
+/** FNV-1a hash of a string, then mixed. Turns a text seed into a 32-bit integer. */
 export function hashString(s: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
@@ -33,7 +33,7 @@ export function hashString(s: string): number {
   return mix32(h >>> 0);
 }
 
-/** Dérive une sous-seed depuis la seed principale et une liste d'entiers (flux, niveau, index...). */
+/** Derives a sub-seed from the main seed and a list of integers (stream, level, index...). */
 export function deriveSeed(seed: number, ...parts: number[]): number {
   let h = mix32((seed ^ 0x9e3779b9) >>> 0);
   for (let i = 0; i < parts.length; i++) {
@@ -47,7 +47,7 @@ export class Rng {
   constructor(seed: number) {
     this.s = seed >>> 0;
   }
-  /** Flottant dans [0, 1). */
+  /** Float in [0, 1). */
   next(): number {
     let t = (this.s = (this.s + 0x6d2b79f5) | 0);
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -57,14 +57,14 @@ export class Rng {
   range(a: number, b: number): number {
     return a + (b - a) * this.next();
   }
-  /** Entier dans [0, n). */
+  /** Integer in [0, n). */
   int(n: number): number {
     return Math.floor(this.next() * n);
   }
   chance(p: number): boolean {
     return this.next() < p;
   }
-  /** Tirage pondéré : renvoie l'index choisi. */
+  /** Weighted draw: returns the chosen index. */
   weighted(weights: ArrayLike<number>, total?: number): number {
     let sum = total ?? 0;
     if (total === undefined) for (let i = 0; i < weights.length; i++) sum += weights[i];

@@ -1,8 +1,8 @@
 /**
- * Grille spatiale uniforme pour les collisions ennemis. Reconstruite par tri par comptage
- * (ordre déterministe, aucune allocation). Les très gros ennemis (boss) vont dans une liste à part.
- * Monde infini : la grille est recentrée sur le joueur à chaque reconstruction ; ce qui sort de la
- * fenêtre est rangé dans les cases du bord (le filtre reste correct, juste moins fin).
+ * Uniform spatial grid for enemy collisions. Rebuilt with a counting sort
+ * (deterministic order, no allocation). Very big enemies (bosses) go into a separate list.
+ * Infinite world: the grid is recentred on the player at each rebuild; whatever falls outside the
+ * window is stored in the edge cells (the filter stays correct, just coarser).
  */
 import { GRID_CELL, GRID_SIZE, MAX_ENEMIES, NORMAL_MAX_RADIUS } from './constants';
 import type { Enemy } from './state';
@@ -16,9 +16,9 @@ export class SpatialGrid {
   readonly items: Int32Array;
   readonly big: Int32Array;
   bigCount = 0;
-  /** tampon de résultats réutilisable */
+  /** reusable result buffer */
   readonly out: Int32Array;
-  /** origine de la fenêtre (unités monde) */
+  /** window origin (world units) */
   ox = 0;
   oy = 0;
 
@@ -76,8 +76,8 @@ export class SpatialGrid {
   }
 
   /**
-   * Remplit `this.out` avec les index d'ennemis pouvant toucher le disque (x, y, r).
-   * Filtre large (cases + gros ennemis) : l'appelant fait le test de distance précis.
+   * Fills `this.out` with the indices of enemies that may touch the disc (x, y, r).
+   * Broad filter (cells + big enemies): the caller does the exact distance test.
    */
   query(enemies: Enemy[], x: number, y: number, r: number): number {
     const reach = r + NORMAL_MAX_RADIUS;
@@ -110,7 +110,7 @@ export class SpatialGrid {
     return n;
   }
 
-  /** Ennemi vivant le plus proche dans un rayon, en sautant les ids exclus. Renvoie l'index ou -1. */
+  /** Nearest living enemy within a radius, skipping excluded ids. Returns the index or -1. */
   nearest(
     enemies: Enemy[],
     x: number,
@@ -126,7 +126,7 @@ export class SpatialGrid {
     const ccy = Math.floor((y - this.oy) / GRID_CELL);
     const maxRing = Math.ceil(maxR / GRID_CELL) + 1;
     for (let ring = 0; ring <= maxRing; ring++) {
-      // Toute case de cet anneau est au moins à (ring - 1) * GRID_CELL du point.
+      // Every cell of this ring is at least (ring - 1) * GRID_CELL away from the point.
       if (best >= 0) {
         const minD = (ring - 1) * GRID_CELL;
         if (minD > 0 && minD * minD > bestD) break;

@@ -105,7 +105,7 @@ function sandboxUi(): { title: string; items: SandboxDef[] }[] {
   ];
 }
 const sandboxDef = (row: HTMLElement): SandboxDef => sandboxUi().flatMap((g) => g.items).find((x) => x.key === row.dataset.sb)!;
-/** Ennemis qu'on peut choisir dans le bac à sable (ni boss, ni caisse bonus). */
+/** Enemies that can be picked in the sandbox (no bosses, no bonus crate). */
 const SANDBOX_FOES = ENEMIES.filter((e) => e.behavior !== 'boss' && e.behavior !== 'prop' && !e.hidden);
 
 /** A short line under "Start at": the chosen duel, or the next boss of the run. */
@@ -118,11 +118,11 @@ function waveHint(wave: number, bosses: boolean, duel: string | null): string {
 
 // ---------- Sandbox ----------
 /**
- * Partie libre pour tester : réglages à gauche (mêmes contrôles que les Options), équipement de
- * départ à droite (chaque tuile monte d'un niveau par clic). Rien n'est enregistré dans les records.
+ * Free-play run for testing: settings on the left (same controls as the Options), starting gear
+ * on the right (each tile goes up one level per click). Nothing is recorded in the records.
  */
 export function showSandbox(ui: UI): void {
-  // Commencer face à un boss : un clic le choisit (il arrive dès le début, seul), un autre l'enlève.
+  // Start against a boss: one click picks it (it arrives right away, alone), another removes it.
   const duelTiles = `<div class="tiles duels">${BOSS_ORDER.map((id) => {
     const d = enemyDef(id);
     return `<button class="tile duel nav" data-duel="${id}" style="--c:${d.color}" title="${esc(t('sandbox.duelTitle', { name: enemyName(id) }))}"><span class="ico" data-icon="enemy:${id}" data-size="34"></span><span class="nm">${esc(enemyShortName(id))}</span></button>`;
@@ -200,7 +200,7 @@ function sandboxValue(ui: UI, key: SandboxKey): SandboxValue {
   return sb.rules[key];
 }
 
-/** Gauche / droite (ou clic) sur une ligne : choix suivant / précédent, interrupteur inversé. */
+/** Left / right (or click) on a row: next / previous choice, switch flipped. */
 function stepSandbox(ui: UI, row: HTMLElement, delta: number): void {
   const def = sandboxDef(row);
   const sb = ui.app.save.sandbox;
@@ -208,19 +208,19 @@ function stepSandbox(ui: UI, row: HTMLElement, delta: number): void {
   let v: SandboxValue;
   if (def.kind === 'toggle') v = !cur;
   else {
-    // Valeur inconnue (vieille sauvegarde) : on repart du premier choix.
+    // Unknown value (old save): start again from the first choice.
     const opts = def.options;
     const i = opts.findIndex(([o]) => o === cur);
     v = opts[i < 0 ? 0 : (i + delta + opts.length) % opts.length][0];
   }
   if (def.key === 'difficulty') sb.difficulty = v as number;
-  // « Sur mesure » part de tous les types : il n'y a plus qu'à retirer ceux dont on ne veut pas.
+  // "Custom" starts from every type: the player then removes the unwanted ones.
   else if (def.key === 'custom') sb.rules.enemies = v ? SANDBOX_FOES.map((e) => e.id) : null;
   else (sb.rules as unknown as Record<string, SandboxValue>)[def.key] = v;
   paintSandbox(ui);
 }
 
-/** Tuile d'équipement : niveau suivant (ou précédent), retour à « absent » après le niveau max. */
+/** Gear tile: next (or previous) level, back to "not equipped" after the max level. */
 function stepKit(ui: UI, tile: HTMLElement, delta: number): void {
   const r = ui.app.save.sandbox.rules;
   const [kind, id] = tile.dataset.kit!.split(':');
@@ -230,7 +230,7 @@ function stepKit(ui: UI, tile: HTMLElement, delta: number): void {
   const cur = list.find((x) => x.id === id);
   const next = ((cur?.level ?? 0) + delta + max + 1) % (max + 1);
   if (!cur && next > 0 && list.length >= cap) {
-    // Emplacements pleins : le compteur clignote, rien ne change.
+    // Slots full: the counter blinks, nothing changes.
     const slots = ui.screenEl?.querySelector<HTMLElement>(`[data-slots="${kind}"]`);
     slots?.classList.remove('full');
     void slots?.offsetWidth;
@@ -269,7 +269,7 @@ export function adjustSandbox(ui: UI, delta: number): boolean {
   return true;
 }
 
-/** Redessine toutes les valeurs de l'écran Sandbox à partir des réglages en mémoire. */
+/** Repaints every value of the Sandbox screen from the settings in memory. */
 function paintSandbox(ui: UI): void {
   const el = ui.screenEl;
   if (ui.current !== 'sandbox' || !el) return;
@@ -280,7 +280,7 @@ function paintSandbox(ui: UI): void {
     const ctl = row.querySelector<HTMLElement>('.ctl')!;
     const hint = row.querySelector<HTMLElement>('.set-label small');
     if (def.key === 'startWave' && hint) hint.textContent = waveHint(r.startWave, r.bosses, r.duel);
-    // La force ne compte que pour un duel.
+    // The strength only matters for a duel.
     if (def.key === 'duelMark') row.disabled = !r.duel;
     if (def.kind === 'toggle') {
       ctl.innerHTML = `<span class="switch"><i></i></span><b class="val">${t(v ? 'common.yes' : 'common.no')}</b>`;

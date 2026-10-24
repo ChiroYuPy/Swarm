@@ -29,7 +29,7 @@ const weaponSeen = new Uint8Array(ALL_WEAPONS.length);
 export function drawProjectiles(view: RenderView, s: GameState, alpha: number): void {
   const ctx = view.ctx;
   const sp = view.sprites;
-  // Balles du joueur : groupées par arme (une texture par arme).
+  // Player bullets: batched by weapon (one texture per weapon).
   const seen = weaponSeen;
   seen.fill(0);
   for (let i = 0; i < s.projCount; i++) {
@@ -49,7 +49,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
       view.sprite(img, x, y, b.vx / v, b.vy / v, Math.max(0.8, b.r / 6));
     }
   }
-  // Boomerangs (rotation continue)
+  // Boomerangs (continuous spin)
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_BOOMERANG) continue;
@@ -60,7 +60,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     view.sprite(sp.boomerang[b.weapon], x, y, Math.cos(a), Math.sin(a), b.r / 10);
   }
   view.worldTransform();
-  // Crêpes (mines) + voyant quand elles sont armées
+  // Mines + indicator light once armed
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_MINE || !view.visible(b.x, b.y, 20)) continue;
@@ -71,7 +71,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !view.visible(b.x, b.y, 20)) continue;
     view.spriteAt(sp.mineLight, b.x, b.y);
   }
-  // Flammes de l'Étoile : disques orange qui vacillent et s'éteignent.
+  // Star's flames: flickering orange discs that die out.
   let fires = false;
   ctx.beginPath();
   for (let i = 0; i < s.projCount; i++) {
@@ -93,8 +93,8 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  // Feu au sol du joueur : cratères des Météores (anneau en pointillés, qui le distingue du feu ennemi plein)
-  // et traînée du Phénix (de simples flammèches), avec des braises qui montent.
+  // Player ground fire: Meteors craters (dashed ring, which tells it apart from the solid enemy fire)
+  // and the Phoenix trail (simple flamelets), with rising embers.
   const flameCore = view.softPuff('#ffe9a8');
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
@@ -105,7 +105,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
       const fade = Math.min(1, b.life / 40);
       const mid = view.softPuff(col);
       const deep = view.softPuff('#ff3d1a');
-      // Lueur au sol, puis des flammèches qui montent (blanches au départ, rouges en s'éteignant).
+      // Ground glow, then rising flamelets (white at first, red as they die out).
       let R = b.r * 1.1;
       ctx.globalAlpha = 0.14 * fade;
       ctx.drawImage(fade > 0.6 ? mid : deep, b.x - R, b.y - R, R * 2, R * 2);
@@ -147,7 +147,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     }
     ctx.globalAlpha = 1;
   }
-  // Obus du Mortier (en cloche, avec leur ombre) et Météores (qui tombent en biais) : la zone d'impact s'affiche au sol.
+  // Mortar shells (arcing, with their shadow) and Meteors (falling at an angle): the impact zone shows on the ground.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_SHELL) continue;
@@ -168,11 +168,11 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     const gy = b.vy + (b.ty - b.vy) * t;
     if (!view.visible(gx, gy, 400)) continue;
     if (b.c === 1) {
-      // Météore : arrive d'en haut à gauche, avec une traînée.
+      // Meteor: comes from the top left, with a trail.
       const k = 1 - t;
       const mx = gx - 170 * k;
       const my = gy - 440 * k;
-      // Queue de feu
+      // Fire tail
       const tail = view.softPuff(col);
       for (let q = 0; q < 8; q++) {
         const f = q / 8;
@@ -210,7 +210,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
       view.glow(col, 2);
     }
   }
-  // Drones autonomes : petites flèches orientées, qui apparaissent en fondu.
+  // Autonomous drones: small oriented arrows that fade in.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_DRONE) continue;
@@ -237,7 +237,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     view.glow(def.color, 1.8);
     ctx.globalAlpha = 1;
   }
-  // Phénix : un oiseau de feu aux ailes battantes, suivi de flammèches.
+  // Phoenix: a fire bird with flapping wings, followed by flamelets.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_PHOENIX) continue;
@@ -246,7 +246,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     if (!view.visible(x, y, b.r * 3)) continue;
     drawPhoenix(view, x, y, b.vx, b.vy, b.r, ALL_WEAPONS[b.weapon].color, b.age + alpha);
   }
-  // Tourelles : socle hexagonal et canon tourné vers la cible ; elles clignotent avant de disparaître.
+  // Turrets: hexagonal base and barrel turned towards the target; they blink before vanishing.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_TURRET || !view.visible(b.x, b.y, 30)) continue;
@@ -273,7 +273,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     }
     view.glow(def.color, 3);
   }
-  // Disques ricochets : un anneau à trois encoches qui tourne.
+  // Ricochet discs: a spinning ring with three notches.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_RICOCHET) continue;
@@ -293,8 +293,8 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     ctx.fillStyle = '#ffffff';
     ctx.fill();
   }
-  // Balles ennemies : pleines, rouges à cœur blanc (distinctes de tout le reste). Celles des Tireurs,
-  // cassables, sont violettes cerclées de pointillés.
+  // Enemy bullets: solid, red with a white core (distinct from everything else). Shooters' bullets,
+  // which can be destroyed, are purple with a dashed ring.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_EBULLET || b.life <= 0) continue;
@@ -304,7 +304,7 @@ export function drawProjectiles(view: RenderView, s: GameState, alpha: number): 
     view.spriteAt(b.a === 1 ? sp.breakableBullet : sp.enemyBullet, x, y);
   }
 
-  // Ondes de choc (Onde de choc, Séisme, Bastion) : peu nombreuses, vectorielles.
+  // Shockwaves (Shockwave, Earthquake, Bastion): few of them, vector.
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_RING || !view.visible(b.x, b.y, b.a)) continue;

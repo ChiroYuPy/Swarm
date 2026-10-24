@@ -1,6 +1,6 @@
 /**
- * Tables précalculées à partir des fichiers de données : index numériques, codes de comportement,
- * phases de vagues compilées. Évite toute recherche par chaîne dans la boucle chaude.
+ * Tables precomputed from the data files: numeric indices, behavior codes,
+ * compiled wave phases. Avoids any string lookup in the hot loop.
  */
 import { ALL_WEAPONS, BASE_WEAPONS, type WeaponDef, type WeaponLevel } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
@@ -24,17 +24,17 @@ export const NUM_ENEMY_TYPES = ENEMIES.length;
 
 export function weaponId(id: string): number {
   const i = WEAPON_INDEX[id];
-  if (i === undefined) throw new Error(`Arme inconnue : ${id}`);
+  if (i === undefined) throw new Error(`Unknown weapon: ${id}`);
   return i;
 }
 export function enemyId(id: string): number {
   const i = ENEMY_INDEX[id];
-  if (i === undefined) throw new Error(`Ennemi inconnu : ${id}`);
+  if (i === undefined) throw new Error(`Unknown enemy: ${id}`);
   return i;
 }
 export function passiveId(id: string): number {
   const i = PASSIVE_INDEX[id];
-  if (i === undefined) throw new Error(`Passif inconnu : ${id}`);
+  if (i === undefined) throw new Error(`Unknown passive: ${id}`);
   return i;
 }
 
@@ -63,15 +63,15 @@ export const BEHAVIOR = {
   EGG: 11,
 } as const satisfies Record<Uppercase<EnemyBehavior>, number>;
 export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR[e.behavior.toUpperCase() as Uppercase<EnemyBehavior>]);
-/** Diviseur : type d'ennemi né à sa mort (-1 : aucun). */
+/** Splitter: enemy type born on its death (-1: none). */
 export const SPLIT_INTO = ENEMIES.map((e) => (e.splitInto ? enemyId(e.splitInto) : -1));
-/** Meneur : bonus de vitesse des ennemis qu'il galvanise. */
+/** Leader: speed bonus of the enemies it rallies. */
 export const LEADER_SPEED = ENEMIES.find((e) => e.behavior === 'leader')?.auraSpeed ?? 0;
 
 export interface CompiledFusion {
   result: number;
   weapon: number;
-  /** passif requis */
+  /** required passive */
   with: number;
 }
 export const FUSION_TABLE: CompiledFusion[] = FUSIONS.map((f) => ({
@@ -85,21 +85,21 @@ export interface CompiledRate {
   rate: number;
 }
 
-/** Courbe de débit pour chaque difficulté (dates × pace, débit × rate). */
+/** Spawn-rate curve for each difficulty (times × pace, rate × rate). */
 export const RATES_BY_DIFFICULTY: CompiledRate[][] = DIFFICULTIES.map((d) =>
   WAVES.rates.map((p) => ({ atTick: Math.round(p.at * d.pace * TICK_RATE), rate: p.rate * d.rate })),
 );
 
-/** Une vague + sa pause : un créneau de mélange. */
+/** One wave + its pause: one mix slot. */
 export const MIX_TICKS = Math.round((WAVES.waveLength + WAVES.pause) * TICK_RATE);
 export const WAVE_TICKS = Math.round(WAVES.waveLength * TICK_RATE);
-/** Horloge des vagues entre deux boss (le boss arrive à la fin de la pause de la dernière vague). */
+/** Wave clock between two bosses (the boss arrives at the end of the last wave's pause). */
 export const BOSS_TICKS = MIX_TICKS * WAVES.wavesPerBoss;
 export const AFTER_BOSS_TICKS = Math.round(WAVES.afterBoss * TICK_RATE);
 
 /**
- * Créneau de mélange à partir duquel chaque type apparaît, par difficulté (-1 : jamais dans le flux).
- * L'arrivée est arrondie au créneau suivant.
+ * Mix slot from which each type appears, per difficulty (-1: never in the stream).
+ * The arrival is rounded up to the next slot.
  */
 export const UNLOCK_SLOT: Int32Array[] = DIFFICULTIES.map((d) => {
   const out = new Int32Array(NUM_ENEMY_TYPES).fill(-1);
@@ -111,11 +111,11 @@ export interface CompiledMix {
   weights: Float64Array;
   total: number;
   types: number[];
-  /** poids de tirage : les mélanges aux types les plus récents sortent plus souvent */
+  /** draw weight: mixes with the most recent types come up more often */
   pick: number;
 }
 
-/** rang d'arrivée de chaque type (0 = le premier) */
+/** arrival rank of each type (0 = the first) */
 const UNLOCK_RANK = new Int32Array(NUM_ENEMY_TYPES);
 Object.entries(WAVES.unlocks)
   .sort((a, b) => a[1] - b[1])
@@ -136,7 +136,7 @@ export const MIXES: CompiledMix[] = WAVES.mixes.map((m) => {
   return { weights, total, types, pick: (rank + 1) * Math.sqrt(rank + 1) };
 });
 
-/** Mélange d'arrivée de chaque type : le premier de la liste qui le contient. */
+/** Debut mix of each type: the first one in the list that contains it. */
 export const DEBUT_MIX = new Int32Array(NUM_ENEMY_TYPES).fill(-1);
 MIXES.forEach((m, i) => {
   for (const t of m.types) if (DEBUT_MIX[t] < 0) DEBUT_MIX[t] = i;
@@ -149,13 +149,13 @@ export const RING_TYPE = enemyId(WAVES.ring.type);
 export const PROP_TYPE = uniqueType('prop');
 export const WALL_TYPE = uniqueType('wall');
 export const EGG_TYPE = uniqueType('egg');
-/** Boss dans leur ordre d'arrivée. */
+/** Bosses in their arrival order. */
 export const BOSS_TYPES = BOSS_ORDER.map(enemyId);
 
 export interface CompiledSummon extends BossSummon {
   typeId: number;
 }
-/** Phases et renforts de chaque boss, par type d'ennemi (vide pour les autres). */
+/** Phases and reinforcements of each boss, per enemy type (empty for the others). */
 export const BOSS_PATTERNS: BossPhase[][] = ENEMIES.map((e) => e.boss?.pattern ?? []);
 export const BOSS_SUMMONS: (CompiledSummon | null)[] = ENEMIES.map((e) => {
   const sm = e.boss?.summon;

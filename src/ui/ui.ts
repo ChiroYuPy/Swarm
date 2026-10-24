@@ -2,12 +2,12 @@
  * The UI class: mounts DOM screens into #ui with their enter / leave transitions, tracks whether the
  * mouse or the keyboard / gamepad drives the selection, moves that selection, and shows toasts. Each
  * screen is a function in ./screens taking the UI instance (its state below without `private` is
- * shared with them); the public methods main.ts calls delegate to those. Shared HTML helpers are in
+ * shared with them); the public methods the app (app/app.ts) calls delegate to those. Shared HTML helpers are in
  * html.ts, codex content in codex-data.ts, data shapes in types.ts (re-exported here).
  *
- * Écrans DOM. Tous suivent le gabarit de la fin de partie : un titre néon souligné (heading), du
- * contenu à nu séparé par des filets, des chiffres « libellé / valeur » (statTiles), des onglets
- * soulignés, le rappel des touches (keys) et une arrivée en cascade (cascade). Voir style.css.
+ * DOM screens. They all follow the end-of-run template: an underlined neon title (heading), bare
+ * content separated by rules, "label / value" figures (statTiles), underlined tabs,
+ * the key hints (keys) and a cascading entrance (cascade). See styles/.
  */
 import { DIFFICULTIES } from '../data/difficulty';
 import { initCursor } from './cursor';
@@ -22,13 +22,13 @@ export { passiveTotal } from './describe';
 
 /** Screens redrawn in place without a screen transition: tabbed screens (codex, records) and the options (language change). */
 const TAB_SCREENS = new Set(['codex', 'scores', 'settings']);
-/** Profondeur de navigation : aller plus profond glisse vers la gauche, revenir glisse vers la droite. */
+/** Navigation depth: going deeper slides to the left, going back slides to the right. */
 const DEPTH: Record<string, number> = { difficulty: 1, sandbox: 1, codex: 1, scores: 1, settings: 1 };
 const depth = (name: string) => DEPTH[name] ?? 0;
-/** Durée de sortie de chaque écran (ms), alignée sur style.css. */
+/** Leave duration of each screen (ms), matching styles/screen.css and styles/death.css. */
 const LEAVE_MS: Record<string, number> = { default: 460, death: 560 };
 
-/** Son joué au clic d'un bouton : « retour » pour revenir, rien pour lancer une partie (elle a le sien). */
+/** Sound played on a button click: "back" to go back, none to start a run (it has its own). */
 function clickSound(b: HTMLButtonElement): 'ui' | 'uiBack' | null {
   if (b.id === 'back' || b.id === 'menu') return 'uiBack';
   if (b.id === 'start' || b.id === 'go' || b.id === 'retry' || b.matches('.diff[data-d]')) return null;
@@ -45,25 +45,25 @@ export class UI {
   /** options opened from the pause: shown over the run */
   settingsOverlay = false;
   codexReturn: () => void = () => this.showMenu();
-  /** codex ouvert depuis la pause : affiché par-dessus la partie */
+  /** codex opened from the pause: shown over the run */
   codexOverlay = false;
   codexTab: CodexTab = 'weapons';
   countAnim = 0;
   levelOpenedAt = 0;
-  /** écran affiché (ceux qui sortent restent un instant dans #ui, inertes) */
+  /** displayed screen (leaving ones stay in #ui for a moment, inert) */
   screenEl: HTMLElement | null = null;
   private closeTimer = 0;
-  /** intro en cours : en veille, la prochaine touche allume l'écran ; ensuite, elle passe l'intro */
+  /** running intro: in standby, the next key turns the screen on; after that, it skips the intro */
   intro: { stage: 'standby' | 'on'; ready: Promise<unknown>; timers: number[]; stop: () => void } | null = null;
-  /** mode démo (inactivité sur le menu) */
+  /** attract mode (idle on the menu) */
   attract = false;
   lastActivity = performance.now();
   /**
-   * Qui pilote la sélection : la souris (est sélectionné ce qui est sous le pointeur, rien sinon) ou
-   * le clavier / la manette (le pointeur est ignoré tant qu'il ne bouge pas vraiment).
+   * What drives the selection: the mouse (what is under the pointer is selected, nothing otherwise) or
+   * the keyboard / gamepad (the pointer is ignored until it really moves).
    */
   kbd = false;
-  /** Point de départ du clavier quand rien n'est sélectionné : dernier bouton sélectionné de l'écran. */
+  /** Keyboard starting point when nothing is selected: the screen's last selected button. */
   private navHome: HTMLElement | null = null;
   pointer = { x: -1, y: -1 };
 
@@ -71,11 +71,11 @@ export class UI {
     this.root = document.getElementById('ui')!;
     this.toasts = document.getElementById('toasts')!;
     initCursor();
-    // Garde-fou : #ui ne défile jamais de côté (les écrans qui glissent dépassent volontairement).
+    // Safeguard: #ui never scrolls sideways (sliding screens overflow on purpose).
     this.root.addEventListener('scroll', () => {
       if (this.root.scrollLeft) this.root.scrollLeft = 0;
     });
-    // Activité du joueur : repousse le mode démo, et en sort (ce geste-là ne fait rien d'autre).
+    // Player activity: postpones attract mode, and exits it (that input does nothing else).
     const swallow = (e: Event) => {
       this.noteActivity();
       if (!this.attract) return;
@@ -99,7 +99,7 @@ export class UI {
       this.noteActivity();
       if (this.attract) this.exitAttract();
     });
-    // Souris ou clavier : c'est le dernier des deux qui a servi qui pilote la sélection.
+    // Mouse or keyboard: whichever was used last drives the selection.
     window.addEventListener(
       'keydown',
       (e) => {
@@ -109,7 +109,7 @@ export class UI {
     );
     const onPointer = (e: PointerEvent) => {
       this.pointer = { x: e.clientX, y: e.clientY };
-      // Un écran qui glisse sous un pointeur immobile envoie aussi des mouvements, mais nuls.
+      // A screen sliding under a still pointer also sends moves, but zero ones.
       if (e.type === 'pointerdown' || e.movementX || e.movementY) this.setKbd(false);
       if (!this.kbd) this.syncPointer(e.target);
     };
@@ -128,7 +128,7 @@ export class UI {
     document.body.classList.toggle('kbd', on);
   }
 
-  /** Souris aux commandes : est sélectionné le bouton sous le pointeur, et rien s'il n'y en a pas. */
+  /** Mouse in control: the button under the pointer is selected, and nothing if there is none. */
   syncPointer(target: EventTarget | null): void {
     const el = this.screenEl;
     if (!el || this.attract) return;
@@ -146,8 +146,8 @@ export class UI {
   }
 
   /**
-   * Sélection de départ d'un écran : affichée d'emblée au clavier ; à la souris, c'est ce qui est
-   * sous le pointeur qui compte, et le clavier repartira de là.
+   * A screen's starting selection: shown right away with the keyboard; with the mouse, what is
+   * under the pointer counts, and the keyboard will start again from there.
    */
   home(b: HTMLElement | null | undefined): void {
     if (!b) return;
@@ -156,7 +156,7 @@ export class UI {
     else this.syncPointer(document.elementFromPoint(this.pointer.x, this.pointer.y));
   }
 
-  /** Rien de sélectionné (la souris était ailleurs) : la première touche fait juste réapparaître la sélection. */
+  /** Nothing selected (the mouse was elsewhere): the first key just brings the selection back. */
   private wake(): boolean {
     const el = this.screenEl;
     if (!el || this.current === 'levelup') return false;
@@ -175,11 +175,11 @@ export class UI {
   }
 
   /**
-   * Monte un écran. `overlay` : par-dessus la partie (fond assombri), sinon écran de menu.
-   * L'écran précédent n'est pas effacé d'un coup : il reste un instant en place, inerte, le temps
-   * de jouer sa sortie pendant que le nouveau entre (glissement selon le sens de navigation).
-   * `instant` : l'écran est posé d'emblée, sans aucune animation (pause automatique : la page est en
-   * arrière-plan, le navigateur retiendrait les animations jusqu'au retour du joueur).
+   * Mounts a screen. `overlay`: over the run (darkened backdrop), otherwise a menu screen.
+   * The previous screen is not wiped at once: it stays in place for a moment, inert, long enough
+   * to play its exit while the new one enters (sliding according to the navigation direction).
+   * `instant`: the screen is shown right away, with no animation at all (automatic pause: the page is in
+   * the background, the browser would hold the animations until the player comes back).
    */
   mount(name: string, html: string, overlay = false, instant = false): HTMLElement {
     cancelAnimationFrame(this.countAnim);
@@ -187,7 +187,7 @@ export class UI {
     const prev = this.screenEl;
     const prevName = this.current;
     this.current = name;
-    this.toasts.replaceChildren(); // les messages de jeu ne doivent pas traîner sur un écran
+    this.toasts.replaceChildren(); // in-game messages must not linger on a screen
     this.root.className = `visible ${overlay ? 'overlay' : 'menu'} on-${name}${instant ? ' instant' : ''}`;
     document.body.classList.toggle('menu-home', name === 'menu');
     const el = document.createElement('div');
@@ -198,9 +198,9 @@ export class UI {
       el.classList.add('instant');
       this.root.appendChild(el);
     } else if (prev && prevName === name && TAB_SCREENS.has(name)) {
-      // Même écran, autre onglet (codex, records) : seul le contenu change.
+      // Same screen, other tab (codex, records): only the content changes.
       el.classList.add('same');
-      // Si l'écran est encore en train d'arriver, le nouveau reprend le glissement là où il en était.
+      // If the screen is still arriving, the new one resumes the slide where it was.
       const run = prev.getAnimations().find((an) => an.playState === 'running');
       const enter = [...prev.classList].find((c) => c.startsWith('enter-'));
       if (run && enter && typeof run.currentTime === 'number') {
@@ -209,11 +209,11 @@ export class UI {
       }
       prev.replaceWith(el);
     } else {
-      // Tout circule de droite à gauche ; revenir en arrière (ou quitter la fin de partie, dont le
-      // bandeau file vers la droite) inverse le sens.
+      // Everything flows from right to left; going back (or leaving the end-of-run screen, whose
+      // banner flies off to the right) reverses the direction.
       const dir = depth(name) < depth(prevName) || prevName === 'death' ? 'back' : 'fwd';
       if (prev) this.leave(prev, prevName, dir);
-      // La fin de partie n'arrive pas en glissant : c'est son bandeau qui fait l'entrée.
+      // The end-of-run screen does not slide in: its banner makes the entrance.
       el.classList.add(name === 'death' ? 'enter-none' : `enter-${dir}`);
       this.root.appendChild(el);
     }
@@ -231,7 +231,7 @@ export class UI {
     return el;
   }
 
-  /** Fait sortir un écran : figé à sa place, inerte (ni focus ni clic), retiré à la fin de son animation. */
+  /** Makes a screen leave: frozen in place, inert (no focus, no click), removed at the end of its animation. */
   private leave(el: HTMLElement, name: string, dir: 'fwd' | 'back'): void {
     if (reducedMotion()) {
       el.remove();
@@ -263,7 +263,7 @@ export class UI {
       return;
     }
     this.leave(prev, prevName, prevName === 'death' ? 'back' : 'fwd');
-    // Le fond s'efface en même temps que l'écran ; #ui reste affiché (sans capter la souris) jusqu'à la fin.
+    // The backdrop fades with the screen; #ui stays displayed (without catching the mouse) until the end.
     this.root.classList.remove('visible', 'instant');
     this.root.classList.add('closing');
     this.closeTimer = window.setTimeout(() => {
@@ -273,19 +273,19 @@ export class UI {
     }, LEAVE_MS[prevName] ?? LEAVE_MS.default);
   }
 
-  /** Carte choisie au level-up : elle s'illumine pendant que l'écran sort. */
+  /** Card picked on level-up: it lights up while the screen leaves. */
   markPicked(i: number): void {
     if (this.current !== 'levelup') return;
     this.screenEl?.querySelectorAll<HTMLElement>('.card')[i]?.classList.add('picked');
   }
 
-  /** Déplace la sélection entre les boutons de l'écran courant (flèches / croix de la manette). */
+  /** Moves the selection between the current screen's buttons (arrows / gamepad d-pad). */
   navigate(dir: NavDir): void {
     this.setKbd(true);
     if (this.wake()) return;
     if (this.current === 'codex' && screens.codexNav(this, dir)) return;
     if (this.current === 'scores' && (dir === 'left' || dir === 'right')) {
-      // Records : gauche / droite passent d'une difficulté à l'autre (en boucle).
+      // Records: left / right switch between difficulties (wrapping around).
       const cur = Number(this.screenEl?.querySelector<HTMLElement>('.tab.on')?.dataset.d ?? 0);
       const n = DIFFICULTIES.length;
       this.showScores((cur + (dir === 'left' ? -1 : 1) + n) % n);
@@ -305,7 +305,7 @@ export class UI {
     this.app.uiSound('uiMove');
   }
 
-  /** Valide le bouton sélectionné (bouton A de la manette). */
+  /** Confirms the selected button (gamepad A button). */
   activate(): boolean {
     this.setKbd(true);
     if (this.wake()) return true;

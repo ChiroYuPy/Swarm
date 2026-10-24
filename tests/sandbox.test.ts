@@ -6,7 +6,7 @@ import { defaultSandbox } from '../src/storage/storage';
 
 const rules = (over: Partial<SandboxConfig> = {}): SandboxConfig => ({ ...defaultSandbox().rules, ...over });
 
-/** Avance la partie sans bouger, en prenant toujours la première amélioration proposée. */
+/** Runs the game without moving, always taking the first offered upgrade. */
 function run(cfg: Parameters<typeof createGame>[0], seconds: number) {
   const s = createGame(cfg);
   const end = s.tick + seconds * TICK_RATE;
@@ -14,8 +14,8 @@ function run(cfg: Parameters<typeof createGame>[0], seconds: number) {
   return s;
 }
 
-describe('bac à sable', () => {
-  it('équipement, niveau, objet et minute de départ', () => {
+describe('sandbox', () => {
+  it('gear, level, item and starting minute', () => {
     const s = createGame({
       seed: 'SB',
       sandbox: rules({
@@ -37,50 +37,50 @@ describe('bac à sable', () => {
     ]);
     expect(PASSIVES[p.passives[0].def].id).toBe('might');
     expect(p.level).toBe(12);
-    expect(p.activable).toBeGreaterThanOrEqual(0);
+    expect(p.activeItem).toBeGreaterThanOrEqual(0);
     expect(s.tick).toBe(5 * MIX_TICKS);
     expect(p.stats.might).toBeCloseTo((1 + PASSIVES[p.passives[0].def].perLevel.might! * 5) * 3);
     expect(p.hp).toBe(p.stats.maxHp);
   });
 
-  it('invincible : ne meurt jamais, même en Difficile sans bouger', () => {
+  it('invincible: never dies, even on Hard without moving', () => {
     const s = run({ seed: 'SB-INV', difficulty: 2, sandbox: rules({ invincible: true, startWave: 11, weapons: [] }) }, 120);
     expect(s.over).toBe(false);
     expect(s.players[0].hp).toBe(s.players[0].stats.maxHp);
   });
 
-  it('sans ennemis : seules les caisses bonus apparaissent, et pas de boss', () => {
+  it('no enemies: only bonus crates spawn, and no boss', () => {
     const s = run({ seed: 'SB-VIDE', sandbox: rules({ enemyMul: 0, bosses: false }) }, 200);
     for (let i = 0; i < s.enemyCount; i++) expect(s.enemies[i].flags & EF_PROP).toBeTruthy();
     expect(s.bossSpawned).toBe(0);
   });
 
-  it('types choisis : uniquement ceux-là, dès le début', () => {
+  it('chosen types: only those, from the start', () => {
     const s = run({ seed: 'SB-TYPES', sandbox: rules({ enemies: ['block'], weapons: [] }) }, 30);
     const types = new Set<string>();
     for (let i = 0; i < s.enemyCount; i++) if (!(s.enemies[i].flags & EF_PROP)) types.add(ENEMIES[s.enemies[i].type].id);
     expect([...types]).toEqual(['block']);
   });
 
-  it('ids inconnus ignorés, partie reproductible', () => {
-    const cfg = { seed: 'SB-REPRO', sandbox: rules({ weapons: [{ id: 'nexistepas', level: 2 }, { id: 'force_field', level: 9 }], xp: 5 }) };
+  it('unknown ids are ignored, the game is reproducible', () => {
+    const cfg = { seed: 'SB-REPRO', sandbox: rules({ weapons: [{ id: 'does_not_exist', level: 2 }, { id: 'force_field', level: 9 }], xp: 5 }) };
     const a = run(cfg, 60);
     const b = run(cfg, 60);
     expect(weaponDef(a.players[0].weapons[0].def).id).toBe('force_field');
     expect(a.players[0].weapons[0].level).toBe(5);
     expect(hashState(a)).toBe(hashState(b));
   });
-  it('duel : le boss choisi arrive tout de suite, seul, avec la force de son rang', () => {
+  it('duel: the chosen boss arrives right away, alone, with the strength of its rank', () => {
     const s = run({ seed: 'SB-DUEL', sandbox: rules({ startWave: 3, duel: 'ricochet_star', duelMark: 2, weapons: [] }) }, 1);
     const bosses = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.flags & EF_BOSS);
     expect(bosses.map((e) => ENEMIES[e.type].id)).toEqual(['ricochet_star']);
-    // Mk II : son deuxième passage dans une partie.
+    // Mk II: its second appearance in a game.
     expect(bosses[0].aux2).toBe(BOSS_ORDER.length + BOSS_ORDER.indexOf('ricochet_star'));
-    // Hors du compte : le boss de la vague 4 reste le Trapèze.
+    // Not counted: the wave 4 boss is still the Trapezoid.
     expect(s.bossSpawned).toBe(0);
   });
 
-  it('renforts des boss : coupés, le boss reste seul', () => {
+  it('boss reinforcements: when turned off, the boss stays alone', () => {
     const minions = (summons: boolean) => {
       const s = run({ seed: 'SB-SEUL', sandbox: rules({ duel: 'trapezoid', summons, enemyMul: 0, weapons: [] }) }, 20);
       return s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && !(e.flags & (EF_BOSS | EF_PROP))).length;

@@ -1,17 +1,17 @@
 /**
- * Monde ouvert infini : un champ d'obstacles géométriques généré par morceaux (chunks) depuis la seed.
- * Aucune case spéciale : les bonus sont des objets à ramasser (voir loot.ts).
+ * Infinite open world: a field of geometric obstacles generated in chunks from the seed.
+ * No special tiles: bonuses are pickups (see loot.ts).
  */
 export const MAP_GEN = {
-  /** taille d'un morceau de monde (unités) */
+  /** size of a world chunk (units) */
   chunk: 768,
-  /** marge intérieure : un obstacle ne déborde jamais de son morceau (évite les recoins piégeux) */
+  /** inner margin: an obstacle never spills out of its chunk (avoids trap corners) */
   margin: 170,
-  /** probabilités d'avoir 0, 1, 2 ou 3 obstacles dans un morceau */
+  /** odds of having 0, 1, 2 or 3 obstacles in a chunk */
   countWeights: [3, 5, 3, 1],
-  /** zone dégagée autour du point de départ */
+  /** clear area around the starting point */
   clearRadius: 420,
-  /** écart minimal entre deux obstacles d'un même morceau (passage garanti) */
+  /** minimum gap between two obstacles of the same chunk (guaranteed passage) */
   gap: 90,
   circle: { min: 34, max: 95 },
   hexagon: { min: 45, max: 110 },

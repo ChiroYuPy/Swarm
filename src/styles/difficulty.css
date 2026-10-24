@@ -1,6 +1,6 @@
 /* Difficulty screen: cards, threat chevrons, comparison meters and per-difficulty record. */
 
-/* ---------- Choix de la difficulté ---------- */
+/* ---------- Difficulty picker ---------- */
 .diffs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -38,7 +38,7 @@
     0 12px 32px rgba(0, 0, 0, 0.45),
     0 0 26px color-mix(in srgb, var(--c) 30%, transparent);
 }
-/* les cartes non sélectionnées passent en retrait */
+/* unselected cards step back */
 .diffs:has(.diff:focus) .diff:not(:focus) {
   opacity: 0.5;
   filter: saturate(0.5);
@@ -61,7 +61,7 @@
   justify-content: space-between;
   height: 22px;
 }
-/* niveau de menace : 1 à 3 chevrons allumés */
+/* threat level: 1 to 3 lit chevrons */
 .threat {
   display: flex;
   gap: 4px;

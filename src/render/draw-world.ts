@@ -4,7 +4,7 @@ import { CHUNK, OB_CIRCLE, OB_HEX, PK_CHEST, type GameState, type Obstacle } fro
 import { COLORS, OBSTACLE_TINTS } from './palette';
 import { lerp, type RenderView } from './view';
 
-/** Fond (points discrets, pas de cases) + obstacles néon des morceaux visibles. */
+/** Background (faint dots, no grid cells) + neon obstacles of the visible chunks. */
 export function drawMap(view: RenderView, s: GameState): void {
   const ctx = view.ctx;
   const step = 96;
@@ -17,7 +17,7 @@ export function drawMap(view: RenderView, s: GameState): void {
   const cy0 = Math.floor(view.viewY0 / CHUNK);
   const cx1 = Math.floor(view.viewX1 / CHUNK);
   const cy1 = Math.floor(view.viewY1 / CHUNK);
-  // Deux passes : remplissages sombres, puis contours néon groupés par teinte.
+  // Passes: dark fills first, then neon outlines grouped by tint (one pass per tint).
   for (let pass = 0; pass < 4; pass++) {
     ctx.beginPath();
     for (let cy = cy0; cy <= cy1; cy++) {
@@ -88,12 +88,12 @@ export function drawPickups(view: RenderView, s: GameState, time: number): void 
   for (let i = 0; i < s.pickupCount; i++) {
     const it = s.pickups[i];
     if (!view.visible(it.x, it.y, 60)) continue;
-    // Clignote pendant ses 5 dernières secondes.
+    // Blinks during its last 5 seconds.
     if (it.life > 0 && it.life < 300 && Math.floor(time * 8) % 2 === 0) continue;
     const def = PICKUPS[it.kind];
     const chest = it.kind === PK_CHEST;
     const y = it.y + Math.sin(time * 3 + i) * 3;
-    // Halo au sol qui pulse : les objets se repèrent d'un coup d'œil.
+    // Pulsing ground halo: items can be spotted at a glance.
     const R = (chest ? 34 : 22) + Math.sin(time * 4 + i) * 3;
     ctx.beginPath();
     ctx.arc(it.x, it.y, R, 0, Math.PI * 2);

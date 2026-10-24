@@ -1,8 +1,8 @@
 /**
- * Équilibrage headless : le bot joue plusieurs seeds sans interface, on mesure la survie.
+ * Headless balancing: the bot plays several seeds without any UI and survival is measured.
  *   npm run balance            (6 seeds, 15 min max)
  *   npm run balance -- 10 20   (10 seeds, 20 min max)
- *   npm run balance -- 6 15 0  (difficulté : 0 easy, 1 normal, 2 hard)
+ *   npm run balance -- 6 15 0  (difficulty: 0 easy, 1 normal, 2 hard)
  */
 import { createGame, step, computeScore, findBoss, hashState, weaponDef, TICK_RATE, type GameState } from '../src/sim';
 import { botInput } from '../src/ai/bot';
@@ -48,11 +48,11 @@ for (let k = 0; k < seeds; k++) {
   const mm = Math.floor(r.survivedSec / 60);
   const ss = Math.floor(r.survivedSec % 60).toString().padStart(2, '0');
   console.log(
-    `${seed.padEnd(11)} ${s.over ? 'mort ' : 'vivant'} ${mm}:${ss}  kills ${String(r.kills).padStart(5)}  niv ${String(r.level).padStart(2)}  ` +
-      `boss1 ${firstBossKilledAt > 0 ? ((firstBossKilledAt - bossSeenAt) / 60).toFixed(0) + 's' : '—'}  max ennemis ${maxEnemies}  ` +
-      `${(ms / steps).toFixed(3)} ms/pas  [${build(s)}]  hash ${hashState(s).slice(0, 8)}`,
+    `${seed.padEnd(11)} ${s.over ? 'dead ' : 'alive'} ${mm}:${ss}  kills ${String(r.kills).padStart(5)}  lvl ${String(r.level).padStart(2)}  ` +
+      `boss1 ${firstBossKilledAt > 0 ? ((firstBossKilledAt - bossSeenAt) / 60).toFixed(0) + 's' : '—'}  max enemies ${maxEnemies}  ` +
+      `${(ms / steps).toFixed(3)} ms/step  [${build(s)}]  hash ${hashState(s).slice(0, 8)}`,
   );
 }
 results.sort((a, b) => a - b);
 const med = results[Math.floor(results.length / 2)];
-console.log(`\nSurvie médiane : ${Math.floor(med / 60)}:${String(Math.floor(med % 60)).padStart(2, '0')}  — coût moyen ${(totalMs / totalTicks).toFixed(3)} ms/tick`);
+console.log(`\nMedian survival: ${Math.floor(med / 60)}:${String(Math.floor(med % 60)).padStart(2, '0')}  — average cost ${(totalMs / totalTicks).toFixed(3)} ms/tick`);

@@ -13,14 +13,14 @@ import {
 } from '../src/sim';
 import { PASSIVES } from '../src/data/passives';
 
-/** Avance immobile jusqu'au premier level-up (avec un aimant géant pour ramasser l'XP sans bouger). */
+/** Stands still until the first level-up (with a giant magnet to collect XP without moving). */
 function untilLevelUp(s: GameState): void {
   s.players[0].base.magnet = 5000;
   for (let i = 0; i < 120 * TICK_RATE && !isAwaitingChoice(s) && !s.over; i++) step(s, [0]);
 }
 
-describe('propositions de level-up', () => {
-  it("l'ordre des propositions ne dépend que de (seed, niveau)", () => {
+describe('level-up offers', () => {
+  it('offer order depends only on (seed, level)', () => {
     const seed = 123456;
     expect(offerOrder(seed, 5)).toEqual(offerOrder(seed, 5));
     expect(offerOrder(seed, 5)).not.toEqual(offerOrder(seed, 6));
@@ -28,7 +28,7 @@ describe('propositions de level-up', () => {
     expect(new Set(offerOrder(seed, 9)).size).toBe(offerOrder(seed, 9).length);
   });
 
-  it('même seed, même build => mêmes propositions au même niveau', () => {
+  it('same seed, same build => same offers at the same level', () => {
     const a = createGame({ seed: 'PROPOSITIONS' });
     const b = createGame({ seed: 'PROPOSITIONS' });
     untilLevelUp(a);
@@ -38,9 +38,9 @@ describe('propositions de level-up', () => {
     expect(a.players[0].offers.length).toBe(3);
   });
 
-  it('les propositions sont les mêmes même si le chemin pour y arriver diffère', () => {
-    // Joueur A immobile, joueur B qui bouge : ils atteignent le niveau 2 à des instants différents,
-    // mais avec le même build => mêmes propositions.
+  it('offers are the same even if the path to get there differs', () => {
+    // Player A stands still, player B moves: they reach level 2 at different times,
+    // but with the same build => same offers.
     const a = createGame({ seed: 'CHEMINS' });
     const b = createGame({ seed: 'CHEMINS' });
     untilLevelUp(a);
@@ -51,13 +51,13 @@ describe('propositions de level-up', () => {
     expect(a.players[0].offers).toEqual(b.players[0].offers);
   });
 
-  it('le choix du joueur est appliqué et libre', () => {
+  it("the player's choice is applied, and any offer can be picked", () => {
     const s = createGame({ seed: 'CHOIX' });
     untilLevelUp(s);
     const offer = s.players[0].offers[2];
     const tick = s.tick;
     step(s, [202]);
-    expect(s.tick).toBe(tick); // pas « zéro » : le temps n'avance pas
+    expect(s.tick).toBe(tick); // zero-time step: time does not advance
     const p = s.players[0];
     if (offer.kind === OFFER_WEAPON) {
       expect(p.weapons.find((w) => w.def === offer.id)?.level).toBe(Math.max(1, offer.toLevel));
@@ -66,7 +66,7 @@ describe('propositions de level-up', () => {
     }
   });
 
-  it('le monde est figé pendant le choix', () => {
+  it('the world is frozen during the choice', () => {
     const s = createGame({ seed: 'GEL' });
     untilLevelUp(s);
     const tick = s.tick;
@@ -76,11 +76,11 @@ describe('propositions de level-up', () => {
     expect(s.players[0].x).toBe(x);
   });
 
-  it('une fusion disponible est toujours proposée en premier', () => {
+  it('an available fusion is always offered first', () => {
     const s = createGame({ seed: 'FUSION-OFFRE' });
     untilLevelUp(s);
     const p = s.players[0];
-    // Blaster niveau max + Surcadence niveau max => Spirale
+    // Blaster at max level + Overclock at max level => Spiral
     p.weapons[0].level = 5;
     const overclock = new PassiveInst();
     overclock.def = PASSIVES.findIndex((x) => x.id === 'overclock');
@@ -88,7 +88,7 @@ describe('propositions de level-up', () => {
     p.passives.push(overclock);
     p.offers = [];
     p.pendingLevels = 1;
-    // Les propositions sont retirées au pas suivant.
+    // The offers are re-rolled on the next step.
     step(s, [0]);
     expect(p.offers[0].kind).toBe(OFFER_FUSION);
   });

@@ -1,6 +1,6 @@
 /* In-game toasts and the attract (demo) mode overlay. */
 
-/* ---------- Messages en jeu ---------- */
+/* ---------- In-game messages ---------- */
 #toasts {
   position: fixed;
   top: 96px;

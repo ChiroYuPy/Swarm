@@ -1,6 +1,6 @@
 /* Buttons (single style plus primary / go / tint / danger), the main menu button stack, action bars, underlined tabs and panels. */
 
-/* ---------- Boutons (un seul style) ---------- */
+/* ---------- Buttons (a single style) ---------- */
 button {
   font: inherit;
   color: inherit;
@@ -55,7 +55,7 @@ button:focus {
   background: rgba(57, 255, 122, 0.14);
   color: #fff;
 }
-/* Bouton à la couleur de son contexte (--c), ex. « Jouer en Difficile » dans les records. */
+/* Button in its context's color (--c), e.g. "Play in Hard" in the records. */
 .btn.tint {
   border-color: color-mix(in srgb, var(--c) 60%, transparent);
   color: var(--c);
@@ -137,7 +137,7 @@ button:focus {
   text-align: center;
 }
 
-/* ---------- Onglets ---------- */
+/* ---------- Tabs ---------- */
 .tabs {
   display: flex;
   gap: 6px;
@@ -167,7 +167,7 @@ button:focus {
   background: color-mix(in srgb, var(--c) 10%, transparent);
 }
 
-/* ---------- Colonnes de contenu (sans cadre) ---------- */
+/* ---------- Content columns (no frame) ---------- */
 .panel {
   width: min(560px, 100%);
 }

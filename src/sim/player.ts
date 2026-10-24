@@ -1,4 +1,4 @@
-/** Héros : stats, bonus temporaires, objet activable, déplacement, régénération, XP. */
+/** Hero: stats, timed buffs, active item, movement, regeneration, XP. */
 import { HERO, xpForLevel } from '../data/hero';
 import { PASSIVES } from '../data/passives';
 import { LOOT } from '../data/loot';
@@ -24,7 +24,7 @@ import {
   type GameState,
 } from './state';
 
-/** Stats issues des passifs (p.base). Les stats effectives (p.stats) y ajoutent les bonus temporaires. */
+/** Stats coming from passives (p.base). Effective stats (p.stats) add the timed buffs on top. */
 export function computeStats(p: Player): void {
   let cd = 0;
   let spd = 0;
@@ -64,7 +64,7 @@ export function computeStats(p: Player): void {
   applyBuffs(p, 0);
 }
 
-/** Stats effectives = passifs × bonus temporaires actifs. */
+/** Effective stats = passives × active timed buffs. */
 export function applyBuffs(p: Player, tick: number): void {
   const b = p.base;
   const st = p.stats;
@@ -79,7 +79,7 @@ export function applyBuffs(p: Player, tick: number): void {
   st.speed = b.speed * (p.turboUntil > tick ? 1.5 : 1);
 }
 
-/** Décode un code d'entrée en direction. Renvoie l'amplitude (0, 0.5 ou 1) et écrit la direction dans `out`. */
+/** Decodes an input code into a direction. Returns the magnitude (0, 0.5 or 1) and writes the direction into `out`. */
 export function decodeMove(code: number, out: { x: number; y: number }): number {
   if (code >= 1 && code <= INPUT_DIRS) {
     out.x = DIR_X[code - 1];
@@ -115,11 +115,11 @@ export function updatePlayer(s: GameState, p: Player, code: number): void {
   if (p.stats.regen > 0) healPlayer(s, p, p.stats.regen * DT, false);
 }
 
-/** Déclenche l'objet activable en réserve (pas « zéro », code d'entrée 210). */
+/** Triggers the held active item ("zero-time" step, input code 210). */
 export function useActivable(s: GameState, p: Player): void {
-  const kind = p.activable;
+  const kind = p.activeItem;
   if (kind < 0) return;
-  p.activable = -1;
+  p.activeItem = -1;
   emit(s, EV_ACTIVATE, p.x, p.y, 0, kind, 0, 0, p.index);
   switch (kind) {
     case PK_VACUUM:
@@ -127,7 +127,7 @@ export function useActivable(s: GameState, p: Player): void {
       for (let i = 0; i < s.pickupCount; i++) s.pickups[i].magnet = true;
       break;
     case PK_FREEZE: {
-      // Gel : seulement autour du joueur, et jamais le boss.
+      // Freeze: only around the player, and never the boss.
       const until = s.tick + Math.round(LOOT.freezeSeconds * TICK_RATE);
       const R = LOOT.freezeRadius;
       for (let i = 0; i < s.enemyCount; i++) {
@@ -162,8 +162,8 @@ export function useActivable(s: GameState, p: Player): void {
 }
 
 /**
- * Clone : un double immobile du joueur (même armes, mêmes passifs) qui tire tout seul pendant
- * quelques secondes et attire les ennemis proches. Un seul à la fois : en relancer un le remplace.
+ * Clone: a motionless double of the player (same weapons, same passives) that shoots on its own for
+ * a few seconds and lures nearby enemies. Only one at a time: using another replaces it.
  */
 function spawnClone(s: GameState, p: Player): void {
   let c = s.players.find((q) => q.master === p.index);

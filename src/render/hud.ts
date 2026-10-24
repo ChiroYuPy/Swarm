@@ -1,9 +1,9 @@
 /**
- * HUD dessiné dans le canvas, même police et mêmes tailles que l'interface DOM.
- * Haut gauche : le score et le mode (difficulté, sandbox). Haut centre : la frise des vagues à venir (une
- * ligne : vagues, pauses, portraits des boss) ou la vie du boss en cours, puis le chrono.
- * Bas centre : une seule barre avec PV, XP + niveau, armes, objet activable (Espace) et passifs ;
- * les bonus temporaires actifs juste au-dessus. Les stats détaillées sont dans l'écran de pause.
+ * HUD drawn in the canvas, same font and sizes as the DOM UI.
+ * Top left: the score and the mode (difficulty, sandbox). Top center: the strip of upcoming waves (one
+ * line: waves, pauses, boss portraits) or the current boss's health, then the timer.
+ * Bottom center: a single bar with HP, XP + level, weapons, active item (Space) and passives;
+ * active timed bonuses right above it. Detailed stats are on the pause screen.
  */
 import { ENEMIES } from '../data/enemies';
 import { HERO } from '../data/hero';
@@ -47,26 +47,26 @@ import { iconCanvas } from './icons';
 import { enemyPreview } from './sprites';
 
 export const FONT = '"Chakra Petch", "Trebuchet MS", sans-serif';
-/** Échelle de tailles commune (identique au CSS) */
+/** Shared size scale (same as the CSS) */
 const LABEL = `600 12px ${FONT}`;
 const TEXT = `600 13px ${FONT}`;
 
 export interface HudOptions {
   showFps: boolean;
   fps: number;
-  /** part de la résolution native (résolution dynamique) */
+  /** fraction of the native resolution (dynamic resolution) */
   resolution?: number;
   replay: { speed: number; progress: number } | null;
-  /** meilleur score enregistré dans cette difficulté (0 si aucun) */
+  /** best score recorded in this difficulty (0 if none) */
   best: number;
-  /** partie de bac à sable : pas de record, éventuellement pas de boss */
+  /** sandbox run: no record, possibly no bosses */
   sandbox: SandboxRules | null;
   difficulty: DifficultyDef;
-  /** temps réel (animations) */
+  /** real time (animations) */
   time: number;
 }
 
-// Icônes converties en ImageBitmap : dessiner un canvas source à chaque image force une copie GPU coûteuse.
+// Icons converted to ImageBitmap: drawing a source canvas every frame forces a costly GPU copy.
 const iconCache = new Map<string, CanvasImageSource>();
 function icon(kind: 'weapon' | 'passive' | 'pickup', id: string): CanvasImageSource {
   const key = `${kind}:${id}`;
@@ -102,20 +102,20 @@ function foeIcon(type: number): CanvasImageSource {
   return c;
 }
 
-/** Durée (s d'horloge des vagues) couverte par la frise, et place qu'y prend un boss. */
+/** Duration (wave clock seconds) covered by the strip, and the room a boss takes in it. */
 const STRIP_SECONDS = 190;
 const BOSS_BLOCK = 30;
-/** Bandeau du haut (frise des vagues ou vie du boss) : sa hauteur, et la ligne au milieu. */
+/** Top band (wave strip or boss health): its height, and the line in the middle. */
 const BAND_Y = 6;
 const BAND_H = 42;
 const LINE_Y = BAND_Y + 30;
-/** position de « maintenant » sur la ligne (à gauche : ce qui vient de passer, en fondu) */
+/** position of "now" on the line (to its left: what just passed, fading) */
 const NOW_X = 28;
-/** largeur des fondus gauche et droit */
+/** width of the left and right fades */
 const FADE_L = 26;
 const FADE_R = 60;
 
-/** Couleur d'une vague selon sa difficulté (débit × solidité des ennemis) : du vert au magenta. */
+/** A wave's color by difficulty (spawn rate × enemy toughness): from green to magenta. */
 const WAVE_TIERS: [number, string][] = [
   [0, '#39ff7a'],
   [3, '#b8ff3d'],
@@ -139,19 +139,19 @@ function bandWidth(W: number): number {
   return Math.min(520, W * 0.46);
 }
 
-/** Les (au plus) 3 ennemis principaux d'une vague, du plus fréquent au moins fréquent. */
+/** The (at most) 3 main enemies of a wave, from most to least frequent. */
 function mainFoes(types: number[], weights?: Float64Array): number[] {
   const out = [...types];
   if (weights) out.sort((a, b) => weights[b] - weights[a]);
   return out.slice(0, 3);
 }
 
-/** Calque de la frise : dessinée à part pour que ses bords s'effacent en fondu (sans fond ni cadre). */
+/** Strip layer: drawn separately so its edges fade out (no background or frame). */
 let layer: HTMLCanvasElement | null = null;
 
 /**
- * Frise des vagues : une ligne qui défile vers la gauche. Chaque vague y est un trait à la couleur de
- * sa difficulté, avec ses ennemis principaux au-dessus ; chaque boss, son portrait posé sur la ligne.
+ * Wave strip: a line scrolling to the left. Each wave is a segment in its difficulty color,
+ * with its main enemies above it; each boss is its portrait sitting on the line.
  */
 function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink: boolean): void {
   const bw = bandWidth(W);
@@ -180,7 +180,7 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
   const w = waveInfo(s.clock);
   const toBoss = (w.toBoss + Math.max(0, s.calmUntil - s.tick)) / TICK_RATE;
 
-  // La ligne de fond, fine.
+  // The thin background line.
   g.beginPath();
   g.moveTo(0, ly);
   g.lineTo(bw, ly);
@@ -189,7 +189,7 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
   g.stroke();
 
   const first = Math.max(0, Math.floor(Math.max(0, s.clock - 1) / MIX_TICKS) - 1);
-  // rang du prochain boss (les suivants viennent dans l'ordre) ; chaque boss décale la suite
+  // index of the next boss (the following ones come in order); each boss shifts what follows
   let k = s.bossSpawned;
   let shift = 0;
   for (let j = first; j < first + 7; j++) {
@@ -209,14 +209,14 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
       g.lineWidth = current ? 4 : 3;
       g.stroke();
       g.globalAlpha = 1;
-      // Ses ennemis principaux au-dessus du trait, centrés sur la partie encore à venir.
+      // Its main enemies above the segment, centered on the part still to come.
       const foes = mainFoes(pool ?? mix!.types, mix?.weights);
       const step = 19;
       const span = (foes.length - 1) * step;
       const cx = Math.min(b - span / 2 - 8, Math.max((a + b) / 2, NOW_X + span / 2 + 6));
       foes.forEach((t, i) => g.drawImage(foeIcon(t), cx - span / 2 + i * step - 14, ly - 31, 28, 28));
     }
-    // Boss : à la fin de la pause de la dernière vague du cycle, son portrait sur la ligne.
+    // Boss: at the end of the pause after the cycle's last wave, its portrait on the line.
     if (bossOn && (j + 1) % WAVES.wavesPerBoss === 0 && j + 1 > s.bossSpawned * WAVES.wavesPerBoss) {
       const type = BOSS_TYPES[k % BOSS_TYPES.length];
       const col = ENEMIES[type].color;
@@ -233,13 +233,13 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
       shift += BOSS_BLOCK;
     }
   }
-  // « Maintenant » : un point blanc.
+  // "Now": a white dot.
   g.beginPath();
   g.arc(NOW_X, ly, 3, 0, Math.PI * 2);
   g.fillStyle = '#ffffff';
   g.fill();
 
-  // Fondus : la frise s'efface sur les bords (on gomme le calque, le jeu reste visible derrière).
+  // Fades: the strip fades out at the edges (the layer is erased, the game stays visible behind).
   g.globalCompositeOperation = 'destination-out';
   const gl = g.createLinearGradient(0, 0, FADE_L, 0);
   gl.addColorStop(0, 'rgba(0, 0, 0, 1)');
@@ -255,7 +255,7 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
   ctx.drawImage(layer, x0, BAND_Y, bw, BAND_H);
 }
 
-/** Pendant un boss : son portrait et sa vie, sur la même ligne que la frise. */
+/** During a boss: its portrait and health, on the same line as the strip. */
 function drawBossBand(ctx: Ctx, boss: Enemy, W: number): void {
   const bw = bandWidth(W);
   const x0 = W / 2 - bw / 2;
@@ -296,7 +296,7 @@ export function pad7(n: number): string {
 
 type Ctx = CanvasRenderingContext2D;
 
-/** Texte avec un léger halo de couleur (trait large translucide), réservé aux chiffres importants. */
+/** Text with a light colored halo (wide translucent stroke), for important numbers only. */
 export function glowText(ctx: Ctx, text: string, x: number, y: number, color: string, fill = '#ffffff'): void {
   ctx.strokeStyle = color;
   ctx.globalAlpha = 0.3;
@@ -368,9 +368,9 @@ export function dec(v: number, digits = 2): string {
   return String(Number(v.toFixed(digits))).replace('.', t('format.decimal'));
 }
 
-/** « 45 % » (fr) / "45%" (en). */
+/** "45 %" (fr) / "45%" (en). */
 export const percent = (n: number | string) => t('format.percent', { n });
-/** « 8 s » (fr) / "8s" (en). */
+/** "8 s" (fr) / "8s" (en). */
 export const seconds = (n: number | string) => t('format.seconds', { n });
 
 const rate = (v: number) => percent(Math.round(v * 100));
@@ -445,7 +445,7 @@ const BUFFS: { kind: number; field: 'rageUntil' | 'frenzyUntil' | 'turboUntil' |
   { kind: PK_FEVER, field: 'feverUntil' },
 ];
 
-/** Effets en cours affichés au-dessus de la barre : bonus du joueur, Horloge, clone, Totem en réserve. */
+/** Ongoing effects shown above the bar: player buffs, Clock, clone, stored Totem. */
 function activeEffects(s: GameState, p: Player): { kind: number; left: number; total: number }[] {
   const out = BUFFS.filter((b) => p[b.field] > s.tick).map((b) => ({
     kind: b.kind,
@@ -465,7 +465,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const blink = Math.floor(opt.time * 3) % 2 === 0;
   ctx.textBaseline = 'middle';
 
-  // ---------- Haut centre : bandeau (frise des vagues ou boss), chrono dessous ----------
+  // ---------- Top center: band (wave strip or boss), timer below ----------
   const boss = findBoss(s);
   if (boss) drawBossBand(ctx, boss, W);
   else drawWaveStrip(ctx, s, W, opt, blink);
@@ -474,7 +474,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   ctx.font = `700 28px ${FONT}`;
   glowText(ctx, formatTime(score.survivedSec), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
 
-  // ---------- Haut gauche : le score, et le mode ----------
+  // ---------- Top left: the score, and the mode ----------
   const lx = 18;
   ctx.font = `700 34px ${FONT}`;
   ctx.textAlign = 'left';
@@ -488,10 +488,10 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.fillText(t(opt.sandbox.invincible ? 'hud.sandboxInvincible' : 'hud.sandbox'), lx + ctx.measureText(mode).width + 8, 60);
   }
 
-  // ---------- Bas centre : barre principale (PV, XP, armes, objet, passifs) ----------
-  const ws = 46; // emplacement d'arme
-  const ps = 40; // emplacement de passif
-  const as = 52; // objet activable
+  // ---------- Bottom center: main bar (HP, XP, weapons, item, passives) ----------
+  const ws = 46; // weapon slot
+  const ps = 40; // passive slot
+  const as = 52; // active item
   const gap = 6;
   const sep = 24;
   const weaponsW = MAX_WEAPON_SLOTS * ws + (MAX_WEAPON_SLOTS - 1) * gap;
@@ -503,20 +503,20 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   const top = H - PH - 12;
   panel(ctx, x0, top, PW, PH);
 
-  // PV : la barre la plus visible de l'écran.
+  // HP: the most visible bar on screen.
   const hpF = p.hp / p.stats.maxHp;
   const low = hpF < 0.3;
   const barX = x0 + 50;
   const barW = PW - 50 - 16;
   label(ctx, t('hud.hp'), x0 + 16, top + 22, 'left', COLORS.hp);
   bar(ctx, barX, top + 12, barW, 20, hpF, low && blink ? '#ffffff' : COLORS.hp, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`);
-  // XP + niveau
+  // XP + level
   label(ctx, t('common.lvlCap', { n: p.level }), x0 + 16, top + 46, 'left', COLORS.xp);
   bar(ctx, barX + 8, top + 40, barW - 8, 12, p.xp / p.xpNext, COLORS.xp, '');
 
   const ry = top + 76;
   let x = x0 + 16;
-  // Armes
+  // Weapons
   label(ctx, t('hud.weapons', { n: p.weapons.length, max: MAX_WEAPON_SLOTS }), x, ry - 10);
   for (let i = 0; i < MAX_WEAPON_SLOTS; i++) {
     const sx = x + i * (ws + gap);
@@ -531,15 +531,15 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     } else pips(ctx, sx, ry + ws + 4, ws, w.level, weaponMaxLevel(w.def), def.color);
   }
   x += weaponsW + sep;
-  // Objet activable (Espace), au centre
-  const act = p.activable;
+  // Activable item (Space), in the center
+  const act = p.activeItem;
   const ay = ry - 3;
   slot(ctx, x, ay, as, act >= 0 ? PICKUPS[act].color : null);
   if (act >= 0) ctx.drawImage(icon('pickup', PICKUPS[act].id), x + 4, ay + 4, as - 8, as - 8);
   label(ctx, act >= 0 ? pickupName(PICKUPS[act].id) : t('hud.item'), x + as / 2, ry - 10, 'center', act >= 0 ? PICKUPS[act].color : COLORS.muted);
   label(ctx, t('keys.space'), x + as / 2, ay + as + 8, 'center', act >= 0 ? '#ffffff' : COLORS.muted);
   x += as + sep;
-  // Passifs
+  // Passives
   const py = ry + (ws - ps);
   label(ctx, t('hud.passives', { n: p.passives.length, max: MAX_PASSIVE_SLOTS }), x, ry - 10);
   for (let i = 0; i < MAX_PASSIVE_SLOTS; i++) {
@@ -552,7 +552,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     pips(ctx, sx, py + ps + 4, ps, it.level, 5, def.color);
   }
 
-  // ---------- Bonus temporaires actifs : juste au-dessus de la barre ----------
+  // ---------- Active timed bonuses: right above the bar ----------
   const active = activeEffects(s, p);
   const bs = 40;
   let bx = W / 2 - (active.length * (bs + 8) - 8) / 2;
@@ -572,7 +572,7 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     bx += bs + 8;
   }
 
-  // Relecture
+  // Replay
   if (opt.replay) {
     label(ctx, t('hud.replay', { speed: opt.replay.speed }), W / 2, top - 92, 'center', '#ffe14d');
     bar(ctx, W / 2 - 200, top - 80, 400, 4, opt.replay.progress, '#ffe14d', '');

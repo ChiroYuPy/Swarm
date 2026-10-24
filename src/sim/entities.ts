@@ -1,4 +1,4 @@
-/** Création / suppression d'entités dans les pools. Aucune allocation. */
+/** Entity creation / removal in the pools. No allocation. */
 import { ENEMIES } from '../data/enemies';
 import { MAX_ENEMIES, MAX_GEMS, MAX_PICKUPS, MAX_PROJECTILES, PICKUP_LIFE } from './constants';
 import { BEHAVIOR, ENEMY_BEHAVIOR } from './registry';
@@ -101,7 +101,7 @@ export function gemTier(v: number): number {
   return v < 3 ? 0 : v < 10 ? 1 : v < 40 ? 2 : 3;
 }
 
-/** Au-delà de GEM_MERGE_AT gemmes au sol, une nouvelle gemme rejoint une gemme immobile toute proche. */
+/** Beyond GEM_MERGE_AT gems on the ground, a new gem merges into a nearby idle gem. */
 const GEM_MERGE_AT = 200;
 const GEM_MERGE_R2 = 64 * 64;
 
@@ -119,7 +119,7 @@ export function spawnGem(s: GameState, x: number, y: number, value: number): voi
     }
   }
   if (s.gemCount >= MAX_GEMS) {
-    // Trop de gemmes : on fusionne la valeur dans une gemme existante (choix déterministe).
+    // Too many gems: merge the value into an existing gem (deterministic choice).
     const g = s.gems[s.gemMergeCursor % s.gemCount];
     s.gemMergeCursor++;
     g.value += value;

@@ -1,12 +1,12 @@
 /**
- * Entrées clavier + manette. Produit un code d'entrée de sim (voir sim/inputcodec.ts).
- * On utilise `KeyboardEvent.code` (position physique) : WASD sur QWERTY = ZQSD sur AZERTY.
- * Visée manuelle (facultative) : clic gauche maintenu sur le jeu, ou stick droit de la manette ;
- * sinon les armes visent toutes seules.
+ * Keyboard + gamepad input. Produces a sim input code (see sim/inputcodec.ts).
+ * Uses `KeyboardEvent.code` (physical position): WASD on QWERTY = ZQSD on AZERTY.
+ * Manual aim (optional): left mouse button held on the game, or the gamepad's right stick;
+ * otherwise the weapons aim on their own.
  */
 import { aimDir, encodeMove } from '../sim';
 
-/** Curseur trop près du héros (px) : on garde la dernière direction visée. */
+/** Cursor too close to the hero (px): the last aim direction is kept. */
 const AIM_DEADZONE = 14;
 
 export type UiAction = 'pause' | 'mute' | 'use' | 'confirm' | 'back' | 'left' | 'right' | 'up' | 'down' | 'choice1' | 'choice2' | 'choice3' | 'fps' | 'speed1' | 'speed2' | 'speed4';
@@ -22,7 +22,7 @@ export class InputManager {
   private padY = 0;
   private padButtons: boolean[] = [];
   private padAim = -1;
-  /** clic gauche maintenu sur le jeu : surface visée et position du pointeur */
+  /** left button held on the game: aimed surface and pointer position */
   private aimSurface: Element | null = null;
   private pointerX = 0;
   private pointerY = 0;
@@ -31,15 +31,15 @@ export class InputManager {
 
   constructor(target: Window) {
     target.addEventListener('keydown', (e) => {
-      // Laisse les champs de saisie tranquilles.
+      // Leave text fields alone.
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
         if (e.code === 'Escape') this.fire('back');
         return;
       }
       if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
-      // Entrée sans bouton sélectionné : c'est le jeu qui décide, et le bouton qu'il sélectionne alors
-      // ne doit pas être cliqué dans la foulée par le navigateur.
+      // Enter with no button selected: the game decides, and the button it then selects
+      // must not be clicked right after by the browser.
       if (e.code === 'Enter' && document.activeElement?.tagName !== 'BUTTON') e.preventDefault();
       if (!e.repeat) this.keyAction(e.code);
       this.keys.add(e.code);
@@ -79,12 +79,12 @@ export class InputManager {
         this.fire('mute');
         break;
       case 'Space':
-        // Espace = objet activable uniquement (jamais un choix de level-up par accident).
-        // Dans les menus, le navigateur active déjà le bouton qui a le focus.
+        // Space = active item only (never a level-up choice by accident).
+        // In menus, the browser already activates the focused button.
         this.fire('use');
         break;
       case 'Enter': {
-        // Si un bouton a le focus, le navigateur s'en charge déjà.
+        // If a button has focus, the browser already handles it.
         const ae = document.activeElement;
         if (!ae || ae === document.body || ae.tagName !== 'BUTTON') this.fire('confirm');
         break;
@@ -117,7 +117,7 @@ export class InputManager {
     if (DOWN.includes(code)) this.fire('down');
   }
 
-  /** À appeler une fois par image : lit la manette et déclenche les actions de ses boutons. */
+  /** Call once per frame: reads the gamepad and fires its buttons' actions. */
   poll(): void {
     this.padX = 0;
     this.padY = 0;
@@ -152,7 +152,7 @@ export class InputManager {
     this.padButtons = b;
   }
 
-  /** Vecteur de déplacement courant (clavier prioritaire si utilisé). */
+  /** Current movement vector (keyboard takes priority when used). */
   vector(): { x: number; y: number } {
     let x = 0;
     let y = 0;
@@ -170,8 +170,8 @@ export class InputManager {
   }
 
   /**
-   * Direction visée (0..63, voir sim/inputcodec.ts), ou -1 pour laisser les armes viser seules.
-   * La caméra suit le héros : il est au centre du canvas, on vise du centre vers le curseur.
+   * Aim direction (0..63, see sim/inputcodec.ts), or -1 to let the weapons aim on their own.
+   * The camera follows the hero: he is at the canvas center, so aim from the center to the cursor.
    */
   aim(): number {
     if (this.padAim >= 0) return this.padAim;
@@ -183,7 +183,7 @@ export class InputManager {
     return this.lastAim;
   }
 
-  /** Code d'entrée de sim pour ce pas. */
+  /** Sim input code for this step. */
   sampleCode(): number {
     const v = this.vector();
     return encodeMove(v.x, v.y);

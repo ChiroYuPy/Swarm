@@ -1,14 +1,14 @@
 /**
- * Évolutions : `weapon` (arme de base niveau max) + `with` (passif niveau max) => `result`.
- * L'arme est remplacée par son évolution (même emplacement), le passif est conservé.
- * L'ordre de cette liste sert aussi de priorité quand plusieurs évolutions sont possibles.
- * (Dans le code, une évolution s'appelle encore « fusion ».)
+ * Evolutions: `weapon` (max-level base weapon) + `with` (max-level passive) => `result`.
+ * The weapon is replaced by its evolution (same slot), the passive is kept.
+ * The order of this list is also the priority when several evolutions are possible.
+ * (In the code, an evolution is still called a "fusion".)
  */
 
 export interface FusionDef {
   result: string;
   weapon: string;
-  /** passif requis */
+  /** required passive */
   with: string;
 }
 

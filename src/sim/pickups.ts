@@ -1,4 +1,4 @@
-/** Gemmes d'XP et objets ramassables (bonus instantanés, temporaires, activables, coffre). */
+/** XP gems and pickups (instant bonuses, timed buffs, active items, chest). */
 import { LOOT, PICKUPS } from '../data/loot';
 import { DT, TICK_RATE } from './constants';
 import { removeGem, removePickup } from './entities';
@@ -27,7 +27,7 @@ function nearestAlive(s: GameState, x: number, y: number): { p: Player | null; d
   let best: Player | null = null;
   let bestD = Infinity;
   for (const p of s.players) {
-    if (!p.alive || p.master >= 0) continue; // les clones ne ramassent rien
+    if (!p.alive || p.master >= 0) continue; // clones pick nothing up
     const dx = p.x - x;
     const dy = p.y - y;
     const d = dx * dx + dy * dy;
@@ -102,10 +102,10 @@ function buffTicks(kind: number): number {
 function applyPickup(s: GameState, p: Player, kind: number, x: number, y: number): void {
   emit(s, EV_PICKUP, x, y, 0, kind, 0, 0, p.index);
   if (kind >= PK_FIRST_ACTIVE && kind <= PK_LAST_ACTIVE) {
-    p.activable = kind; // un nouvel activable remplace l'ancien
+    p.activeItem = kind; // a new active item replaces the old one
     return;
   }
-  // Un bonus temporaire déjà actif est prolongé (pas cumulé).
+  // A timed buff that is already active is extended (not stacked).
   const until = (cur: number) => Math.max(cur, s.tick) + buffTicks(kind);
   switch (kind) {
     case PK_HEAL:
@@ -127,7 +127,7 @@ function applyPickup(s: GameState, p: Player, kind: number, x: number, y: number
       p.feverUntil = until(p.feverUntil);
       break;
     case PK_TOTEM:
-      // Un seul Totem à la fois : le suivant se transforme en soin.
+      // Only one Totem at a time: the next one turns into a heal.
       if (p.totem > 0) healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
       else p.totem = 1;
       break;

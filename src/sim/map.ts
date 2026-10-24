@@ -1,7 +1,7 @@
 /**
- * Monde ouvert infini : obstacles géométriques (cercles, hexagones, rectangles orientés) générés
- * à la demande, morceau par morceau, depuis la seed (flux MAP). La génération d'un morceau ne dépend
- * que de (seed, cx, cy) : le cache n'est qu'une optimisation, il ne fait pas partie de l'état.
+ * Infinite open world: geometric obstacles (circles, hexagons, oriented rectangles) generated
+ * on demand, chunk by chunk, from the seed (MAP stream). Generating a chunk only depends
+ * on (seed, cx, cy): the cache is only an optimization, it is not part of the state.
  */
 import { MAP_GEN } from '../data/map';
 import { CHUNK } from './constants';
@@ -16,22 +16,22 @@ export interface Obstacle {
   kind: number;
   x: number;
   y: number;
-  /** rayon englobant (cercle : rayon exact ; hexagone : rayon du sommet) */
+  /** bounding radius (circle: exact radius; hexagon: vertex radius) */
   r: number;
-  /** demi-largeur / demi-hauteur (rectangle) */
+  /** half-width / half-height (rectangle) */
   hw: number;
   hh: number;
-  /** orientation (rectangle et hexagone) */
+  /** orientation (rectangle and hexagon) */
   ca: number;
   sa: number;
-  /** variante de couleur (rendu uniquement) */
+  /** colour variant (rendering only) */
   tint: number;
 }
 
-/** Rayon approché d'un hexagone pour l'évitement (entre l'apothème et le rayon du sommet). */
+/** Approximate hexagon radius for avoidance (between the apothem and the vertex radius). */
 const HEX_COLLIDE = 0.92;
 const SQ3_2 = 0.8660254037844386;
-/** Normales des 6 arêtes de l'hexagone (30° + k·60°), dans son repère. */
+/** Normals of the hexagon's 6 edges (30° + k·60°), in its local frame. */
 const HEX_NC = [SQ3_2, 0, -SQ3_2, -SQ3_2, 0, SQ3_2];
 const HEX_NS = [0.5, 1, 0.5, -0.5, -1, -0.5];
 
@@ -39,7 +39,7 @@ export class WorldMap {
   private cache = new Map<number, Obstacle[]>();
   constructor(readonly seed: number) {}
 
-  /** Obstacles du morceau (cx, cy). */
+  /** Obstacles of chunk (cx, cy). */
   chunk(cx: number, cy: number): Obstacle[] {
     const key = cx * 65536 + cy;
     let c = this.cache.get(key);
@@ -59,7 +59,7 @@ export function generateChunk(seed: number, cx: number, cy: number): Obstacle[] 
   const out: Obstacle[] = [];
   const span = g.chunk - 2 * g.margin;
   for (let i = 0; i < n; i++) {
-    // Toujours le même nombre de tirages par obstacle, qu'il soit gardé ou non.
+    // Always the same number of draws per obstacle, whether it is kept or not.
     const kind = rng.int(3);
     const x = cx * g.chunk + g.margin + rng.next() * span;
     const y = cy * g.chunk + g.margin + rng.next() * span;
@@ -75,7 +75,7 @@ export function generateChunk(seed: number, cx: number, cy: number): Obstacle[] 
     } else if (kind === OB_HEX) {
       o.r = g.hexagon.min + a * (g.hexagon.max - g.hexagon.min);
     } else {
-      // Rectangles : parfois de longs murets fins, parfois des blocs.
+      // Rectangles: sometimes long thin low walls, sometimes blocks.
       o.hw = g.rect.min + a * (g.rect.max - g.rect.min);
       o.hh = b < 0.5 ? g.rect.thinMin + b * 30 : g.rect.min + b * (g.rect.max - g.rect.min) * 0.6;
       o.r = Math.sqrt(o.hw * o.hw + o.hh * o.hh);
@@ -103,11 +103,11 @@ export function generateChunk(seed: number, cx: number, cy: number): Obstacle[] 
   return out;
 }
 
-// Résultat de `penetration` (pas d'allocation) : normale de sortie et profondeur.
+// Result of `penetration` (no allocation): exit normal and depth.
 let PNX = 0;
 let PNY = 0;
 
-/** Profondeur de pénétration du cercle (x, y, r) dans l'obstacle (0 si aucun contact). Écrit la normale dans PNX/PNY. */
+/** Penetration depth of circle (x, y, r) into the obstacle (0 if no contact). Writes the normal into PNX/PNY. */
 function penetration(o: Obstacle, x: number, y: number, r: number): number {
   const dx = x - o.x;
   const dy = y - o.y;
@@ -127,7 +127,7 @@ function penetration(o: Obstacle, x: number, y: number, r: number): number {
     return rr - d;
   }
   if (o.kind === OB_HEX) {
-    // Hexagone exact (sommets à k·60° dans le repère de l'obstacle), comme au rendu.
+    // Exact hexagon (vertices at k·60° in the obstacle's frame), as rendered.
     const d2 = dx * dx + dy * dy;
     const rr = o.r + r;
     if (d2 >= rr * rr) return 0;
@@ -154,7 +154,7 @@ function penetration(o: Obstacle, x: number, y: number, r: number): number {
       ny = ns;
       depth = r - best;
     } else {
-      // Point le plus proche sur l'arête (ou son sommet).
+      // Closest point on the edge (or its vertex).
       const half = o.r * 0.5;
       let u = -lx * ns + ly * nc;
       u = u < -half ? -half : u > half ? half : u;
@@ -176,7 +176,7 @@ function penetration(o: Obstacle, x: number, y: number, r: number): number {
     PNY = nx * o.sa + ny * o.ca;
     return depth;
   }
-  // Rectangle orienté : repère local
+  // Oriented rectangle: local frame
   const lx = dx * o.ca + dy * o.sa;
   const ly = -dx * o.sa + dy * o.ca;
   const qx = lx < -o.hw ? -o.hw : lx > o.hw ? o.hw : lx;
@@ -194,7 +194,7 @@ function penetration(o: Obstacle, x: number, y: number, r: number): number {
     ny = ey / e;
     depth = r - e;
   } else {
-    // Centre à l'intérieur : on sort par la face la plus proche.
+    // Centre inside: exit through the nearest face.
     const px = o.hw - Math.abs(lx);
     const py = o.hh - Math.abs(ly);
     if (px < py) {
@@ -212,7 +212,7 @@ function penetration(o: Obstacle, x: number, y: number, r: number): number {
   return depth;
 }
 
-// Morceaux touchés par une requête (tampon réutilisé, aucune allocation).
+// Chunks touched by a query (reused buffer, no allocation).
 const NEAR: Obstacle[][] = [];
 for (let i = 0; i < 25; i++) NEAR.push([]);
 let nearN = 0;
@@ -225,7 +225,7 @@ function gather(m: WorldMap, x0: number, y0: number, x1: number, y1: number): vo
   for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) if (nearN < NEAR.length) NEAR[nearN++] = m.chunk(cx, cy);
 }
 
-/** Le cercle touche-t-il un obstacle ? */
+/** Does the circle touch an obstacle? */
 export function circleHitsObstacle(m: WorldMap, x: number, y: number, r: number): boolean {
   gather(m, x - r, y - r, x + r, y + r);
   for (let c = 0; c < nearN; c++) {
@@ -236,8 +236,8 @@ export function circleHitsObstacle(m: WorldMap, x: number, y: number, r: number)
 }
 
 /**
- * Déplace un cercle puis le repousse hors des obstacles : on glisse naturellement le long des bords.
- * Renvoie true s'il y a eu contact.
+ * Moves a circle then pushes it out of obstacles: it naturally slides along the edges.
+ * Returns true if there was contact.
  */
 export function moveCircle(m: WorldMap, o: { x: number; y: number }, dx: number, dy: number, r: number): boolean {
   o.x += dx;
@@ -263,7 +263,7 @@ export function moveCircle(m: WorldMap, o: { x: number; y: number }, dx: number,
   return touched;
 }
 
-/** Direction d'esquive conseillée quand un obstacle barre la route (évitement des ennemis). */
+/** Suggested dodge direction when an obstacle blocks the way (enemy avoidance). */
 export const AVOID = { x: 0, y: 0 };
 export function avoidance(m: WorldMap, x: number, y: number, r: number, ux: number, uy: number, look: number): boolean {
   let best = Infinity;
@@ -283,7 +283,7 @@ export function avoidance(m: WorldMap, x: number, y: number, r: number, ux: numb
       if (Math.abs(side) > R) continue;
       if (along < best) {
         best = along;
-        // On contourne par le côté où l'on est déjà décalé.
+        // Go around on the side we are already offset to.
         const sgn = side > 0 ? -1 : 1;
         AVOID.x = -uy * sgn;
         AVOID.y = ux * sgn;
@@ -293,14 +293,14 @@ export function avoidance(m: WorldMap, x: number, y: number, r: number, ux: numb
   return best < Infinity;
 }
 
-/** Le cercle (x, y, r) touche-t-il cet obstacle précis ? */
+/** Does circle (x, y, r) touch this specific obstacle? */
 export function obstacleTouches(o: Obstacle, x: number, y: number, r: number): boolean {
   return penetration(o, x, y, r) > 0;
 }
 
 /**
- * Ligne de vue : un cercle de rayon r peut-il glisser en ligne droite de (x0, y0) à (x1, y1)
- * sans heurter d'obstacle ? (hexagones approchés par un cercle, rectangles exacts)
+ * Line of sight: can a circle of radius r slide in a straight line from (x0, y0) to (x1, y1)
+ * without hitting an obstacle? (hexagons approximated by a circle, exact rectangles)
  */
 export function segmentClear(m: WorldMap, x0: number, y0: number, x1: number, y1: number, r: number): boolean {
   gather(m, Math.min(x0, x1) - r, Math.min(y0, y1) - r, Math.max(x0, x1) + r, Math.max(y0, y1) + r);
@@ -311,7 +311,7 @@ export function segmentClear(m: WorldMap, x0: number, y0: number, x1: number, y1
     const list = NEAR[c];
     for (let i = 0; i < list.length; i++) {
       const o = list[i];
-      // Distance du centre au segment (rejet rapide par le cercle englobant).
+      // Distance from the centre to the segment (quick rejection by the bounding circle).
       const cx = o.x - x0;
       const cy = o.y - y0;
       let t = len2 > 0 ? (cx * sx + cy * sy) / len2 : 0;
@@ -327,7 +327,7 @@ export function segmentClear(m: WorldMap, x0: number, y0: number, x1: number, y1
         if (d2 < R * R) return false;
         continue;
       }
-      // Rectangle orienté : test des dalles dans son repère, boîte élargie de r.
+      // Oriented rectangle: slab test in its frame, box grown by r.
       const ax = x0 - o.x;
       const ay = y0 - o.y;
       const lx0 = ax * o.ca + ay * o.sa;
@@ -372,7 +372,7 @@ export function segmentClear(m: WorldMap, x0: number, y0: number, x1: number, y1
   return true;
 }
 
-/** Point dans un obstacle ? (projectiles) */
+/** Point inside an obstacle? (projectiles) */
 export function pointInObstacle(m: WorldMap, x: number, y: number): boolean {
   return circleHitsObstacle(m, x, y, 0.5);
 }

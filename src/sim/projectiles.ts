@@ -1,4 +1,4 @@
-/** Mise à jour des projectiles : balles, balles ennemies, mines, boomerangs, ondes. */
+/** Projectile update: bullets, enemy bullets, mines, boomerangs, waves. */
 import { DT, MAX_WEAPON_SLOTS, TICK_RATE } from './constants';
 import { LOOT } from '../data/loot';
 import { clearShotsIn } from './shots';
@@ -46,7 +46,7 @@ function addHit(b: Projectile, id: number): void {
 export function updateProjectiles(s: GameState): void {
   for (let i = s.projCount - 1; i >= 0; i--) {
     const b = s.projectiles[i];
-    // Détruit en cours de pas (balle de Tireur abattue, balle du joueur usée sur elle).
+    // Destroyed during the step (Shooter bullet shot down, player bullet spent on it).
     if (b.life <= 0) {
       removeProjectile(s, i);
       continue;
@@ -155,7 +155,7 @@ function enemyBullet(s: GameState, b: Projectile): boolean {
   return false;
 }
 
-/** Flamme au sol (Étoile ricochet) : brûle qui reste dessus, par petites touches (sans invulnérabilité). */
+/** Ground flame (Ricochet star): burns whoever stays on it, in small ticks (no invulnerability). */
 const FIRE_TICK = 10;
 function fire(s: GameState, b: Projectile): void {
   if (s.tick % FIRE_TICK !== 0) return;
@@ -168,7 +168,7 @@ function fire(s: GameState, b: Projectile): void {
   }
 }
 
-/** Balle de Tireur touchée par une balle ou un boomerang du joueur ? (une balle sans perforation s'y use) */
+/** Shooter bullet hit by a player bullet or boomerang? (a non-piercing bullet is spent on it) */
 function hitByShot(s: GameState, b: Projectile): boolean {
   for (let j = 0; j < s.projCount; j++) {
     const o = s.projectiles[j];
@@ -186,7 +186,7 @@ function hitByShot(s: GameState, b: Projectile): boolean {
   return false;
 }
 
-/** Flamme au sol du Souffle du dragon : brûle les ennemis dessus, par petites touches. */
+/** Player's ground fire (Meteor crater, Phoenix trail): burns the enemies on it, in small ticks. */
 function blaze(s: GameState, b: Projectile): void {
   if ((s.tick + b.age) % FIRE_TICK !== 0) return;
   const g = s.grid;
@@ -198,7 +198,7 @@ function blaze(s: GameState, b: Projectile): void {
   }
 }
 
-/** Tourelle : vise l'ennemi le plus proche à portée et tire ; le Bastion lâche aussi des ondes de recul. */
+/** Turret: aims at the nearest enemy in range and shoots; the Bastion also releases knockback waves. */
 function turret(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
   if (!o || !o.alive) return true;
@@ -214,7 +214,7 @@ function turret(s: GameState, b: Projectile): boolean {
       b.vy = dsin(ang);
       const nb = L.burstCount ?? 1;
       const spread = L.spread ?? 0;
-      // Les balles vont juste un peu plus loin que la portée de la tourelle.
+      // Bullets go just a bit further than the turret's range.
       const life = Math.max(1, Math.round((((L.range ?? 320) + 60) / (L.speed ?? 520)) * TICK_RATE));
       for (let k = 0; k < nb; k++) {
         const t = spawnBullet(s, o, b.slot, b.weapon, ang + (k - (nb - 1) / 2) * spread, L, b.x + b.vx * 12, b.y + b.vy * 12);
@@ -233,9 +233,9 @@ function turret(s: GameState, b: Projectile): boolean {
   return false;
 }
 
-/** Disque ricochet : rebondit sur les obstacles, et d'ennemi en ennemi. `a` = rebonds restants. */
+/** Ricochet disc: bounces off obstacles, and from enemy to enemy. `a` = bounces left. */
 function ricochet(s: GameState, b: Projectile): boolean {
-  // Tête chercheuse : vise l'ennemi pas encore touché le plus proche et s'oriente vers lui.
+  // Homing: targets the nearest not-yet-hit enemy and steers toward it.
   const g0 = s.grid;
   if ((b.age & 3) === 1 || !validTarget(s, b)) {
     b.c = g0.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
@@ -270,7 +270,7 @@ function ricochet(s: GameState, b: Projectile): boolean {
     const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
     damageEnemy(s, idx, b.damage, b.owner, (b.vx / sp) * b.knock, (b.vy / sp) * b.knock);
     if (--b.a < 0) return true;
-    // Rebond dévié vers l'ennemi le plus proche pas encore touché (à moitié seulement : il peut le rater).
+    // Bounce deflected toward the nearest not-yet-hit enemy (only halfway: it can miss it).
     const t = g.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
     b.c = t;
     if (t >= 0) {
@@ -281,19 +281,19 @@ function ricochet(s: GameState, b: Projectile): boolean {
   }
   return false;
 }
-/** portée de la tête chercheuse, part de virage par pas en vol, et déviation au rebond sur un ennemi */
+/** homing range, turn share per step in flight, and deflection when bouncing off an enemy */
 const RICOCHET_SEEK = 190;
 const RICOCHET_STEER = 0.06;
 const RICOCHET_BOUNCE = 0.55;
 
-/** La cible suivie (index `c`, id `ty`) est-elle toujours la même et en vie ? */
+/** Is the tracked target (index `c`, id `ty`) still the same one and alive? */
 function validTarget(s: GameState, b: Projectile): boolean {
   if (b.c < 0 || b.c >= s.enemyCount) return false;
   const e = s.enemies[b.c];
   return e.alive && e.id === b.ty;
 }
 
-/** Oriente la vitesse vers (x, y) sans changer sa norme ; `k` = part de virage par pas (0..1). */
+/** Steers the velocity toward (x, y) without changing its magnitude; `k` = turn share per step (0..1). */
 function steer(b: Projectile, x: number, y: number, k: number): void {
   const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
   if (sp < 1e-6) return;
@@ -308,18 +308,18 @@ function steer(b: Projectile, x: number, y: number, k: number): void {
   b.vy = (vy / n) * sp;
 }
 
-/** Arme du joueur `o` qui a créé ce projectile (null si elle a disparu : fusion, échange). */
+/** Weapon of player `o` that created this projectile (null if it is gone: evolution, swap). */
 function ownerWeapon(o: Player, def: number): WeaponInst | null {
   for (const w of o.weapons) if (w.def === def) return w;
   return null;
 }
 
 /**
- * Drone autonome : il part chasser une cible (les gênants d'abord, sauf les kamikazes qui foncent dans le tas),
- * en évitant celles que tes autres drones visent déjà. Il vole comme un avion : il ne tourne qu'en avançant
- * et ne tire que devant lui. Drone : passes de tir, puis il dégage et revient. Escadrille (`orbit`) : il tourne
- * autour de sa cible à distance et lance ses disques chercheurs droit devant. Abattu au contact des ennemis,
- * il réapparaît près de toi. `tx` = ticks de dégagement restants après une passe.
+ * Autonomous drone: it goes hunting a target (nuisances first, except kamikazes which charge into the pack),
+ * avoiding those your other drones already target. It flies like a plane: it only turns while moving forward
+ * and only shoots ahead. Drone: strafing passes, then it breaks away and comes back. Squadron (`orbit`): it circles
+ * its target at a distance and launches its homing discs straight ahead. Shot down on contact with enemies,
+ * it respawns near you. `tx` = break-away ticks left after a pass.
  */
 function droneAgent(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
@@ -334,7 +334,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
   const leashed = lx * lx + ly * ly > DRONE_LEASH * DRONE_LEASH;
   if (leashed) b.c = -1;
   else if (b.age % 30 === 0 || !validTarget(s, b)) {
-    // Les cibles sont cherchées autour de toi, en évitant celles des autres drones.
+    // Targets are searched around you, avoiding the other drones' ones.
     b.c = huntTarget(s, o.x, o.y, range, !L.dive, CLAIMED, claimTargets(s, b));
     if (b.c >= 0) b.ty = s.enemies[b.c].id;
     b.tx = 0;
@@ -347,11 +347,11 @@ function droneAgent(s: GameState, b: Projectile): boolean {
   let want = speed;
   let desired: number;
   if (e && b.tx > 0) {
-    // Dégagement : il s'écarte en biais de sa cible avant de revenir pour une nouvelle passe.
+    // Break-away: it veers off its target at an angle before coming back for a new pass.
     b.tx--;
     desired = heading + (b.d & 1 ? 1 : -1);
   } else if (e && L.orbit) {
-    // Vise un point du cercle autour de la cible, un peu en avant de lui : il tourne autour.
+    // Aims at a point on the circle around the target, slightly ahead of itself: it circles around.
     const keep = (L.attackRange ?? 280) * 0.7;
     const a = datan2(b.y - e.y, b.x - e.x) + (b.d & 1 ? 0.6 : -0.6);
     desired = datan2(e.y + dsin(a) * keep - b.y, e.x + dcos(a) * keep - b.x);
@@ -362,13 +362,13 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     const brk = (L.attackRange ?? 180) * 0.4 + e.r;
     if (!L.dive && ex * ex + ey * ey < brk * brk) b.tx = DRONE_BREAK;
   } else {
-    // Patrouille : il tourne autour de toi.
+    // Patrol: it circles around you.
     const a = b.age * 0.025 + b.d * 1.9;
     desired = datan2(o.y + dsin(a) * 70 - b.y, o.x + dcos(a) * 70 - b.x);
     want = speed * 0.6;
   }
   if (leashed) want = speed * 1.6;
-  // Écart avec tes autres drones : ils ne s'empilent pas au même endroit.
+  // Spacing from your other drones: they do not pile up in the same spot.
   let sx = 0;
   let sy = 0;
   for (let j = 0; j < s.projCount; j++) {
@@ -388,7 +388,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     const dvy = dsin(desired) + sy * 1.5;
     desired = datan2(dvy, dvx);
   }
-  // Virage limité, et jamais à l'arrêt : il doit avancer pour tourner.
+  // Limited turn rate, and never stopped: it must move forward to turn.
   const h = turnToward(heading, desired, (L.turn ?? 3.2) * DT);
   const sp = Math.max(speed * 0.4, sp0 + (want - sp0) * 0.08);
   b.vx = dcos(h) * sp;
@@ -397,7 +397,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
   b.y += b.vy * DT;
 
   if (L.dive) {
-    // Kamikaze : une bombe qui explose au contact, puis il réapparaît près de toi.
+    // Kamikaze: a bomb that explodes on contact, then it respawns near you.
     if (!e) return false;
     const ex = e.x - b.x;
     const ey = e.y - b.y;
@@ -408,7 +408,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     return true;
   }
 
-  // Tir : seulement si la cible est devant lui, à portée (en orbite, ses disques chercheurs la rattrapent).
+  // Shooting: only if the target is ahead of it, in range (when orbiting, its homing discs catch up with it).
   b.a -= 1;
   if (b.a <= 0 && e) {
     const ex = e.x - b.x;
@@ -428,7 +428,7 @@ function droneAgent(s: GameState, b: Projectile): boolean {
     } else b.a = 2;
   }
 
-  // Au contact des ennemis, il s'abîme.
+  // On contact with enemies, it takes damage.
   const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, b.r);
   for (let k = 0; k < n; k++) {
@@ -446,16 +446,16 @@ function droneAgent(s: GameState, b: Projectile): boolean {
   }
   return false;
 }
-/** au-delà de cette distance du joueur, un drone revient */
+/** beyond this distance from the player, a drone comes back */
 const DRONE_LEASH = 650;
-/** durée du dégagement après une passe de tir */
+/** break-away duration after a strafing pass */
 const DRONE_BREAK = 30;
-/** demi-angle du cône de tir, devant le drone */
+/** half-angle of the firing cone, ahead of the drone */
 const DRONE_CONE = 0.3;
-/** distance en dessous de laquelle deux drones s'écartent */
+/** distance below which two drones move apart */
 const DRONE_SPACING = 46;
 
-/** Ids des cibles déjà visées par les autres drones du même joueur. */
+/** Ids of the targets already claimed by the same player's other drones. */
 const CLAIMED = new Int32Array(32);
 function claimTargets(s: GameState, self: Projectile): number {
   let n = 0;
@@ -467,7 +467,7 @@ function claimTargets(s: GameState, self: Projectile): number {
   return n;
 }
 
-/** Obus : vole jusqu'à sa cible et explose (cratère en feu pour un météore). */
+/** Shell: flies to its target and explodes (burning crater for a meteor). */
 function shell(s: GameState, b: Projectile): boolean {
   if (b.age < b.a) {
     const t = b.age / b.a;
@@ -496,9 +496,9 @@ function shell(s: GameState, b: Projectile): boolean {
 }
 
 /**
- * Phénix : un oiseau de feu lancé vers l'ennemi le plus proche, qui file ensuite tout droit à travers la
- * horde sans jamais tourner. Il brûle chaque ennemi touché (au plus une fois par `hitCd`) et laisse une
- * traînée de feu au sol. (vx, vy) = cap.
+ * Phoenix: a firebird launched along the line picked by weapons/phoenix.ts, which then flies straight through
+ * the horde without ever turning. It burns every enemy it touches (at most once per `hitCd`) and leaves a
+ * trail of fire on the ground. (vx, vy) = heading.
  */
 function phoenix(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
@@ -536,7 +536,7 @@ function phoenix(s: GameState, b: Projectile): boolean {
   }
   return false;
 }
-/** une flaque de feu tous les N ticks derrière le Phénix */
+/** one fire puddle every N ticks behind the Phoenix */
 const PHOENIX_TRAIL = 9;
 
 function mine(s: GameState, b: Projectile): boolean {
@@ -586,7 +586,7 @@ function boomerang(s: GameState, b: Projectile): boolean {
     b.y += b.vy * step;
   }
 
-  // Crêpe-rang : sème des mini-crêpes.
+  // Mine boomerang: drops mini mines along the way.
   const L = weaponLevel(b.weapon, 1);
   if (L.dropEvery) {
     b.c -= 1;

@@ -13,7 +13,7 @@ export type Locale = 'fr' | 'en';
 export const LOCALES: readonly Locale[] = ['fr', 'en'];
 export const DEFAULT_LOCALE: Locale = 'fr';
 /** Name of each language, written in that language (language selector). */
-export const LOCALE_NAMES: Record<Locale, string> = { fr: 'Français', en: 'English' };
+export const LOCALE_NAMES: Record<Locale, string> = { fr: fr.common.languageName, en: en.common.languageName };
 /** BCP 47 tag used for Intl formatting (numbers, dates, plural rules). */
 const INTL_TAGS: Record<Locale, string> = { fr: 'fr-FR', en: 'en-US' };
 

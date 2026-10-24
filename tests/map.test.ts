@@ -4,15 +4,15 @@ import { MAP_GEN } from '../src/data/map';
 import { spawnEnemy } from '../src/sim/entities';
 import type { Obstacle } from '../src/sim';
 
-describe('monde infini', () => {
-  it('même seed => mêmes obstacles, morceau par morceau', () => {
+describe('infinite world', () => {
+  it('same seed => same obstacles, chunk by chunk', () => {
     const seed = hashString('CARTE');
     for (const [cx, cy] of [[0, 0], [3, -2], [-17, 40]]) {
       expect(generateChunk(seed, cx, cy)).toEqual(generateChunk(seed, cx, cy));
     }
   });
 
-  it('seeds différentes => mondes différents', () => {
+  it('different seeds => different worlds', () => {
     const a = new WorldMap(hashString('CARTE-1'));
     const b = new WorldMap(hashString('CARTE-2'));
     let diff = 0;
@@ -20,14 +20,14 @@ describe('monde infini', () => {
     expect(diff).toBeGreaterThan(20);
   });
 
-  it('le cache ne change rien : un morceau régénéré est identique', () => {
+  it('the cache changes nothing: a regenerated chunk is identical', () => {
     const m = new WorldMap(hashString('CACHE'));
     const first = JSON.stringify(m.chunk(5, 5));
-    for (let i = 0; i < 1000; i++) m.chunk(i, -i); // force la purge du cache
+    for (let i = 0; i < 1000; i++) m.chunk(i, -i); // forces cache eviction
     expect(JSON.stringify(m.chunk(5, 5))).toBe(first);
   });
 
-  it('il y a des obstacles variés, jamais au départ, jamais collés entre eux', () => {
+  it('obstacles are varied, never at the start, never touching each other', () => {
     const m = new WorldMap(hashString('OBSTACLES'));
     const kinds = new Set<number>();
     let total = 0;
@@ -37,7 +37,7 @@ describe('monde infini', () => {
         total += list.length;
         for (const o of list) {
           kinds.add(o.kind);
-          // Un obstacle reste dans son morceau (pas de recoin piège entre deux morceaux).
+          // An obstacle stays inside its chunk (no trap corner between two chunks).
           expect(o.x - o.r).toBeGreaterThanOrEqual(cx * CHUNK);
           expect(o.x + o.r).toBeLessThanOrEqual((cx + 1) * CHUNK);
           if (o.kind === OB_RECT) expect(o.hw).toBeGreaterThan(0);
@@ -54,7 +54,7 @@ describe('monde infini', () => {
     expect(circleHitsObstacle(m, 0, 0, MAP_GEN.clearRadius - 10)).toBe(false);
   });
 
-  it('le héros ne traverse jamais un obstacle', () => {
+  it('the hero never goes through an obstacle', () => {
     const s = createGame({ seed: 'COLLISION' });
     for (let i = 0; i < 60 * 60; i++) {
       step(s, [s.players[0].offers.length ? 200 : 1 + (Math.floor(i / 200) * 9) % 64]);
@@ -63,7 +63,7 @@ describe('monde infini', () => {
     }
   });
 
-  it("un ennemi caché derrière un obstacle le contourne pour rejoindre le joueur", () => {
+  it('an enemy hidden behind an obstacle walks around it to reach the player', () => {
     const probe = createGame({ seed: 'CONTOURNEMENT' });
     const cases: Obstacle[] = [];
     for (let cx = -4; cx <= 4 && cases.length < 18; cx++)
@@ -71,7 +71,7 @@ describe('monde infini', () => {
     expect(cases.length).toBeGreaterThan(10);
     let tested = 0;
     for (const o of cases) {
-      // Le joueur et l'ennemi de part et d'autre, dans l'axe où l'obstacle est le plus large.
+      // Player and enemy on either side, along the axis where the obstacle is widest.
       const long = o.kind === 2 && o.hw > o.hh;
       const ux = long ? -o.sa : 1;
       const uy = long ? o.ca : 0;
@@ -96,7 +96,7 @@ describe('monde infini', () => {
         if (!me) break;
         if (Math.hypot(me.x - p.x, me.y - p.y) < p.r + me.r + 12) reached = true;
       }
-      expect(reached, `obstacle ${o.kind} en (${o.x | 0}, ${o.y | 0})`).toBe(true);
+      expect(reached, `obstacle ${o.kind} at (${o.x | 0}, ${o.y | 0})`).toBe(true);
       tested++;
     }
     expect(tested).toBeGreaterThan(8);

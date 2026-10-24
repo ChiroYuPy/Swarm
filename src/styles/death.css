@@ -1,6 +1,6 @@
 /* Game over screen: sloped banner, stamp, score; the shared cascade (.reveal) and leaving / back / instant / reduced-motion rules; rank badge. */
 
-/* ---------- Fin de partie : bandeau en pente ---------- */
+/* ---------- End of run: sloped banner ---------- */
 #ui.overlay {
   overflow-x: hidden;
 }
@@ -10,7 +10,7 @@
   position: relative;
   display: flex;
   justify-content: center;
-  /* plus large que l'écran : la pente ne laisse pas voir les extrémités */
+  /* wider than the screen: the slope does not show the ends */
   width: 130vw;
   margin: 18px 0 6px;
   padding: 22px 0 20px;
@@ -42,7 +42,7 @@
     inset 0 0 22px var(--bg-glow);
   animation: band-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-/* reflet qui balaie le bandeau une fois posé */
+/* shine sweeping across the banner once in place */
 .banner-band::after {
   content: '';
   position: absolute;
@@ -58,7 +58,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  /* le texte part du côté opposé, une fois le bandeau presque posé */
+  /* the text starts from the opposite side, once the banner is almost in place */
   animation: content-in 0.7s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes band-in {
@@ -107,7 +107,7 @@ h2.go {
     transform: translateY(-50%) rotate(9deg) scale(2.4);
   }
 }
-/* Arrivée en cascade : chaque bloc monte à son tour (--i), une fois le bandeau passé. */
+/* Cascading entrance: each block rises in turn (--i), once the banner has passed. */
 .reveal {
   animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: calc(0.22s + var(--i, 0) * 70ms);
@@ -122,22 +122,22 @@ h2.go {
     transform: translateY(14px);
   }
 }
-/* Sortie : tout l'écran file vers la droite, le bandeau en tête. */
+/* Exit: the whole screen flies off to the right, the banner first. */
 .screen-death.leaving .banner-band {
   animation: band-out 0.5s var(--ease-io) forwards;
 }
 .screen-death.leaving .stamp {
   animation: fade-out 0.15s ease-in forwards;
-  /* son délai d'entrée est posé en ligne par ui.ts */
+  /* its entrance delay is set inline by ui/screens/death.ts */
   animation-delay: 0s !important;
 }
 .screen.leaving .reveal,
 .screen.leaving .head h2,
 .screen.leaving .head .line {
-  /* déjà arrivés : on fige leur état final pendant que l'écran file */
+  /* already arrived: freeze their final state while the screen flies off */
   animation: none;
 }
-/* Retour d'un sous-écran, ou autre onglet du même écran : tout est déjà en place. */
+/* Back from a sub-screen, or another tab of the same screen: everything is already in place. */
 .screen.enter-back .reveal,
 .screen.enter-back .head h2,
 .screen.enter-back .head .line,
@@ -151,7 +151,7 @@ h2.go {
     transform: translateX(105%);
   }
 }
-/* Écran posé d'emblée (pause automatique) : aucune animation, ni d'entrée ni de fond. */
+/* Screen shown right away (automatic pause): no animation, neither entrance nor backdrop. */
 .screen.instant,
 .screen.instant *,
 .screen.instant *::before,
@@ -202,7 +202,7 @@ h2.go {
   text-shadow: 0 0 16px rgba(255, 225, 77, 0.45);
   font-variant-numeric: tabular-nums;
 }
-/* Rang de la partie : une ligne de texte, pas une pastille. */
+/* Run rank: a line of text, not a badge. */
 .badge {
   font-size: var(--fs-s);
   font-weight: 600;

@@ -22,7 +22,7 @@ import { damageEnemy } from '../src/sim/combat';
 import { addXp } from '../src/sim/player';
 import { defaultSandbox } from '../src/storage/storage';
 
-/** Partie vide (aucune apparition automatique) avec l'équipement voulu. */
+/** Empty game (no automatic spawns) with the requested gear. */
 function arena(weapons: { id: string; level: number }[] = []): GameState {
   return createGame({ seed: 'OBJETS', sandbox: { ...defaultSandbox().rules, invincible: false, enemyMul: 0, bosses: false, weapons } });
 }
@@ -36,12 +36,12 @@ function run(s: GameState, ticks: number, code = 0) {
 }
 
 function use(s: GameState, kind: number) {
-  s.players[0].activable = kind;
+  s.players[0].activeItem = kind;
   step(s, [INPUT_USE]);
 }
 
-describe('balles de Tireur cassables', () => {
-  it('le Tireur tire des balles cassables, le boss non', () => {
+describe('breakable Shooter bullets', () => {
+  it('the Shooter fires breakable bullets, the boss does not', () => {
     const s = arena();
     put(s, 'shooter', 300, 0);
     run(s, 4 * TICK_RATE);
@@ -50,7 +50,7 @@ describe('balles de Tireur cassables', () => {
     expect(shots.every((b) => b.a === 1)).toBe(true);
   });
 
-  it('une aura détruit les balles avant qu’elles touchent', () => {
+  it('an aura destroys bullets before they hit', () => {
     const withAura = arena([{ id: 'force_field', level: 5 }]);
     const without = arena();
     for (const s of [withAura, without]) put(s, 'shooter', 320, 0, 100);
@@ -62,8 +62,8 @@ describe('balles de Tireur cassables', () => {
   });
 });
 
-describe('Gel et Horloge', () => {
-  it('Gel : fige les ennemis proches seulement, ils éclatent en chaîne', () => {
+describe('Freeze and Clock', () => {
+  it('Freeze: freezes nearby enemies only, and they shatter in a chain', () => {
     const s = arena();
     const near = [0, 1, 2, 3, 4].map((k) => put(s, 'hunter', 120 + k * 30, 0));
     const far = put(s, 'hunter', 900, 0);
@@ -72,15 +72,15 @@ describe('Gel et Horloge', () => {
     expect(far.frozenUntil).toBe(0);
     const x0 = near[2].x;
     run(s, 30);
-    expect(near[2].x).toBe(x0); // figé
-    // On en tue un seul : les éclats emportent toute la rangée gelée.
+    expect(near[2].x).toBe(x0); // frozen
+    // Kill just one: the shards take out the whole frozen row.
     damageEnemy(s, s.enemies.indexOf(near[0]), 1000, 0, 0, 0);
     run(s, 1);
     expect(near.every((e) => !e.alive)).toBe(true);
     expect(far.alive).toBe(true);
   });
 
-  it('Horloge : les ennemis avancent environ 3× moins vite', () => {
+  it('Clock: enemies move about 3x slower', () => {
     const a = arena();
     const b = arena();
     const ea = put(a, 'hunter', 500, 0, 50);
@@ -95,8 +95,8 @@ describe('Gel et Horloge', () => {
   });
 });
 
-describe('Totem, Clone, Fièvre', () => {
-  it('Totem : ramène une fois le joueur à 50 % de PV', () => {
+describe('Totem, Clone, Fever', () => {
+  it('Totem: brings the player back to 50% HP, once', () => {
     const s = arena();
     const p = s.players[0];
     spawnPickup(s, PK_TOTEM, p.x, p.y);
@@ -110,13 +110,13 @@ describe('Totem, Clone, Fièvre', () => {
     expect(p.hp).toBeGreaterThan(p.stats.maxHp * 0.4);
   });
 
-  it('Clone : tire pour le joueur, ne ramasse rien, disparaît à l’heure', () => {
+  it('Clone: shoots for the player, picks up nothing, disappears on time', () => {
     const s = arena([{ id: 'blaster', level: 5 }]);
     use(s, PK_CLONE);
     const c = s.players[1];
     expect(c.master).toBe(0);
     expect(c.weapons.length).toBe(1);
-    // Le joueur part loin : seuls les tirs du clone peuvent tuer cet ennemi.
+    // The player walks away: only the clone's shots can kill this enemy.
     for (let i = 0; i < 90; i++) step(s, [1]);
     put(s, 'hunter', c.x + 120, c.y, 1);
     run(s, 2 * TICK_RATE);
@@ -126,11 +126,11 @@ describe('Totem, Clone, Fièvre', () => {
     run(s, LOOT.cloneSeconds * TICK_RATE);
     expect(c.alive).toBe(false);
     expect(s.over).toBe(false);
-    // L'état avec un clone se sauvegarde et se restaure à l'identique.
+    // A state with a clone serializes and restores identically.
     expect(hashState(deserializeState(serializeState(s)))).toBe(hashState(s));
   });
 
-  it('Fièvre d’XP : XP doublée', () => {
+  it('XP Fever: doubled XP', () => {
     const s = arena();
     const p = s.players[0];
     p.xpNext = 1000;

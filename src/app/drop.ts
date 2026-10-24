@@ -2,7 +2,7 @@
 import type { Player } from '../sim';
 import type { Effects } from '../render/effects';
 
-/** caméra au début de la chute (fraction du zoom normal) */
+/** camera zoom at the start of the fall (fraction of the normal zoom) */
 const DROP_ZOOM = 0.28;
 
 /** Camera zoom: from high above, diving faster and faster onto the hero. `drop` = fall progress (0 → 1), -1 outside the fall. */

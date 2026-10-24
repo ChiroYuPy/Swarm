@@ -1,7 +1,7 @@
 /**
- * Icônes procédurales (armes, bonus, objets) au style « tube néon » :
- * un halo large translucide, un trait de couleur, puis un fin cœur blanc qui les rend lisibles même petites.
- * Chaque icône est un pictogramme simple et unique, dessiné dans un carré de côté `size` centré en (cx, cy).
+ * Procedural icons (weapons, passives, pickups) in "neon tube" style:
+ * a wide translucent halo, a colored stroke, then a thin white core that keeps them readable even when small.
+ * Each icon is a simple, unique pictogram, drawn in a square of side `size` centered on (cx, cy).
  */
 import { ALL_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
@@ -32,7 +32,7 @@ type PickupPainter = (a: PickupArgs) => void;
 
 const TAU = Math.PI * 2;
 
-/** Trace le chemin courant façon tube néon. `fill` : opacité du remplissage coloré (0 = aucun). */
+/** Strokes the current path as a neon tube. `fill`: opacity of the colored fill (0 = none). */
 export function neon(ctx: Ctx, color: string, lw: number, fill = 0, halo = true): void {
   if (fill > 0) {
     ctx.fillStyle = color;
@@ -55,7 +55,7 @@ export function neon(ctx: Ctx, color: string, lw: number, fill = 0, halo = true)
   ctx.globalAlpha = 1;
 }
 
-/** Remplissage plein lumineux (cœur blanc + halo de couleur). */
+/** Bright solid fill (white core + colored halo). */
 function solid(ctx: Ctx, color: string, lw: number): void {
   ctx.fillStyle = color;
   ctx.fill();
@@ -138,7 +138,7 @@ const paintAura: IconPainter = ({ ctx, r, c, lw, id }) => {
   neon(ctx, c, lw * 0.8, 0.18);
   ctx.beginPath();
   if (id === 'vampire_field') {
-    // Croix de soin au centre
+    // Heal cross in the center
     const k = r * 0.13;
     ctx.rect(-k, -k * 2.6, k * 2, k * 5.2);
     ctx.rect(-k * 2.6, -k, k * 5.2, k * 2);
@@ -178,7 +178,7 @@ const paintWaves: IconPainter = ({ ctx, r, c, lw, id }) => {
 };
 const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
   if (id === 'scythe') {
-    // Lame courbe sur un manche
+    // Curved blade on a handle
     ctx.moveTo(-r * 0.55, r * 0.85);
     ctx.lineTo(r * 0.15, -r * 0.55);
     neon(ctx, '#ffffff', lw * 0.8);
@@ -188,7 +188,7 @@ const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
     ctx.quadraticCurveTo(-r * 0.3, -r * 0.62, r * 0.05, -r * 0.35);
     neon(ctx, c, lw, 0.35);
   } else {
-    // Manche avec pommeau, lanière qui fait une boucle puis se tend en s'affinant, claquement au bout.
+    // Handle with a pommel, a lash that loops then stretches out thinner, a crack at the tip.
     ctx.moveTo(-r * 0.92, r * 0.9);
     ctx.lineTo(-r * 0.5, r * 0.48);
     neon(ctx, '#ffffff', lw * 1.5);
@@ -196,7 +196,7 @@ const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
     ctx.arc(-r * 0.92, r * 0.9, r * 0.08, 0, TAU);
     solid(ctx, '#ffffff', lw * 0.4);
     const lash: [number, number, number, number, number, number, number][] = [
-      // c1x, c1y, c2x, c2y, x, y, épaisseur
+      // c1x, c1y, c2x, c2y, x, y, thickness
       [-r * 0.1, r * 0.4, r * 0.55, r * 0.45, r * 0.48, r * 0.1, 1.1],
       [r * 0.42, -r * 0.62, -r * 0.55, -r * 0.6, -r * 0.32, -r * 0.2, 0.85],
       [-r * 0.15, r * 0.05, r * 0.35, -r * 0.5, r * 0.82, -r * 0.62, 0.6],
@@ -211,7 +211,7 @@ const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
       px = x;
       py = y;
     }
-    // Claquement : une étincelle à 4 branches
+    // Crack: a 4-pointed spark
     ctx.beginPath();
     const sx = r * 0.82;
     const sy = -r * 0.62;
@@ -225,7 +225,7 @@ const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
 };
 const paintTurret: IconPainter = ({ ctx, r, c, lw, id }) => {
   const big = id === 'bastion';
-  // Trépied
+  // Tripod
   ctx.moveTo(0, r * 0.25);
   ctx.lineTo(-r * 0.6, r * 0.9);
   ctx.moveTo(0, r * 0.25);
@@ -233,12 +233,12 @@ const paintTurret: IconPainter = ({ ctx, r, c, lw, id }) => {
   ctx.moveTo(0, r * 0.25);
   ctx.lineTo(0, r * 0.9);
   neon(ctx, c, lw * 0.8);
-  // Dôme
+  // Dome
   ctx.beginPath();
   ctx.arc(-r * 0.05, r * 0.2, r * (big ? 0.48 : 0.4), Math.PI, 0);
   ctx.closePath();
   neon(ctx, c, lw, 0.3);
-  // Canon(s), pointés vers le haut à droite
+  // Barrel(s), pointing to the top right
   ctx.beginPath();
   const offs = big ? [-0.14, 0.14] : [0];
   for (const o of offs) {
@@ -259,7 +259,7 @@ function paintWeaponFallback({ ctx, r, c, lw }: IconArgs): void {
 /** Weapon icons by weapon id (tests/icons.test.ts checks the keys against ALL_WEAPONS). */
 export const WEAPON_PAINTERS: Record<string, IconPainter> = {
   blaster: ({ ctx, r, c, lw }) => {
-    // Projectile en capsule + traînées de vitesse
+    // Capsule projectile + speed trails
     ctx.moveTo(-r * 0.05, -r * 0.22);
     ctx.lineTo(r * 0.5, -r * 0.22);
     ctx.arc(r * 0.5, 0, r * 0.22, -Math.PI / 2, Math.PI / 2);
@@ -276,7 +276,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.7);
   },
   spiral: ({ ctx, r, c, lw }) => {
-    // Spirale + trois projectiles
+    // Spiral + three projectiles
     for (let t = 0; t <= 1.001; t += 0.04) {
       const a = t * TAU * 1.6;
       const d = r * (0.08 + 0.7 * t);
@@ -327,7 +327,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
   whip: paintLash,
   scythe: paintLash,
   flamethrower: ({ ctx, r, c, lw }) => {
-    // Flamme
+    // Flame
     ctx.moveTo(0, r * 0.85);
     ctx.bezierCurveTo(-r * 0.75, r * 0.5, -r * 0.3, -r * 0.2, 0, -r * 0.9);
     ctx.bezierCurveTo(r * 0.25, -r * 0.35, r * 0.75, r * 0.2, 0, r * 0.85);
@@ -339,7 +339,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     solid(ctx, '#fff1b8', lw * 0.4);
   },
   fire_tornado: ({ ctx, r, c, lw }) => {
-    // Trois jets en tourbillon autour d'un point
+    // Three jets swirling around a point
     for (let k = 0; k < 3; k++) {
       const a0 = (k * TAU) / 3;
       ctx.moveTo(Math.cos(a0) * r * 0.2, Math.sin(a0) * r * 0.2);
@@ -356,7 +356,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     solid(ctx, '#fff1b8', lw * 0.5);
   },
   phoenix: ({ ctx, r, c, lw }) => {
-    // Oiseau de feu, ailes déployées
+    // Fire bird, wings spread
     ctx.moveTo(0, -r * 0.55);
     ctx.quadraticCurveTo(-r * 0.5, -r * 0.75, -r * 0.95, -r * 0.2);
     ctx.quadraticCurveTo(-r * 0.45, -r * 0.2, -r * 0.15, r * 0.05);
@@ -381,7 +381,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
   turret: paintTurret,
   bastion: paintTurret,
   drone: ({ ctx, r, c, lw }) => {
-    // Quadricoptère vu de dessus : bras en X, quatre rotors, un corps avec son œil vers l'avant.
+    // Quadcopter seen from above: X arms, four rotors, a body with its eye facing forward.
     const arm = r * 0.58;
     for (const [sx, sy] of [
       [1, 1],
@@ -404,7 +404,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
       ctx.arc(sx * arm, sy * arm, r * 0.3, 0, TAU);
     }
     neon(ctx, c, lw * 0.75, 0.18);
-    // Pales (traits fins en travers des rotors)
+    // Blades (thin strokes across the rotors)
     ctx.beginPath();
     for (const [sx, sy] of [
       [1, 1],
@@ -428,7 +428,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     solid(ctx, '#ffffff', lw * 0.4);
   },
   squadron: ({ ctx, r, c, lw }) => {
-    // Trois drones en orbite autour d'une cible, qui lancent un disque.
+    // Three drones orbiting a target, launching a disc.
     ctx.arc(0, 0, r * 0.62, 0, TAU);
     ctx.setLineDash([lw, lw * 1.8]);
     neon(ctx, c, lw * 0.5, 0, false);
@@ -441,7 +441,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
       const a = -Math.PI / 2 + (k * TAU) / 3;
       const x = Math.cos(a) * r * 0.62;
       const y = Math.sin(a) * r * 0.62;
-      // flèche tangente (sens de rotation)
+      // tangent arrow (rotation direction)
       const tx = -Math.sin(a);
       const ty = Math.cos(a);
       const L = r * 0.26;
@@ -454,7 +454,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.7, 0.45);
   },
   kamikaze_drones: ({ ctx, r, c, lw }) => {
-    // Flèche qui pique sur une explosion
+    // Arrow diving onto an explosion
     ctx.moveTo(-r * 0.8, -r * 0.8);
     ctx.lineTo(-r * 0.05, -r * 0.35);
     ctx.lineTo(-r * 0.35, -r * 0.05);
@@ -473,7 +473,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, '#ffd23a', lw * 0.8, 0.35);
   },
   mortar: ({ ctx, r, c, lw }) => {
-    // Tube incliné + obus en cloche
+    // Tilted tube + arcing shell
     ctx.moveTo(-r * 0.75, r * 0.85);
     ctx.lineTo(-r * 0.25, r * 0.15);
     ctx.moveTo(-r * 0.45, r * 0.95);
@@ -493,7 +493,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.6);
   },
   meteors: ({ ctx, r, c, lw }) => {
-    // Deux météores en biais avec leurs traînées
+    // Two slanted meteors with their trails
     for (const [mx, my, k] of [
       [r * 0.35, r * 0.35, 1],
       [-r * 0.35, -r * 0.05, 0.65],
@@ -509,7 +509,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     solid(ctx, c, lw * 0.6);
   },
   ricochet: ({ ctx, r, c, lw }) => {
-    // Trajet qui rebondit sur deux impacts, puis le disque-scie qui file.
+    // Path bouncing off two impacts, then the saw disc flying off.
     const hits: [number, number][] = [
       [-r * 0.6, -r * 0.05],
       [-r * 0.05, r * 0.62],
@@ -530,7 +530,7 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
       }
     }
     neon(ctx, '#ffffff', lw * 0.45, 0, false);
-    // Disque-scie : 8 dents
+    // Saw disc: 8 teeth
     const dx = r * 0.45;
     const dy = -r * 0.38;
     ctx.beginPath();
@@ -574,7 +574,7 @@ function paintPassiveFallback({ ctx, r, c, lw }: IconArgs): void {
 /** Passive icons by passive id (tests/icons.test.ts checks the keys against PASSIVES). */
 export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
   overclock: ({ ctx, r, c, lw }) => {
-    // Chronomètre : recharge plus rapide
+    // Stopwatch: faster cooldown
     ctx.arc(0, r * 0.1, r * 0.7, 0, TAU);
     neon(ctx, c, lw, 0.15);
     ctx.beginPath();
@@ -587,7 +587,7 @@ export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.8);
   },
   thrusters: ({ ctx, r, c, lw }) => {
-    // Double chevron : vitesse
+    // Double chevron: speed
     for (const ox of [-0.38, 0.22]) {
       ctx.moveTo(r * (ox - 0.25), -r * 0.6);
       ctx.lineTo(r * (ox + 0.3), 0);
@@ -607,7 +607,7 @@ export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
     solid(ctx, '#ffffff', lw * 0.5);
   },
   might: ({ ctx, r, c, lw }) => {
-    // Épée : dégâts
+    // Sword: damage
     ctx.moveTo(r * 0.75, -r * 0.75);
     ctx.lineTo(-r * 0.25, r * 0.25);
     neon(ctx, c, lw * 1.4);
@@ -619,7 +619,7 @@ export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw);
   },
   amplifier: ({ ctx, r, c, lw }) => {
-    // Quatre flèches vers l'extérieur : zone
+    // Four outward arrows: area
     ctx.rect(-r * 0.18, -r * 0.18, r * 0.36, r * 0.36);
     neon(ctx, c, lw * 0.7, 0.4);
     ctx.beginPath();
@@ -636,7 +636,7 @@ export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.9);
   },
   vitality: ({ ctx, r, c, lw }) => {
-    // Cœur : vitalité
+    // Heart: vitality
     ctx.moveTo(0, r * 0.75);
     ctx.bezierCurveTo(-r * 1.05, 0, -r * 0.55, -r * 0.85, 0, -r * 0.35);
     ctx.bezierCurveTo(r * 0.55, -r * 0.85, r * 1.05, 0, 0, r * 0.75);
@@ -652,7 +652,7 @@ export const PASSIVE_PAINTERS: Record<string, IconPainter> = {
     neon(ctx, c, lw * 0.6);
   },
   luck: ({ ctx, r, c, lw }) => {
-    // Trèfle à quatre feuilles
+    // Four-leaf clover
     for (let k = 0; k < 4; k++) {
       const a = Math.PI / 4 + (k * Math.PI) / 2;
       const x = Math.cos(a) * r * 0.32;
@@ -722,7 +722,7 @@ export type PickupIcon =
   | 'eradicate'
   | 'chest';
 
-/** Familles d'objets : un cadre différent les rend reconnaissables d'un coup d'œil. */
+/** Pickup families: a different frame makes them recognizable at a glance. */
 const KIND_FAMILY: Record<PickupKind, 'bonus' | 'active' | 'relic' | 'chest'> = {
   instant: 'bonus',
   timed: 'bonus',
@@ -752,7 +752,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, c, lw * 0.8, 0.6);
   },
   rage: ({ ctx, q, c, lw }) => {
-    // Flamme
+    // Flame
     ctx.moveTo(0, -q);
     ctx.quadraticCurveTo(q * 0.9, -q * 0.1, q * 0.55, q * 0.55);
     ctx.quadraticCurveTo(q * 0.3, q * 0.95, 0, q * 0.9);
@@ -762,7 +762,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, c, lw * 0.8, 0.4);
   },
   frenzy: ({ ctx, q, c, lw }) => {
-    // Flèches circulaires : recharge accélérée
+    // Circular arrows: faster cooldown
     ctx.arc(0, 0, q * 0.7, -2.6, 0.2);
     ctx.moveTo(q * 0.7 + q * 0.3, -q * 0.05);
     ctx.lineTo(q * 0.69, q * 0.15);
@@ -784,7 +784,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, c, lw * 0.9, 0.3);
   },
   fever: ({ ctx, q, c, lw }) => {
-    // Gemme d'XP surmontée d'une flèche montante
+    // XP gem topped by a rising arrow
     ctx.moveTo(0, -q * 0.15);
     ctx.lineTo(q * 0.5, q * 0.35);
     ctx.lineTo(0, q * 0.85);
@@ -800,7 +800,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, c, lw * 0.8);
   },
   totem: ({ ctx, q, c, lw }) => {
-    // Ankh : boucle, tige et barre, le symbole de la vie qui revient
+    // Ankh: loop, stem and bar, the symbol of returning life
     ctx.ellipse(0, -q * 0.48, q * 0.3, q * 0.4, 0, 0, TAU);
     ctx.moveTo(0, -q * 0.08);
     ctx.lineTo(0, q * 0.95);
@@ -824,7 +824,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, c, lw * 0.8);
   },
   clone: ({ ctx, q, c, lw }) => {
-    // Deux octogones décalés : le héros et son double
+    // Two offset octagons: the hero and their double
     for (const [ox, oy] of [
       [-q * 0.25, -q * 0.2],
       [q * 0.25, q * 0.2],
@@ -860,7 +860,7 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
     neon(ctx, '#ffffff', lw * 0.6);
   },
   eradicate: ({ ctx, q, c, lw }) => {
-    // Éclat d'explosion à 8 branches
+    // 8-pointed explosion burst
     for (let i = 0; i < 16; i++) {
       const a = -Math.PI / 2 + (i * Math.PI) / 8;
       const d = i % 2 ? q * 0.38 : q * 0.95;
@@ -882,9 +882,9 @@ export const PICKUP_PAINTERS: Record<PickupIcon, PickupPainter> = {
 };
 
 /**
- * Objets ramassables (monde, HUD, codex).
- * Bonus (soin et temporaires) dans un cercle, activables dans un losange, coffre sans cadre.
- * `framed = false` : pictogramme seul (HUD).
+ * Pickups (world, HUD, codex).
+ * Bonuses (heal and timed) in a circle, active items in a diamond, relics in a hexagon, chest unframed.
+ * `framed = false`: pictogram only (HUD).
  */
 export function drawPickupIcon(ctx: Ctx, kind: PickupIcon, cx: number, cy: number, size: number, framed = true): void {
   const r = size / 2;
@@ -900,7 +900,7 @@ export function drawPickupIcon(ctx: Ctx, kind: PickupIcon, cx: number, cy: numbe
     ctx.beginPath();
     if (fam === 'bonus') ctx.arc(0, 0, r * 0.95, 0, TAU);
     else if (fam === 'relic') {
-      // Relique : hexagone (ni cercle de bonus, ni losange d'activable)
+      // Relic: hexagon (neither a bonus circle nor an active-item diamond)
       for (let k = 0; k < 6; k++) {
         const a = -Math.PI / 2 + (k * Math.PI) / 3;
         if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
@@ -935,7 +935,7 @@ function makeCanvas(size: number): [HTMLCanvasElement, Ctx] {
   return [cv, ctx];
 }
 
-/** Crée un petit canvas d'icône pour l'interface DOM. */
+/** Creates a small icon canvas for the DOM UI. */
 export function iconCanvas(kind: 'weapon' | 'passive' | 'pickup', id: string, size: number): HTMLCanvasElement {
   const [cv, ctx] = makeCanvas(size);
   if (kind === 'weapon') drawWeaponIcon(ctx, id, size / 2, size / 2, size * 0.78);

@@ -16,8 +16,8 @@ import type { BuildInfo, RunInfo } from '../types';
 import type { UI } from '../ui';
 
 /**
- * Équipement détaillé (pause) : niveau en pastilles, vrais chiffres, et où en est chaque évolution
- * (prête au prochain level-up, ou le passif qu'il lui manque).
+ * Detailed gear (pause): level as pips, real numbers, and where each evolution stands
+ * (ready at the next level-up, or the passive it still needs).
  */
 function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
   const owned = new Map(b.passives.map((x) => [x.id, x.level]));
@@ -54,8 +54,8 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
 
 // ---------- Pause ----------
 /**
- * Résumé de la partie en cours, au style de la fin de partie : chiffres, équipement détaillé, stats.
- * `instant` : pause automatique (fenêtre quittée), l'écran est déjà en place au retour.
+ * Summary of the current run, in the end-of-run style: figures, detailed gear, stats.
+ * `instant`: automatic pause (window left), the screen is already in place on return.
  */
 export function showPause(ui: UI, build: BuildInfo, run: RunInfo, instant = false): void {
   const r = run.record;

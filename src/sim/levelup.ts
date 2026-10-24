@@ -1,10 +1,10 @@
 /**
- * Propositions de level-up, application des choix, fusions.
+ * Level-up offers, applying choices, evolutions.
  *
- * Reproductibilité : pour le niveau L, on mélange l'univers fixe des objets (8 armes + 6 passifs)
- * avec un PRNG dérivé de (seed, LEVELUP, L). Cet ordre est IDENTIQUE pour tous les joueurs d'une seed ;
- * on garde ensuite les 3 premières offres valides pour le build du joueur. Deux joueurs au même build
- * voient donc exactement les mêmes propositions.
+ * Reproducibility: for level L, the fixed universe of items (all base weapons + passives) is shuffled
+ * with a PRNG derived from (seed, LEVELUP, L). This order is IDENTICAL for all players of a seed;
+ * then the first 3 offers valid for the player's build are kept. Two players with the same build
+ * therefore see exactly the same offers.
  */
 import { ALL_WEAPONS, BASE_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
@@ -20,7 +20,7 @@ import {
   EV_FUSION,
   OFFER_FUSION,
   OFFER_PASSIVE,
-  OFFER_PIZZA,
+  OFFER_HEAL,
   OFFER_SWAP,
   OFFER_WEAPON,
   PassiveInst,
@@ -42,7 +42,7 @@ const UNIVERSE: UniverseItem[] = [
   ...PASSIVES.map((p, i) => ({ kind: OFFER_PASSIVE, id: i, weight: p.weight ?? 0.85 })),
 ];
 
-/** Ordre de proposition pour un niveau donné : ne dépend que de (seed, niveau). */
+/** Offer order for a given level: only depends on (seed, level). */
 export function offerOrder(seed: number, level: number): number[] {
   const rng = new Rng(deriveSeed(seed, STREAM.LEVELUP, level));
   const remaining = UNIVERSE.map((_, i) => i);
@@ -86,7 +86,7 @@ function makeOffer(p: Player, u: UniverseItem): Offer | null {
   return p.passives.length < MAX_PASSIVE_SLOTS ? { kind: u.kind, id: u.id, toLevel: 1 } : null;
 }
 
-/** Index des évolutions disponibles pour ce joueur (ordre de priorité des données). */
+/** Indices of the evolutions available to this player (data priority order). */
 export function availableFusions(p: Player): number[] {
   const out: number[] = [];
   for (let i = 0; i < FUSION_TABLE.length; i++) {
@@ -106,7 +106,7 @@ export function rollOffers(s: GameState, p: Player): void {
   p.offerLevel = level;
   const offers: Offer[] = [];
   const fusions = availableFusions(p);
-  // Toutes les évolutions possibles sont proposées (une arme peut en avoir deux : à toi de choisir).
+  // Every possible evolution is offered (a weapon can have two: your call).
   for (const f of fusions) if (offers.length < 3) offers.push({ kind: OFFER_FUSION, id: f, toLevel: 1 });
   const order = offerOrder(s.seed, level);
   for (const idx of order) {
@@ -114,7 +114,7 @@ export function rollOffers(s: GameState, p: Player): void {
     const o = makeOffer(p, UNIVERSE[idx]);
     if (o) offers.push(o);
   }
-  if (offers.length === 0) offers.push({ kind: OFFER_PIZZA, id: 0, toLevel: 0 });
+  if (offers.length === 0) offers.push({ kind: OFFER_HEAL, id: 0, toLevel: 0 });
   p.offers = offers;
 }
 
@@ -165,16 +165,16 @@ function applyOfferEffect(s: GameState, p: Player, o: Offer): void {
     case OFFER_FUSION:
       applyFusion(s, p, o.id);
       break;
-    case OFFER_PIZZA:
+    case OFFER_HEAL:
       healPlayer(s, p, p.stats.maxHp * LOOT.healAmount);
       break;
   }
   computeStats(p);
 }
 
-// ---------- Échange d'arme ----------
+// ---------- Weapon swap ----------
 
-/** Armes contre lesquelles l'arme de l'emplacement `slot` peut s'échanger (base ↔ base, évolution ↔ évolution). */
+/** Weapons the weapon in slot `slot` can be swapped for (base ↔ base, evolution ↔ evolution). */
 function swapCandidates(p: Player, slot: number): number[] {
   const w = p.weapons[slot];
   if (!w) return [];
@@ -183,7 +183,7 @@ function swapCandidates(p: Player, slot: number): number[] {
     for (let id = 0; id < BASE_WEAPONS.length; id++) if (!findWeapon(p, id) && !p.banned.includes(id)) out.push(id);
   } else {
     for (const f of FUSION_TABLE) {
-      // Une évolution dont on tient encore l'arme d'origine ferait doublon : exclue.
+      // An evolution whose base weapon is still held would be a duplicate: excluded.
       if (findWeapon(p, f.result) || findWeapon(p, f.weapon)) continue;
       if (!out.includes(f.result)) out.push(f.result);
     }
@@ -191,12 +191,12 @@ function swapCandidates(p: Player, slot: number): number[] {
   return out;
 }
 
-/** Le joueur peut-il échanger l'arme de cet emplacement maintenant ? */
+/** Can the player swap the weapon in this slot now? */
 export function canSwap(p: Player, slot: number): boolean {
   return p.alive && p.pendingLevels > 0 && p.swaps > 0 && swapCandidates(p, slot).length > 0;
 }
 
-/** Ouvre l'échange : les propositions deviennent 3 armes du même niveau (ordre fixé par seed, niveau, emplacement). */
+/** Opens the swap: the offers become 3 weapons of the same level (order fixed by seed, level, slot). */
 function startSwap(s: GameState, p: Player, slot: number): void {
   if (!canSwap(p, slot)) return;
   const cands = swapCandidates(p, slot);
@@ -216,7 +216,7 @@ function applySwap(s: GameState, p: Player, o: Offer): void {
   const w = p.weapons[p.swapSlot];
   p.swapSlot = -1;
   if (!w) return;
-  // L'arme rendue ne revient plus ; l'arme d'origine d'une évolution reçue non plus.
+  // The given-back weapon never comes back; neither does the base weapon of a received evolution.
   p.banned.push(w.def);
   for (const f of FUSION_TABLE) if (f.result === o.id) p.banned.push(f.weapon);
   w.def = o.id;
@@ -231,7 +231,7 @@ function applySwap(s: GameState, p: Player, o: Offer): void {
   emit(s, EV_CHOICE, p.x, p.y, o.id, o.kind, o.toLevel, 0, p.index);
 }
 
-/** Code d'échange reçu au level-up : ouvrir (220..224) ou annuler (229). */
+/** Swap code received at level-up: open (220..224) or cancel (229). */
 export function handleSwapCode(s: GameState, p: Player, code: number): void {
   if (!p.alive || p.pendingLevels === 0) return;
   if (code === INPUT_SWAP_CANCEL) {
@@ -245,7 +245,7 @@ export function applyChoice(s: GameState, p: Player, choice: number): void {
   if (p.offers.length === 0) return;
   const o = p.offers[Math.max(0, Math.min(choice, p.offers.length - 1))];
   if (o.kind === OFFER_SWAP) {
-    // L'échange ne consomme pas le niveau : on revient aux propositions de ce niveau.
+    // The swap does not consume the level: go back to this level's offers.
     applySwap(s, p, o);
     rollOffers(s, p);
     return;
@@ -257,7 +257,7 @@ export function applyChoice(s: GameState, p: Player, choice: number): void {
   if (p.pendingLevels > 0) rollOffers(s, p);
 }
 
-/** Coffre de boss : fusion garantie si possible, sinon plusieurs améliorations tirées au sort + soin. */
+/** Boss chest: guaranteed evolution if possible, otherwise several random upgrades + heal. */
 export function openChest(s: GameState, p: Player): void {
   s.chestCount++;
   const fusions = availableFusions(p);

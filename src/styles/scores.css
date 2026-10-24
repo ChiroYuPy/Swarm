@@ -1,7 +1,7 @@
 /* Records screen: difficulty tabs (.dtab), podium, best performances line and the top 10 table. */
 
-/* ---------- Records : hall des records ---------- */
-/* Onglets en texte : la difficulté affichée est soulignée de sa couleur. */
+/* ---------- Records: hall of records ---------- */
+/* Text tabs: the displayed difficulty is underlined in its color. */
 .dtab {
   position: relative;
   display: flex;
@@ -57,10 +57,10 @@
   align-items: center;
   gap: 14px;
   width: 100%;
-  /* hauteur fixe : passer d'un onglet plein à un onglet vide ne fait pas sauter l'écran */
+  /* fixed height: going from a full tab to an empty one does not make the screen jump */
   min-height: min(470px, 58vh);
 }
-/* Podium : 2e, 1er, 3e. Chaque marche est un aplat léger surmonté d'un filet à la couleur de la médaille. */
+/* Podium: 2nd, 1st, 3rd. Each step is a light flat block topped by a rule in the medal's color. */
 .podium {
   display: flex;
   justify-content: center;
@@ -141,7 +141,7 @@
 .p3 {
   --m: #e0975a;
 }
-/* meilleures performances : une ligne « libellé valeur », séparée par des filets */
+/* best performances: one "label value" line, separated by rules */
 .stats.rec-bests div {
   flex-direction: row;
   align-items: baseline;
@@ -151,7 +151,7 @@
 .stats.rec-bests b {
   font-size: var(--fs-l);
 }
-/* Suite du top 10 : une liste à filets, sans cadre. */
+/* Rest of the top 10: a ruled list, no frame. */
 table.scores {
   border-collapse: collapse;
   width: min(760px, 100%);

@@ -1,9 +1,9 @@
 /**
- * Maths déterministes.
+ * Deterministic math.
  *
- * Math.sin / cos / atan2 / pow / hypot ne sont PAS garantis identiques au bit près d'un moteur JS
- * à l'autre. On n'utilise donc que + - * / et Math.sqrt / floor / abs / min / max (exacts en IEEE 754)
- * pour construire nos propres approximations polynomiales.
+ * Math.sin / cos / atan2 / pow / hypot are NOT guaranteed bit-identical from one JS engine
+ * to another. So we only use + - * / and Math.sqrt / floor / abs / min / max (exact in IEEE 754)
+ * to build our own polynomial approximations.
  */
 
 export const PI = 3.141592653589793;
@@ -29,7 +29,7 @@ export function dcos(x: number): number {
   return dsin(x + HALF_PI);
 }
 
-/** atan2 approché (erreur < 1e-5 rad). */
+/** Approximate atan2 (error < 1e-5 rad). */
 export function datan2(y: number, x: number): number {
   const ax = Math.abs(x);
   const ay = Math.abs(y);
@@ -51,7 +51,7 @@ export function clamp(v: number, a: number, b: number): number {
   return v < a ? a : v > b ? b : v;
 }
 
-/** Tables de directions pour les codes d'entrée (64 directions, 0 = droite, sens horaire écran). */
+/** Direction tables for input codes (64 directions, 0 = right, clockwise on screen). */
 export const DIR_COUNT = 64;
 export const DIR_X = new Float64Array(DIR_COUNT);
 export const DIR_Y = new Float64Array(DIR_COUNT);
@@ -61,7 +61,7 @@ for (let i = 0; i < DIR_COUNT; i++) {
   DIR_Y[i] = dsin(a);
 }
 
-/** Tourne l'angle `a` vers `to` d'au plus `step` radians. */
+/** Turns angle `a` toward `to` by at most `step` radians. */
 export function turnToward(a: number, to: number, step: number): number {
   let diff = to - a;
   while (diff > PI) diff -= TWO_PI;

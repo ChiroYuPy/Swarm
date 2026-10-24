@@ -8,14 +8,14 @@ import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_PHOENIX, emit, type GameState, type Player, type WeaponInst } from '../state';
 import { AIM, RETRY_TICKS, aim, setAim, ticks } from './common';
 
-/** portée prise en compte pour choisir la ligne du Phénix, et nombre de caps essayés autour du joueur */
+/** range considered when picking the Phoenix line, and number of headings tried around the player */
 const PHOENIX_REACH = 650;
 const PHOENIX_DIRS = 48;
 
 /**
- * Cap du Phénix (dans AIM) : parmi PHOENIX_DIRS directions autour du joueur, celle dont la bande de
- * largeur 2 × `band` traverse le plus de PV ennemis sur `reach` : le plus gros groupe, ou le plus gros
- * sac à PV (boss compris). Faux si personne n'est à portée.
+ * Phoenix heading (in AIM): among PHOENIX_DIRS directions around the player, the one whose band of
+ * width 2 × `band` crosses the most enemy HP over `reach`: the biggest group, or the biggest
+ * HP sponge (bosses included). False if nobody is in range.
  */
 function phoenixLine(s: GameState, p: Player, band: number, reach: number): boolean {
   const g = s.grid;
@@ -44,8 +44,8 @@ function phoenixLine(s: GameState, p: Player, band: number, reach: number): bool
 }
 
 /**
- * Phénix : des oiseaux de feu qui filent tout droit à travers la horde sans revenir (voir projectiles.ts).
- * Comme les drones, l'arme complète l'effectif : un oiseau éteint renaît près de toi après `respawn` s.
+ * Phoenix: firebirds that fly straight through the horde without coming back (see projectiles.ts).
+ * Like drones, the weapon refills the flock: a burnt-out bird is reborn near you after `respawn` s.
  */
 export function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   const n = L.count ?? 1;
@@ -62,7 +62,7 @@ export function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L:
   if (w.timer > 0) return;
   const band = (L.size ?? 26) * p.stats.area;
   const reach = Math.min(PHOENIX_REACH, (L.speed ?? 470) * (L.life ?? 2));
-  // Visée manuelle : il part là où tu vises ; sinon, sur la ligne qui traverse le plus de PV ennemis.
+  // Manual aim: it flies where you aim; otherwise, along the line crossing the most enemy HP.
   if (p.aim >= 0) aim(s, p, reach);
   else if (!phoenixLine(s, p, band, reach)) {
     w.timer = RETRY_TICKS;
@@ -70,7 +70,7 @@ export function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L:
   }
   const b = spawnProjectile(s);
   if (!b) return;
-  // Le deuxième oiseau (s'il y en a un) part un peu de biais, pour ne pas suivre le premier.
+  // The second bird (if any) leaves slightly askew, so it does not follow the first one.
   const a = AIM + (alive & 1 ? 0.35 : 0);
   b.kind = PJ_PHOENIX;
   b.owner = p.index;
@@ -86,6 +86,6 @@ export function phoenix(s: GameState, p: Player, w: WeaponInst, slot: number, L:
   b.knock = L.knockback ?? 40;
   b.pierce = -1;
   b.life = ticks(L.life, 4);
-  w.timer = 15; // le suivant ne part pas dans la même image
+  w.timer = 15; // the next one does not leave on the same frame
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }

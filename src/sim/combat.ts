@@ -1,4 +1,4 @@
-/** Dégâts, morts, butin, explosions. */
+/** Damage, deaths, loot, explosions. */
 import { LOOT, PICKUPS, type PickupKind } from '../data/loot';
 import { HERO } from '../data/hero';
 import { TICK_RATE } from './constants';
@@ -28,13 +28,13 @@ import {
   type Player,
 } from './state';
 
-/** Inflige des dégâts à l'ennemi d'index `idx`. Renvoie true s'il meurt. `owner` = joueur crédité (-1 = personne). */
-/** `quiet` : brûlure continue (feu au sol) — l'impact est marqué (x2 = 1) pour ne pas faire de bruit à chaque tic. */
+/** Deals damage to the enemy at index `idx`. Returns true if it dies. `owner` = credited player (-1 = nobody). */
+/** `quiet`: continuous burn (ground fire) — the hit is flagged (x2 = 1) so it does not make noise every tick. */
 export function damageEnemy(s: GameState, idx: number, amount: number, owner: number, kx: number, ky: number, quiet = false): boolean {
   const e = s.enemies[idx];
   if (!e.alive) return false;
   owner = credited(s, owner);
-  // Gelé : fragile et figé (pas de recul).
+  // Frozen: fragile and locked in place (no knockback).
   const frozen = e.frozenUntil > s.tick;
   if (frozen) amount *= LOOT.freezeFragile;
   e.hp -= amount;
@@ -53,7 +53,7 @@ export function damageEnemy(s: GameState, idx: number, amount: number, owner: nu
   return false;
 }
 
-/** Repousse un ennemi sans le blesser (il clignote quand même, pour qu'on voie le coup). */
+/** Pushes an enemy back without hurting it (it still flashes, so the hit is visible). */
 export function pushEnemy(s: GameState, idx: number, kx: number, ky: number): void {
   const e = s.enemies[idx];
   if (!e.alive || e.frozenUntil > s.tick) return;
@@ -64,7 +64,7 @@ export function pushEnemy(s: GameState, idx: number, kx: number, ky: number): vo
   e.kby += ky * k;
 }
 
-/** Un clone fait gagner ses éliminations et ses dégâts à son modèle. */
+/** A clone credits its kills and damage to its original. */
 function credited(s: GameState, owner: number): number {
   const p = owner >= 0 ? s.players[owner] : undefined;
   return p && p.master >= 0 ? p.master : owner;
@@ -77,7 +77,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
   e.hp = 0;
   const beh = ENEMY_BEHAVIOR[e.type];
   emit(s, EV_KILL, e.x, e.y, e.r, e.type);
-  // Gelé : il éclate, les éclats blessent ses voisins (traités en fin de pas, voir processShatters).
+  // Frozen: it shatters, the shards hurt its neighbours (handled at the end of the step, see processShatters).
   if (e.frozenUntil > s.tick) {
     const might = owner >= 0 ? s.players[owner].stats.might : 1;
     s.shatters.push(e.x, e.y, (LOOT.shatterDamage + e.maxHp * LOOT.shatterHp) * might, owner);
@@ -87,7 +87,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
     dropPropLoot(s, e.x, e.y);
     return;
   }
-  // Murs et œufs : ni victime au compteur, ni butin (un œuf donne juste sa gemme).
+  // Walls and eggs: no kill counted, no loot (an egg just gives its gem).
   if (beh === BEHAVIOR.WALL || beh === BEHAVIOR.EGG) {
     if (e.xp > 0) spawnGem(s, e.x, e.y, e.xp);
     return;
@@ -100,7 +100,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
     for (const p of s.players) if (p.master < 0) p.swaps = Math.min(LOOT.swaps.max, p.swaps + LOOT.swaps.perBoss);
     if (s.bossId === e.id) {
       s.bossId = -1;
-      // Un peu de calme pour ramasser le coffre avant que les vagues reprennent.
+      // A bit of calm to pick up the chest before the waves resume.
       s.calmUntil = s.tick + AFTER_BOSS_TICKS;
     }
     spawnPickup(s, PK_CHEST, e.x, e.y);
@@ -119,7 +119,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
   } else if (e.xp > 0) {
     spawnGem(s, e.x, e.y, e.xp);
   }
-  // Butin : toujours 2 tirages (taux, famille) pour garder un flux régulier.
+  // Loot: always 2 draws (rate, family) to keep a steady stream.
   const luck = owner >= 0 ? s.players[owner].stats.luck : 1;
   const mul = (swarm ? LOOT.swarmMul : 1) * luck;
   const r = s.rngLoot.next();
@@ -129,8 +129,8 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
 }
 
 /**
- * Golem : ses moitiés partent de chaque côté, perpendiculairement à sa marche. Elles naissent en
- * fin de pool (hors de la grille de ce tick) : aucune requête en cours n'est perturbée.
+ * Golem: its halves fly off to each side, perpendicular to its walk. They are born at the
+ * end of the pool (outside this tick's grid): no ongoing query is disturbed.
  */
 function split(s: GameState, x: number, y: number, fx: number, fy: number, type: number, target: number): void {
   const d = ENEMIES[type];
@@ -159,7 +159,7 @@ function split(s: GameState, x: number, y: number, fx: number, fy: number, type:
   }
 }
 
-// Familles d'objets (codes PK_* = index dans PICKUPS).
+// Pickup families (PK_* codes = index into PICKUPS).
 /** random-drop family of each pickup kind (null: never dropped at random) */
 const DROP_FAMILY: Record<PickupKind, 'bonus' | 'active' | null> = { instant: 'bonus', timed: 'bonus', relic: 'bonus', active: 'active', chest: null };
 const BONUS_KINDS = PICKUPS.map((p, i) => (DROP_FAMILY[p.kind] === 'bonus' ? i : -1)).filter((i) => i >= 0);
@@ -178,21 +178,21 @@ function pickFrom(kinds: number[], weights: number[], u: number): number {
   return kinds[kinds.length - 1];
 }
 
-/** Caisse bonus : un activable ou un bonus, à coup sûr. */
+/** Bonus crate: an active item or a bonus, guaranteed. */
 function dropPropLoot(s: GameState, x: number, y: number): void {
   const r = s.rngLoot.next();
   const pick = s.rngLoot.next();
   spawnPickup(s, r < LOOT.propActiveChance ? pickFrom(ACTIVE_KINDS, ACTIVE_W, pick) : pickFrom(BONUS_KINDS, BONUS_W, pick), x, y);
 }
 
-/** Objet posé par l'arène : surtout des Aspirateurs (`u1` choisit la famille, `u2` l'objet). */
+/** Item placed by the arena: mostly Vacuums (`u1` picks the family, `u2` the item). */
 export function rollMapItem(u1: number, u2: number, vacuumAllowed: boolean): number {
   const m = LOOT.mapItems;
   if (vacuumAllowed && u1 < m.vacuumChance) return PK_VACUUM;
   return u2 < m.activeChance ? pickFrom(ACTIVE_KINDS, ACTIVE_W, u2 / m.activeChance) : pickFrom(BONUS_KINDS, BONUS_W, (u2 - m.activeChance) / (1 - m.activeChance));
 }
 
-/** Objet activable tiré au sort (récompense de boss). */
+/** Random active item (boss reward). */
 export function randomActive(s: GameState): number {
   return pickFrom(ACTIVE_KINDS, ACTIVE_W, s.rngLoot.next());
 }
@@ -200,9 +200,9 @@ export function randomActive(s: GameState): number {
 const SHATTER_IDS: number[] = [];
 
 /**
- * Éclats de Gel en attente. Un éclat qui tue un autre gelé en ajoute un nouveau : la réaction en
- * chaîne se propage dans tout le groupe gelé. Appelé avant le compactage des ennemis (indices de la
- * grille encore valides) ; on copie la requête car les dégâts peuvent relancer d'autres requêtes.
+ * Pending Freeze shatters. A shatter that kills another frozen enemy adds a new one: the chain
+ * reaction spreads through the whole frozen group. Called before enemy compaction (grid indices
+ * still valid); the query is copied because damage can trigger other queries.
  */
 export function processShatters(s: GameState): void {
   const q = s.shatters;
@@ -228,7 +228,7 @@ export function processShatters(s: GameState): void {
   }
 }
 
-/** Explosion circulaire qui blesse les ennemis (et optionnellement les joueurs). */
+/** Circular explosion that hurts enemies (and optionally players). */
 export function explode(
   s: GameState,
   x: number,
@@ -270,11 +270,11 @@ export function explode(
 }
 
 /**
- * Blesse un joueur. Renvoie false si le coup est ignoré (invulnérabilité).
- * `environment` : dégâts de zone, qui ignorent et ne déclenchent pas l'invulnérabilité.
+ * Hurts a player. Returns false if the hit is ignored (invulnerability).
+ * `environment`: area damage, which ignores and does not trigger invulnerability.
  */
 export function hurtPlayer(s: GameState, p: Player, amount: number, environment = false): boolean {
-  // Le clone est un leurre : il encaisse les tirs sans jamais tomber.
+  // The clone is a decoy: it soaks up hits without ever going down.
   if (!p.alive || amount <= 0 || p.master >= 0) return false;
   if (p.shieldUntil > s.tick || s.sandbox?.invincible) return false;
   if (!environment) {
@@ -300,14 +300,14 @@ export function hurtPlayer(s: GameState, p: Player, amount: number, environment 
 
 const IFRAME_TICKS = Math.round(HERO.iframes * TICK_RATE);
 
-/** Totem : le joueur revient avec la moitié de ses PV, brièvement invulnérable, et repousse tout. */
+/** Totem: the player comes back with half their HP, briefly invulnerable, and pushes everything away. */
 function revive(s: GameState, p: Player): void {
   p.totem = 0;
   p.hp = p.stats.maxHp * LOOT.totemHeal;
   p.invulnUntil = s.tick + Math.round(LOOT.totemInvuln * TICK_RATE);
   const R = LOOT.totemRadius;
   const stun = s.tick + TICK_RATE;
-  // Boucle directe (pas de grille) : on peut être appelé pendant qu'une requête de grille est en cours.
+  // Direct loop (no grid): this can be called while a grid query is in progress.
   for (let i = 0; i < s.enemyCount; i++) {
     const e = s.enemies[i];
     if (!e.alive || e.flags & (EF_BOSS | EF_PROP)) continue;
@@ -331,7 +331,7 @@ export function healPlayer(s: GameState, p: Player, amount: number, notify = tru
   if (notify && p.hp > before) emit(s, EV_HEAL, p.x, p.y, p.hp - before, 0, 0, 0, p.index);
 }
 
-/** Joueur vivant le plus proche d'un point (-1 si aucun). */
+/** Nearest living player to a point (-1 if none). */
 export function nearestPlayer(s: GameState, x: number, y: number): number {
   let best = -1;
   let bestD = Infinity;

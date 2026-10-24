@@ -7,12 +7,12 @@ import { TRAPEZOID_BOSS, BOSS_ORDER, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM
 import { bossName } from '../src/i18n/content';
 import { defaultSandbox } from '../src/storage/storage';
 
-/** Partie vide (aucune apparition automatique, pas de boss). */
+/** Empty game (no automatic spawns, no boss). */
 function arena(): GameState {
   return createGame({ seed: 'BOSS', sandbox: { ...defaultSandbox().rules, invincible: false, enemyMul: 0, bosses: false, weapons: [] } });
 }
 
-/** Pose un boss à (dx, dy) du joueur, prêt à entrer dans la phase `kind` au prochain pas. */
+/** Places a boss at (dx, dy) from the player, ready to enter phase `kind` on the next step. */
 function boss(s: GameState, id: string, dx: number, dy: number, kind?: string) {
   const t = enemyId(id);
   const p = s.players[0];
@@ -27,8 +27,8 @@ function boss(s: GameState, id: string, dx: number, dy: number, kind?: string) {
 
 const alive = (s: GameState, id: string) => s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.type === enemyId(id));
 
-describe('vagues et boss', () => {
-  it('une vague, puis une pause sans aucune apparition', () => {
+describe('waves and bosses', () => {
+  it('a wave, then a break with no spawns at all', () => {
     const s = createGame({ seed: 'VAGUES', sandbox: { ...defaultSandbox().rules, invincible: true, bosses: false, weapons: [] } });
     let waves = 0;
     for (let i = 0; i < WAVE_TICKS; i++) {
@@ -36,7 +36,7 @@ describe('vagues et boss', () => {
       for (let k = 0; k < s.eventCount; k++) if (s.events[k].type === EV_WAVE) waves++;
     }
     expect(waves).toBe(1);
-    // (les caisses bonus, elles, continuent d'arriver)
+    // (bonus crates keep arriving, though)
     const foes = () => s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.type !== enemyId('bonus_crate'));
     const last = () => Math.max(0, ...foes().map((e) => e.id));
     const n = last();
@@ -46,7 +46,7 @@ describe('vagues et boss', () => {
     expect(last()).toBeGreaterThan(n);
   });
 
-  it('le boss arrive seul : les autres fuient, plus rien n’apparaît et l’horloge attend sa mort', () => {
+  it('the boss arrives alone: the others flee, nothing else spawns and the clock waits for its death', () => {
     const s = createGame({ seed: 'SEUL', sandbox: { ...defaultSandbox().rules, invincible: true, weapons: [] } });
     s.clock = BOSS_TICKS - 30;
     s.tick = s.clock;
@@ -64,11 +64,11 @@ describe('vagues et boss', () => {
     const n = s.nextEnemyId;
     for (let i = 0; i < 5 * TICK_RATE; i++) step(s, [0]);
     expect(s.clock).toBe(clock);
-    // Seul le boss (et ses propres renforts) a pu apparaître.
+    // Only the boss (and its own reinforcements) could spawn.
     const bosses = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && BOSS_TYPES.includes(e.type));
     expect(bosses.length).toBe(1);
     expect(s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.id >= n && e.type !== enemyId(TRAPEZOID_BOSS.summon.type)).length).toBe(0);
-    // Mort du boss : un peu de calme, puis les vagues reprennent.
+    // Boss death: a short lull, then the waves resume.
     damageEnemy(s, s.enemies.indexOf(bosses[0]), 1e9, 0, 0, 0);
     step(s, [0]);
     expect(s.clock).toBe(clock);
@@ -76,14 +76,14 @@ describe('vagues et boss', () => {
     expect(s.clock).toBeGreaterThan(clock);
   });
 
-  it('les boss arrivent dans l’ordre, puis reviennent en Mk II', () => {
-    expect(BOSS_ORDER.map((id, k) => [BOSS_TYPES[k], bossName(k)])).toEqual(BOSS_ORDER.map((id, k) => [enemyId(id), bossName(k)]));
+  it('bosses arrive in order, then come back as Mk II', () => {
+    expect(BOSS_ORDER.map((_id, k) => [BOSS_TYPES[k], bossName(k)])).toEqual(BOSS_ORDER.map((id, k) => [enemyId(id), bossName(k)]));
     expect(bossName(0)).toBe('Trapèze');
     expect(bossName(1)).toBe('Hexagone bâtisseur');
     expect(bossName(5)).toBe('Trapèze Mk II');
   });
 
-  it('Trapèze : la charge va jusqu’au bout de la ligne et fait très mal', () => {
+  it('Trapezoid: the charge goes all the way down the line and hits very hard', () => {
     const s = arena();
     const p = s.players[0];
     const e = boss(s, 'trapezoid', 600, 0, 'charge');
@@ -94,7 +94,7 @@ describe('vagues et boss', () => {
       p.invulnUntil = 0;
     }
     expect(x0 - e.x).toBeGreaterThan(TRAPEZOID_BOSS.chargeLength - 20);
-    // Et il écrase : un coup en pleine charge vaut plus que son contact normal.
+    // And it crushes: a hit mid-charge is worth more than its normal contact damage.
     const t = arena();
     const q = t.players[0];
     const b = boss(t, 'trapezoid', 300, 0, 'charge');
@@ -103,7 +103,7 @@ describe('vagues et boss', () => {
     expect(hp0 - q.hp).toBeGreaterThan(b.dmg * 1.5 * (1 - q.stats.armor));
   });
 
-  it('Hexagone : une cage de murs autour du joueur, qui le bloque, puis tombe toute seule', () => {
+  it('Builder hexagon: a cage of walls around the player that blocks them, then falls on its own', () => {
     const s = arena();
     const p = s.players[0];
     const hex = boss(s, 'builder_hexagon', 500, 0, 'build');
@@ -114,14 +114,14 @@ describe('vagues et boss', () => {
     for (const w of walls)
       expect(Math.abs(Math.hypot(w.x - p.x, w.y - p.y) - BUILDER_HEXAGON_BOSS.cageRadius)).toBeLessThan(BUILDER_HEXAGON_BOSS.cageRadius * 0.15);
     for (let i = 0; i < BUILDER_HEXAGON_BOSS.wallRise * TICK_RATE + 2; i++) step(s, [0]);
-    // On fonce vers la droite : on reste dans la cage.
+    // Rush to the right: the player stays inside the cage.
     for (let i = 0; i < 3 * TICK_RATE; i++) step(s, [1]);
     expect(Math.hypot(p.x, p.y)).toBeLessThan(BUILDER_HEXAGON_BOSS.cageRadius);
     for (let i = 0; i < BUILDER_HEXAGON_BOSS.wallLife * TICK_RATE; i++) step(s, [0]);
     expect(alive(s, 'wall').length).toBe(0);
   });
 
-  it('Hexagone : la cage a deux sorties opposées, et ne revient qu’un cycle sur deux', () => {
+  it('Builder hexagon: the cage has two opposite exits, and only comes back every other cycle', () => {
     const s = arena();
     const p = s.players[0];
     const hex = boss(s, 'builder_hexagon', 500, 0, 'build');
@@ -129,26 +129,26 @@ describe('vagues et boss', () => {
     const angles = alive(s, 'wall')
       .map((w) => Math.atan2(w.y - p.y, w.x - p.x))
       .sort((x, y) => x - y);
-    // Les trous : de grands écarts d'angle entre deux murs voisins (le tour complet compris).
+    // The exits: large angle gaps between two neighbouring walls (wrap-around included).
     const gaps = angles.map((a, i) => (i + 1 < angles.length ? angles[i + 1] - a : angles[0] + 2 * Math.PI - a));
     const big = gaps.filter((g) => g * BUILDER_HEXAGON_BOSS.cageRadius > 60);
     expect(big.length).toBe(2);
     for (const w of alive(s, 'wall')) w.alive = false;
-    // Cycle suivant : pas de cage.
+    // Next cycle: no cage.
     hex.ai = (BOSS_PATTERNS[hex.type].findIndex((ph) => ph.kind === 'build') - 1 + BOSS_PATTERNS[hex.type].length) % BOSS_PATTERNS[hex.type].length;
     hex.timer = 0;
     step(s, [0]);
     expect(alive(s, 'wall').length).toBe(0);
   });
 
-  it('Étoile : sa ruée laisse des flammes qui brûlent', () => {
+  it('Ricochet star: its dash leaves burning flames', () => {
     const s = arena();
     const p = s.players[0];
     const e = boss(s, 'ricochet_star', 300, 0, 'aim');
     for (let i = 0; i < 1.4 * TICK_RATE; i++) step(s, [0]);
     const fires = s.projectiles.slice(0, s.projCount).filter((b) => b.kind === PJ_FIRE);
     expect(fires.length).toBeGreaterThan(5);
-    // Une flamme sous le joueur, loin de l'Étoile.
+    // A flame under the player, far from the star.
     e.x = p.x + 2000;
     const hp0 = p.hp;
     fires[0].x = p.x;
@@ -158,11 +158,11 @@ describe('vagues et boss', () => {
     expect(p.hp).toBeLessThan(hp0);
   });
 
-  it('Étoile : chaque ruée rebondit plusieurs fois dans sa boîte', () => {
+  it('Ricochet star: each dash bounces several times inside its box', () => {
     const s = createGame({ seed: 'BOSS', sandbox: { ...defaultSandbox().rules, invincible: true, enemyMul: 0, bosses: false, weapons: [] } });
     const e = boss(s, 'ricochet_star', 300, 0, 'aim');
     const pat = BOSS_PATTERNS[e.type];
-    // Visée, puis toute la première ruée : chaque rebond change son cap.
+    // Aim, then the whole first dash: each bounce changes its heading.
     for (let i = 0; i < 2 * TICK_RATE && pat[e.ai].kind !== 'dash'; i++) step(s, [0]);
     expect(pat[e.ai].kind).toBe('dash');
     let bounces = 0;
@@ -175,7 +175,7 @@ describe('vagues et boss', () => {
     expect(bounces).toBeGreaterThanOrEqual(3);
   });
 
-  it('Œil : le rayon balaie le cône et touche ; hors de portée, rien', () => {
+  it('Laser eye: the beam sweeps the cone and hits; out of range, nothing', () => {
     const s = arena();
     const p = s.players[0];
     boss(s, 'laser_eye', 300, 0, 'focus');
@@ -186,7 +186,7 @@ describe('vagues et boss', () => {
     const q = t.players[0];
     const e = boss(t, 'laser_eye', 300, 0, 'focus');
     step(t, [0]);
-    // Le joueur part au-delà de la portée du rayon.
+    // The player moves beyond the beam's range.
     q.x = e.x - LASER_EYE_BOSS.beamLength - 80;
     q.px = q.x;
     const hq = q.hp;
@@ -198,7 +198,7 @@ describe('vagues et boss', () => {
     expect(q.hp).toBe(hq);
   });
 
-  it('Reine : pond des œufs qui éclosent en Essaim, sauf si on les casse', () => {
+  it('Swarm queen: lays eggs that hatch into swarm enemies, unless they are broken', () => {
     const s = arena();
     boss(s, 'swarm_queen', 300, 0);
     for (let i = 0; i < 4 * TICK_RATE; i++) step(s, [0]);

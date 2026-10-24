@@ -8,7 +8,7 @@ import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_RICOCHET, emit, type GameState, type Player, type WeaponInst } from '../state';
 import { AIM, RETRY_TICKS, aim, cdTicks, ticks } from './common';
 
-/** Ricochet : des disques chercheurs qui rebondissent d'ennemi en ennemi (voir projectiles.ts). */
+/** Ricochet: homing discs bouncing from enemy to enemy (see projectiles.ts). */
 export function ricochet(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;

@@ -1,12 +1,12 @@
 /**
- * Vagues : chaque vague (flux, essaim, horde ou encerclement) est suivie d'une pause ; toutes les 4 vagues, un boss,
- * seul en piste : l'horloge des vagues s'arrête jusqu'à sa mort. Caisses bonus en continu.
- * Les types d'ennemis arrivent progressivement, plus ou moins vite selon la difficulté. Le flux ne mélange
- * que 2-3 types à la fois (voir WAVES.mixes), choisis sans état à partir de la seed et du créneau.
+ * Waves: each wave (stream, swarm, horde or encirclement) is followed by a pause; every 4 waves, a boss,
+ * alone on the field: the wave clock stops until it dies. Bonus crates keep coming.
+ * Enemy types arrive progressively, more or less quickly depending on the difficulty. The stream only mixes
+ * 2-3 types at a time (see WAVES.mixes), picked statelessly from the seed and the slot.
  *
- * Invariant important : la consommation du flux WAVES ne dépend QUE de l'horloge des vagues. Chaque apparition tire
- * toujours le même nombre de valeurs, même si elle échoue (plafond atteint, obstacle). Ainsi la suite
- * des vagues est identique pour tous les joueurs d'une même seed et d'une même difficulté.
+ * Important invariant: consumption of the WAVES stream depends ONLY on the wave clock. Each spawn always draws
+ * the same number of values, even if it fails (cap reached, obstacle). So the sequence
+ * of waves is identical for all players with the same seed and the same difficulty.
  */
 import { WAVES } from '../data/waves';
 import { BOSS_HP_GROWTH, ENEMIES } from '../data/enemies';
@@ -51,7 +51,7 @@ import {
   type GameState,
 } from './state';
 
-/** Multiplicateurs ennemis selon l'horloge des vagues (courbes de temps × difficulté). */
+/** Enemy multipliers from the wave clock (time curves × difficulty). */
 export function hpMul(s: GameState): number {
   const m = (s.clock * DT) / 60;
   return (1 + m * WAVES.hpScalePerMinute + m * m * WAVES.hpScalePerMinute2) * DIFFICULTIES[s.difficulty].hp;
@@ -84,7 +84,7 @@ function mixAvailable(unlock: Int32Array, i: number, slot: number): boolean {
   return true;
 }
 
-/** Choix du mélange d'un créneau, connaissant celui du créneau précédent (`avoid`). */
+/** Picks a slot's mix, knowing the previous slot's one (`avoid`). */
 function pickMix(seed: number, difficulty: number, slot: number, avoid: number): number {
   const unlock = UNLOCK_SLOT[difficulty];
   let debut = -1;
@@ -104,12 +104,12 @@ function pickMix(seed: number, difficulty: number, slot: number, avoid: number):
   return last;
 }
 
-/** Suite des mélanges déjà calculée pour une seed et une difficulté (pure : simple cache). */
+/** Mix sequence already computed for a seed and a difficulty (pure: just a cache). */
 const mixMemo = { seed: -1, difficulty: -1, list: [] as number[] };
 
 /**
- * Mélange actif pendant le créneau `slot` (index dans MIXES). Un type qui arrive impose son mélange
- * d'arrivée ; sinon tirage pondéré (seed + créneau), jamais le même mélange deux vagues de suite.
+ * Mix active during slot `slot` (index into MIXES). A newly arriving type forces its debut
+ * mix; otherwise a weighted draw (seed + slot), never the same mix two waves in a row.
  */
 export function mixAt(seed: number, difficulty: number, slot: number): number {
   if (mixMemo.seed !== seed || mixMemo.difficulty !== difficulty) {
@@ -122,7 +122,7 @@ export function mixAt(seed: number, difficulty: number, slot: number): number {
   return list[slot];
 }
 
-/** Plafond d'ennemis en vie pour les types limités (Golem) : grandit avec le temps depuis son arrivée. */
+/** Cap on living enemies for limited types (Golem): grows with the time since its arrival. */
 function underCap(s: GameState, type: number): boolean {
   const d = ENEMIES[type];
   if (!d.capStart) return true;
@@ -136,7 +136,7 @@ function underCap(s: GameState, type: number): boolean {
 function targetPlayer(s: GameState): number {
   const n = s.players.length;
   if (n === 1) return 0;
-  // Multi : on répartit les apparitions entre joueurs vivants, de façon déterministe (jamais sur un clone).
+  // Multiplayer: spread spawns across living players, deterministically (never on a clone).
   for (let k = 0; k < n; k++) {
     const i = (s.tick + k) % n;
     if (s.players[i].alive && s.players[i].master < 0) return i;
@@ -144,7 +144,7 @@ function targetPlayer(s: GameState): number {
   return 0;
 }
 
-/** Fait apparaître un ennemi autour d'un joueur. Sans aléa supplémentaire : on essaie des angles voisins. */
+/** Spawns an enemy around a player. No extra randomness: neighbouring angles are tried. */
 function spawnAround(s: GameState, type: number, angle: number, radius: number, target: number): Enemy | null {
   const p = s.players[target];
   const r = ENEMIES[type].radius;
@@ -160,7 +160,7 @@ function spawnAround(s: GameState, type: number, angle: number, radius: number, 
   return null;
 }
 
-/** Temps forts (essaim, horde, encerclement) : plafonnés à WAVES.enemyCap ennemis en vie. */
+/** Highlights (swarm, horde, encirclement): capped at WAVES.enemyCap living enemies. */
 function spawnAt(s: GameState, type: number, x: number, y: number, target: number): Enemy | null {
   if (s.enemyCount >= WAVES.enemyCap) return null;
   if (circleHitsObstacle(s.map, x, y, ENEMIES[type].radius)) return null;
@@ -173,7 +173,7 @@ function countProps(s: GameState): number {
   return n;
 }
 
-/** Caisses bonus : selon le vrai temps (même pendant un boss), position tirée sans état (seed + tick). */
+/** Bonus crates: on real time (even during a boss), position drawn statelessly (seed + tick). */
 function updateProps(s: GameState): void {
   const pr = WAVES.props;
   if (s.tick % Math.round(pr.every * TICK_RATE) !== 0 || countProps(s) >= pr.max) return;
@@ -186,7 +186,7 @@ function updateProps(s: GameState): void {
   }
 }
 
-/** Objets de l'arène (surtout des Aspirateurs) : même principe que les caisses, sans état (seed + tick). */
+/** Arena items (mostly Vacuums): same principle as the crates, stateless (seed + tick). */
 function updateMapItems(s: GameState): void {
   const m = LOOT.mapItems;
   if (s.tick % Math.round(m.every * TICK_RATE) !== 0) return;
@@ -209,8 +209,8 @@ function updateMapItems(s: GameState): void {
 }
 
 /**
- * Le boss arrive : les ennemis normaux s'enfuient, il ne reste que lui (et ce qu'il fait venir).
- * `k` = son rang dans la partie (0 = le premier) : il fixe le boss, sa force et son nom (Mk II…).
+ * The boss arrives: normal enemies flee, only it remains (and whatever it summons).
+ * `k` = its rank in the game (0 = the first): it sets the boss, its strength and its name (Mk II…).
  */
 function spawnBoss(s: GameState, k = s.bossSpawned): void {
   const type = BOSS_TYPES[k % BOSS_TYPES.length];
@@ -235,19 +235,19 @@ function spawnBoss(s: GameState, k = s.bossSpawned): void {
   emit(s, EV_BOSS_SPAWN, e.x, e.y, k, e.type);
 }
 
-/** Où en est-on dans les vagues ? (pour le HUD ; `clock` = horloge des vagues) */
+/** Where are we in the waves? (for the HUD; `clock` = wave clock) */
 export function waveInfo(clock: number) {
   const c = Math.max(0, clock - 1);
   const slot = Math.floor(c / MIX_TICKS);
   const pos = c % MIX_TICKS;
   return {
-    /** numéro de la vague en cours ou qui vient de finir (1 = la première) */
+    /** number of the current or just-finished wave (1 = the first) */
     wave: slot + 1,
     slot,
     inWave: pos < WAVE_TICKS,
-    /** ticks d'horloge restants avant la fin de la vague (ou de la pause) */
+    /** clock ticks left before the end of the wave (or of the pause) */
     left: pos < WAVE_TICKS ? WAVE_TICKS - pos : MIX_TICKS - pos,
-    /** ticks d'horloge avant le prochain boss */
+    /** clock ticks before the next boss */
     toBoss: BOSS_TICKS - (clock % BOSS_TICKS),
   };
 }
@@ -256,7 +256,7 @@ export function updateSpawner(s: GameState): void {
   updateProps(s);
   updateMapItems(s);
   const sb = s.sandbox;
-  // Bac à sable, duel : le boss choisi arrive au premier pas, hors du compte des boss de la partie.
+  // Sandbox, duel: the chosen boss arrives on the first step, outside the game's boss count.
   if (sb && sb.duel >= 0) {
     const next = s.bossSpawned;
     spawnBoss(s, sb.duel);
@@ -264,29 +264,29 @@ export function updateSpawner(s: GameState): void {
     sb.duel = -1;
     return;
   }
-  // Boss en vie, ou calme qui suit sa mort : ni vague ni horloge.
+  // Boss alive, or the calm after its death: no wave, no clock.
   if (s.bossId >= 0 || s.tick < s.calmUntil) return;
   const c = ++s.clock;
-  // Boss : à la toute fin de la pause de la dernière vague du cycle.
+  // Boss: at the very end of the pause after the cycle's last wave.
   if (c % BOSS_TICKS === 0 && (!sb || sb.bosses)) {
     spawnBoss(s);
     return;
   }
   const pos = (c - 1) % MIX_TICKS;
-  if (pos >= WAVE_TICKS) return; // pause entre deux vagues
+  if (pos >= WAVE_TICKS) return; // pause between two waves
   const slot = Math.floor((c - 1) / MIX_TICKS);
   const t = c * DT;
   const rngW = s.rngWaves;
   const diff = DIFFICULTIES[s.difficulty];
   const { rate } = spawnRate(c, s.difficulty);
-  // Bac à sable : nombre d'ennemis multiplié, types choisis (tous disponibles d'emblée), boss facultatifs.
+  // Sandbox: enemy count multiplied, chosen types (all available from the start), optional bosses.
   const mul = sb ? sb.enemyMul : 1;
   const pool = sb?.enemies ?? null;
   const flux = pool ? pool.filter((t) => t !== SWARM_TYPE) : null;
 
   const mix = MIXES[pool ? 0 : mixAt(s.seed, s.difficulty, slot)];
 
-  // Début de vague : annonce (et arrivée d'un nouveau type d'ennemi).
+  // Wave start: announcement (and arrival of a new enemy type).
   if (pos === 0) {
     emit(s, EV_WAVE, 0, 0, slot + 1);
     if (!pool) {
@@ -298,7 +298,7 @@ export function updateSpawner(s: GameState): void {
   s.spawnBudget += rate * DT * mul;
   while (s.spawnBudget >= 1) {
     s.spawnBudget -= 1;
-    // Toujours 3 tirages par apparition, quoi qu'il arrive ensuite.
+    // Always 3 draws per spawn, whatever happens next.
     const type = flux ? flux[Math.min(flux.length - 1, Math.floor(rngW.next() * flux.length))] : rngW.weighted(mix.weights, mix.total);
     const a = rngW.next() * TWO_PI;
     const j = rngW.next();
@@ -308,7 +308,7 @@ export function updateSpawner(s: GameState): void {
   }
   if (mul <= 0) return;
 
-  // Essaim : une fois par vague.
+  // Swarm: once per wave.
   const sw = WAVES.swarm;
   const swFirst = pool ? 0 : sw.firstAt * diff.pace;
   if ((!pool || pool.includes(SWARM_TYPE)) && t >= swFirst && pos === Math.round(sw.at * TICK_RATE)) {
@@ -327,7 +327,7 @@ export function updateSpawner(s: GameState): void {
     emit(s, EV_SWARM, cx, cy, count);
   }
 
-  // Hordes (vagues paires) : beaucoup d'anciens ennemis d'un coup, d'un seul côté.
+  // Hordes (even waves): lots of older enemies at once, from a single side.
   const hd = WAVES.horde;
   if (!pool && slot % 2 === 0 && t >= hd.firstAt * diff.pace && pos === Math.round(hd.at * TICK_RATE)) {
     const type = HORDE_TYPES[(slot / 2) % HORDE_TYPES.length];
@@ -345,7 +345,7 @@ export function updateSpawner(s: GameState): void {
     emit(s, EV_SWARM, cx, cy, count, type + 1);
   }
 
-  // Encerclements (vagues impaires)
+  // Encirclements (odd waves)
   const rg = WAVES.ring;
   const rgFirst = pool ? 0 : rg.firstAt * diff.pace;
   if ((!pool || pool.includes(RING_TYPE)) && slot % 2 === 1 && t >= rgFirst && pos === Math.round(rg.at * TICK_RATE)) {

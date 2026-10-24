@@ -38,6 +38,6 @@ export function aura(s: GameState, p: Player, w: WeaponInst, _slot: number, L: W
     heal += dmg * (L.lifesteal ?? 0);
     hit = true;
   }
-  if (hit) w.activeTicks = 8; // flash visuel du tic, seulement s'il a touché quelqu'un
+  if (hit) w.activeTicks = 8; // visual flash of the tick, only if it hit someone
   if (heal > 0) healPlayer(s, p, Math.min(heal, 4), false);
 }

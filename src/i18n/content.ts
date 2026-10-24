@@ -23,7 +23,7 @@ interface NamedText {
   readonly desc: string;
 }
 interface EnemyText extends NamedText {
-  /** bosses only: short name for tiles and hints (« Étoile » for « Étoile ricochet ») */
+  /** bosses only: short name for tiles and hints ("Star" for "Ricochet Star" in English) */
   readonly short?: string;
 }
 

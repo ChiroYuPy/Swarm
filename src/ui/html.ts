@@ -17,8 +17,8 @@ export function rows(list: [string, string][]): string {
   return `<dl class="rows">${list.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
-// ---------- Gabarit commun des écrans ----------
-/** Couleur de chaque écran : son titre et le filet dessous, rien d'autre. */
+// ---------- Shared screen template ----------
+/** Each screen's color: its title and the rule under it, nothing else. */
 export const SCREEN_COLOR = {
   pause: '#38f6ff',
   codex: '#ff3df5',
@@ -31,27 +31,27 @@ export const SCREEN_COLOR = {
 };
 
 /**
- * En-tête d'écran : un titre néon à la couleur de l'écran, souligné d'un filet qui s'étire depuis le
- * centre ; `sub` (HTML) dessous. Le reste de l'écran suit en cascade (.reveal).
+ * Screen header: a neon title in the screen's color, underlined by a rule stretching out from the
+ * center; `sub` (HTML) below. The rest of the screen follows in a cascade (.reveal).
  */
 export function heading(title: string, color: string, sub = ''): string {
   return `<header class="head" style="--c:${color}"><div class="ttl"><h2>${esc(title)}</h2><span class="line"></span></div>${sub ? `<p class="sub">${sub}</p>` : ''}</header>`;
 }
 
-/** Classe + délai d'un élément de la cascade d'arrivée (à poser dans un attribut class). */
+/** Class + delay of an element in the entrance cascade (to put in a class attribute). */
 export const cascade = (i: number) => `reveal" style="--i:${i}`;
 
-/** Chiffres « libellé / valeur » séparés par des filets, comme à la fin de partie. `v` est du HTML. */
+/** "Label / value" figures separated by rules, as on the end-of-run screen. `v` is HTML. */
 export function statTiles(list: [string, string][], cls = ''): string {
   return `<div class="stats ${cls}">${list.map(([k, v]) => `<div><small>${esc(k)}</small><b>${v}</b></div>`).join('')}</div>`;
 }
 
-/** Rappel des touches, en touches de clavier : [[touches], action]. */
+/** Key hints, as keyboard keys: [[keys], action]. */
 export function keys(list: [string[], string][]): string {
   return `<p class="foot keys">${list.map(([k, a]) => `<span>${k.map((x) => `<kbd>${esc(x)}</kbd>`).join('')} ${esc(a)}</span>`).join('')}</p>`;
 }
 
-/** Jauge de niveau (pastilles) ; `fresh` : la dernière, celle qu'on va gagner, en blanc (level-up). */
+/** Level gauge (pips); `fresh`: the last one, the one about to be gained, in white (level-up). */
 export function levelPips(level: number, max: number, fresh = false): string {
   let h = '<span class="pips">';
   for (let k = 1; k <= max; k++) h += `<i class="${k < level || (k === level && !fresh) ? 'on' : k === level ? 'new' : ''}"></i>`;
@@ -72,8 +72,8 @@ export function fillIcons(el: HTMLElement, size: number): void {
 }
 
 /**
- * Fait défiler verticalement le premier conteneur défilant pour montrer `el`. Jamais de défilement
- * horizontal : `scrollIntoView` décalerait #ui de côté pendant qu'un écran arrive en glissant.
+ * Scrolls the first scrollable ancestor vertically to show `el`. Never scrolls horizontally:
+ * `scrollIntoView` would shift #ui sideways while a screen slides in.
  */
 export function reveal(el: HTMLElement): void {
   for (let p = el.parentElement; p; p = p.parentElement) {

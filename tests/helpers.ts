@@ -1,7 +1,7 @@
 import { createGame, step, InputLog, TICK_RATE, type GameState } from '../src/sim';
 import { botInput } from '../src/ai/bot';
 
-/** Joue `seconds` secondes avec le bot, renvoie l'état final et le journal des entrées. */
+/** Plays `seconds` seconds with the bot; returns the final state and the input log. */
 export function playWithBot(seed: string, seconds: number): { state: GameState; log: InputLog } {
   const s = createGame({ seed });
   const log = new InputLog();
@@ -17,7 +17,7 @@ export function playWithBot(seed: string, seconds: number): { state: GameState; 
   return { state: s, log };
 }
 
-/** Entrées scriptées simples (sans bot) : spirale de déplacements + choix 0 aux level-ups. */
+/** Simple scripted inputs (no bot): a spiral of moves, plus a rotating offer choice at level-ups. */
 export function scriptedCode(i: number, awaiting: boolean): number {
   if (awaiting) return 200 + (i % 3);
   const dir = Math.floor(i / 90) % 64;

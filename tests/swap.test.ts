@@ -24,8 +24,8 @@ function untilLevelUp(s: GameState): void {
   for (let i = 0; i < 120 * TICK_RATE && !isAwaitingChoice(s) && !s.over; i++) step(s, [0]);
 }
 
-describe("échange d'arme", () => {
-  it('ouvre 3 armes au même niveau, remplace sans consommer le niveau, et coûte une charge', () => {
+describe('weapon swap', () => {
+  it('offers 3 weapons at the same level, replaces without using up the level-up, and costs a charge', () => {
     const s = createGame({ seed: 'ECHANGE' });
     untilLevelUp(s);
     const p = s.players[0];
@@ -51,15 +51,15 @@ describe("échange d'arme", () => {
     expect(p.banned).toContain(weaponId('blaster'));
     expect(p.swaps).toBe(LOOT.swaps.start - 1);
     expect(p.swapSlot).toBe(-1);
-    // Le niveau reste à choisir, avec ses propositions normales.
+    // The level-up is still to be chosen, with its normal offers.
     expect(p.pendingLevels).toBe(pending);
     expect(p.offerLevel).toBe(level);
     expect(p.offers.every((o) => o.kind !== OFFER_SWAP)).toBe(true);
-    // Plus de charge : plus d'échange possible.
+    // No charge left: no more swaps.
     expect(canSwap(p, 0)).toBe(false);
   });
 
-  it("annuler rend les propositions du niveau, sans dépenser de charge", () => {
+  it('cancelling restores the level-up offers, without spending a charge', () => {
     const s = createGame({ seed: 'ECHANGE' });
     untilLevelUp(s);
     const p = s.players[0];
@@ -71,7 +71,7 @@ describe("échange d'arme", () => {
     expect(p.swaps).toBe(LOOT.swaps.start);
   });
 
-  it('une fusion ne s’échange que contre une autre fusion', () => {
+  it('a fusion can only be swapped for another fusion', () => {
     const s = createGame({ seed: 'ECHANGE' });
     untilLevelUp(s);
     const p = s.players[0];
@@ -82,7 +82,7 @@ describe("échange d'arme", () => {
     for (const o of p.offers) expect(weaponDef(o.id).fusion).toBe(true);
   });
 
-  it('les échanges sont déterministes (même seed, mêmes codes, même état)', () => {
+  it('swaps are deterministic (same seed, same codes, same state)', () => {
     const run = () => {
       const s = createGame({ seed: 'ECHANGE' });
       untilLevelUp(s);
@@ -94,8 +94,8 @@ describe("échange d'arme", () => {
   });
 });
 
-describe("objets de l'arène", () => {
-  it('des objets apparaissent seuls près du joueur, surtout des Aspirateurs', () => {
+describe('arena items', () => {
+  it('items spawn on their own near the player, mostly Vacuums', () => {
     const s = createGame({ seed: 'ARENE' });
     let vacuums = 0;
     let items = 0;
@@ -105,7 +105,7 @@ describe("objets de l'arène", () => {
         step(s, [choiceCode(0)]);
         continue;
       }
-      s.players[0].hp = s.players[0].stats.maxHp; // immortel : on ne teste que l'apparition des objets
+      s.players[0].hp = s.players[0].stats.maxHp; // immortal: only item spawning is under test
       step(s, [0]);
       for (let k = 0; k < s.eventCount; k++) {
         const e = s.events[k];
@@ -121,8 +121,8 @@ describe("objets de l'arène", () => {
   });
 });
 
-describe('fusion des gemmes', () => {
-  it('au-delà du seuil, une gemme rejoint une gemme proche au lieu de s’ajouter', () => {
+describe('gem merging', () => {
+  it('past the threshold, a new gem merges into a nearby gem instead of being added', () => {
     const s = createGame({ seed: 'GEMMES' });
     for (let i = 0; i < 200; i++) spawnGem(s, 5000 + (i % 20) * 200, 5000 + Math.floor(i / 20) * 200, 1);
     expect(s.gemCount).toBe(200);

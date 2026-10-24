@@ -8,6 +8,8 @@
  */
 export const fr = {
   common: {
+    /** this language's own name, shown in the language selector */
+    languageName: 'Français',
     back: 'Retour',
     reset: 'Réinitialiser',
     yes: 'Oui',
@@ -393,6 +395,7 @@ export const fr = {
     newEnemy: 'Nouvel ennemi : {name}',
     horde: 'Horde : {name} !',
     ring: 'Encerclement !',
+    revive: 'Totem : tu reviens !',
     offerLevel: '{name} niv. {n}',
     offerEvolution: 'Évolution : {name}',
   },

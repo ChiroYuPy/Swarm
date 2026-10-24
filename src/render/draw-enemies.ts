@@ -22,7 +22,7 @@ const buckets: Int32Array[] = [];
 for (let t = 0; t < NUM_TYPES; t++) buckets.push(new Int32Array(MAX_ENEMIES));
 const bucketN = new Int32Array(NUM_TYPES);
 
-/** Meneurs : leur zone (pointillés), et une traînée derrière chaque ennemi qu'ils accélèrent. */
+/** Leaders: their zone (dashed), and a trail behind every enemy they speed up. */
 function drawLeaders(view: RenderView, s: GameState, alpha: number, time: number): void {
   if (ENEMY_LEADER < 0) return;
   const ctx = view.ctx;
@@ -60,7 +60,7 @@ function drawLeaders(view: RenderView, s: GameState, alpha: number, time: number
     const x = lerp(e.px, e.x, alpha);
     const y = lerp(e.py, e.y, alpha);
     if (!view.visible(x, y, e.r * 3)) continue;
-    // Deux traits de vitesse derrière lui.
+    // Two speed lines behind it.
     const fx = e.vx || 1;
     const fy = e.vy || 0;
     const nx = -fy * e.r * 0.5;
@@ -81,7 +81,7 @@ function drawLeaders(view: RenderView, s: GameState, alpha: number, time: number
   }
 }
 
-/** Téléporteurs : cercle d'impact au sol qui se remplit, relié au téléporteur. */
+/** Teleporters: ground impact circle that fills up, linked to the teleporter. */
 function drawBlinks(view: RenderView, s: GameState, alpha: number): void {
   if (ENEMY_BLINKER < 0) return;
   const ctx = view.ctx;
@@ -138,7 +138,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
     if (e.frozenUntil > tick) frozenCount++;
     buckets[e.type][n[e.type]++] = i;
   }
-  // Sprites, groupés par type puis par variante (normal / flash) pour limiter les changements de texture.
+  // Sprites, batched by type then by variant (normal / flash) to limit texture switches.
   for (let t = 0; t < NUM_TYPES; t++) {
     const cnt = n[t];
     if (!cnt) continue;
@@ -150,7 +150,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
       if (!rotates) view.worldTransform();
       for (let k = 0; k < cnt; k++) {
         const e = s.enemies[list[k]];
-        // Mur qui sort du sol : dessiné à part (pointillés), pas encore solide.
+        // Wall rising from the ground: drawn separately (dashed), not solid yet.
         if (t === WALL_TYPE && e.ai === 0) continue;
         const flash =
           e.frozenUntil > tick ||
@@ -167,7 +167,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
   }
   view.worldTransform();
 
-  // Gelés : une coque de glace autour du sprite blanc, qui clignote juste avant de fondre.
+  // Frozen: an ice shell around the white sprite, blinking just before it melts.
   if (frozenCount > 0) {
     ctx.beginPath();
     for (let i = 0; i < s.enemyCount; i++) {
@@ -187,7 +187,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
   drawBlinks(view, s, alpha);
   if (n[WALL_TYPE] > 0) drawRisingWalls(view, s, time);
 
-  // Zone d'explosion des bulles prêtes à éclater
+  // Blast zone of the bubbles about to burst
   if (ENEMY_KAMIKAZE >= 0 && n[ENEMY_KAMIKAZE] > 0) {
     ctx.beginPath();
     let fusing = false;
@@ -212,11 +212,11 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
     }
   }
 
-  // Boss : vectoriel (un seul), avec ses avertissements.
+  // Boss: vector (only one), with its warnings.
   if (boss) drawBoss(view, s, boss, lerp(boss.px, boss.x, alpha), lerp(boss.py, boss.y, alpha), time);
 }
 
-/** Murs en train de sortir du sol : contour en pointillés qui grandit. */
+/** Walls rising from the ground: growing dashed outline. */
 function drawRisingWalls(view: RenderView, s: GameState, time: number): void {
   const ctx = view.ctx;
   const rise = BUILDER_HEXAGON_BOSS.wallRise * TICK_RATE;

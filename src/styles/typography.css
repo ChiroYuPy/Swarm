@@ -1,6 +1,6 @@
 /* Typography: headings, section rules, the neon screen header (.head), version line, key hints (.foot.keys) and kbd. */
 
-/* ---------- Typographie ---------- */
+/* ---------- Typography ---------- */
 h1,
 h2,
 h3,
@@ -28,7 +28,7 @@ h3 {
   color: var(--muted);
   margin-bottom: 10px;
 }
-/* Titre de section suivi d'un filet qui s'efface : remplace les cadres. */
+/* Section title followed by a fading rule: replaces frames. */
 h3.rule {
   display: flex;
   align-items: center;
@@ -59,7 +59,7 @@ h3.rule small {
 .foot {
   text-align: center;
 }
-/* En-tête d'écran : titre néon à la couleur de l'écran (--c), filet qui s'étire depuis le centre. */
+/* Screen header: neon title in the screen's color (--c), rule stretching out from the center. */
 .head {
   display: flex;
   flex-direction: column;
@@ -77,7 +77,7 @@ h3.rule small {
     0 0 16px color-mix(in srgb, var(--c) 70%, transparent);
   animation: neon-on 0.9s 0.05s ease-out both;
 }
-/* le filet prend la largeur du titre, un peu plus de chaque côté (ses bouts s'effacent) */
+/* the rule takes the title's width, a bit more on each side (its ends fade out) */
 .head .ttl {
   display: flex;
   flex-direction: column;
@@ -116,7 +116,7 @@ h3.rule small {
   font-size: var(--fs-s);
   color: var(--muted);
 }
-/* Rappel des touches : des touches de clavier, puis l'action. */
+/* Key hints: keyboard keys, then the action. */
 .foot.keys {
   display: flex;
   flex-wrap: wrap;

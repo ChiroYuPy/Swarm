@@ -1,6 +1,6 @@
 /**
- * Effets visuels côté rendu : particules, nombres de dégâts, éclairs, ondes, secousses.
- * Alimentés par les événements de la sim. Utilisent le flux COSMETIC : ils ne touchent jamais la sim.
+ * Render-side visual effects: particles, damage numbers, lightning, rings, screen shake.
+ * Fed by sim events. They use the COSMETIC stream: they never touch the sim.
  */
 import { ENEMIES } from '../data/enemies';
 import { ALL_WEAPONS, type Behavior } from '../data/weapons';
@@ -145,7 +145,7 @@ const WEAPON_COL = ALL_WEAPONS.map((w) => fxColorIndex(w.color));
 const PICKUP_COL = PICKUPS.map((p) => fxColorIndex(p.color));
 
 export class Effects {
-  // Particules (structure de tableaux)
+  // Particles (structure of arrays)
   readonly px = new Float32Array(MAXP);
   readonly py = new Float32Array(MAXP);
   readonly pvx = new Float32Array(MAXP);
@@ -155,14 +155,14 @@ export class Effects {
   readonly psize = new Float32Array(MAXP);
   readonly pcol = new Uint8Array(MAXP);
   pCount = 0;
-  // Nombres de dégâts
+  // Damage numbers
   readonly tx = new Float32Array(MAXT);
   readonly ty = new Float32Array(MAXT);
   readonly tlife = new Float32Array(MAXT);
   readonly tval = new Float32Array(MAXT);
   readonly tbig = new Uint8Array(MAXT);
   tCount = 0;
-  // Éclairs
+  // Lightning
   readonly lx1 = new Float32Array(MAXL);
   readonly ly1 = new Float32Array(MAXL);
   readonly lx2 = new Float32Array(MAXL);
@@ -171,7 +171,7 @@ export class Effects {
   readonly lcol = new Uint8Array(MAXL);
   readonly lseed = new Uint32Array(MAXL);
   lCount = 0;
-  // Ondes de choc visuelles
+  // Visual shockwave rings
   readonly rx = new Float32Array(MAXR);
   readonly ry = new Float32Array(MAXR);
   readonly rr = new Float32Array(MAXR);
@@ -202,7 +202,7 @@ export class Effects {
   }
 
   addShake(v: number): void {
-    // Douce et plafonnée : l'écran doit rester lisible même quand tout explose.
+    // Gentle and capped: the screen must stay readable even when everything explodes.
     if (this.shakeEnabled) this.shake = Math.min(7, this.shake + v * 0.6);
   }
 
@@ -255,17 +255,17 @@ export class Effects {
     this.lseed[k] = (this.rng.next() * 4294967296) >>> 0;
   }
 
-  /** Transforme les événements du dernier pas de sim en effets, sons et messages. */
+  /** Turns the events of the last sim step into effects, sounds and messages. */
   consume(s: GameState): void {
     const h = this.hooks;
     this.hitBudget = this.lowQuality ? 6 : 14;
-    // Nombres de dégâts : quelques-uns par pas seulement, pour rester lisible.
+    // Damage numbers: only a few per step, to stay readable.
     this.textBudget = 4;
     for (let i = 0; i < s.eventCount; i++) {
       const e = s.events[i];
       switch (e.type) {
         case EV_HIT:
-          // Brûlure du feu au sol (x2 = 1) : ni étincelles ni son à chaque tic, juste les chiffres.
+          // Ground fire burn (x2 = 1): no sparks or sound on every tick, just the numbers.
           if (e.x2 !== 1 && this.hitBudget-- > 0) {
             this.burst(e.x, e.y + 6, 2, 0, 140, 0.18, 2);
             h.sfx('hit');
@@ -309,7 +309,7 @@ export class Effects {
         case EV_EXPLOSION:
           this.ring(e.x, e.y, e.v, e.k === 1 ? 6 : 13, 0.3);
           this.burst(e.x, e.y, 14, e.k === 1 ? 6 : 13, 300, 0.45, 3);
-          // Seules les explosions qui te visent secouent (pas tes mines).
+          // Only explosions aimed at the player shake the screen (not the player's mines).
           if (e.k === 1) this.addShake(4);
           h.sfx('explosion', e.v);
           break;
@@ -328,7 +328,7 @@ export class Effects {
           this.flashColor = ENEMIES[e.k].color;
           break;
         case EV_FLEE:
-          // Les ennemis normaux laissent la place au boss : un petit souffle à leur couleur.
+          // Normal enemies make way for the boss: a small puff in their color.
           this.burst(e.x, e.y, 4, ENEMY_COL[e.k], 150, 0.5, 2);
           break;
         case EV_WAVE:
@@ -422,7 +422,7 @@ export class Effects {
           }
           break;
         case EV_DEATH:
-          // Le héros éclate en éclats néon, deux ondes, un flash bref : net et lisible.
+          // The hero bursts into neon shards, two rings, a short flash: clean and readable.
           this.burst(e.x, e.y, 70, 1, 420, 1.4, 4);
           this.burst(e.x, e.y, 40, 0, 260, 1.1, 3);
           this.ring(e.x, e.y, 160, 1, 0.7);
@@ -451,7 +451,7 @@ export class Effects {
           this.ring(e.x, e.y, e.v * 1.6, 11, 1.0);
           this.burst(e.x, e.y, 60, 13, 380, 1.0, 4);
           this.addShake(10);
-          h.toast('Totem : tu reviens !', '#ffb347');
+          h.toast(t('toasts.revive'), '#ffb347');
           h.sfx('revive');
           break;
         case EV_BLINK:
@@ -466,7 +466,7 @@ export class Effects {
           this.burst(e.x, e.y, 2, e.v === 1 ? 6 : 15, 90, 0.15, 2);
           break;
         case EV_SWARM:
-          // k > 0 : horde (k = type + 1)
+          // k > 0: horde (k = type + 1)
           if (e.k > 0) h.toast(t('toasts.horde', { name: enemyName(ENEMIES[e.k - 1].id) }), ENEMIES[e.k - 1].color);
           h.sfx('alert');
           break;
@@ -546,7 +546,7 @@ export class Effects {
     }
   }
 
-  /** Décalage de caméra dû aux secousses (aléa cosmétique). */
+  /** Camera offset from screen shake (cosmetic randomness). */
   shakeOffset(): { x: number; y: number } {
     if (this.shake <= 0) return { x: 0, y: 0 };
     return { x: (this.rng.next() - 0.5) * 2 * this.shake, y: (this.rng.next() - 0.5) * 2 * this.shake };

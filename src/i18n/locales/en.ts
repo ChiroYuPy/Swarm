@@ -3,6 +3,7 @@ import type { LocaleShape } from '../index';
 
 export const en: LocaleShape = {
   common: {
+    languageName: 'English',
     back: 'Back',
     reset: 'Reset',
     yes: 'Yes',
@@ -375,6 +376,7 @@ export const en: LocaleShape = {
     newEnemy: 'New enemy: {name}',
     horde: 'Horde: {name}!',
     ring: 'Surrounded!',
+    revive: 'Totem: you’re back!',
     offerLevel: '{name} lv. {n}',
     offerEvolution: 'Evolution: {name}',
   },

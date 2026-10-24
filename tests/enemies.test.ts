@@ -10,7 +10,7 @@ import { WAVES } from '../src/data/waves';
 import { MIXES, UNLOCK_SLOT } from '../src/sim/registry';
 import { mixAt } from '../src/sim/spawner';
 
-/** Partie vide (aucune apparition automatique). */
+/** Empty game (no automatic spawns). */
 function arena(): GameState {
   return createGame({ seed: 'ENNEMIS', sandbox: { ...defaultSandbox().rules, invincible: false, enemyMul: 0, bosses: false, weapons: [] } });
 }
@@ -26,15 +26,15 @@ function alive(s: GameState, id: string) {
 
 const def = (id: string) => ENEMIES.find((e) => e.id === id)!;
 
-describe('nouveaux ennemis', () => {
-  it('Golem : se coupe en 2 Golems moyens, puis chacun en 2 petits', () => {
+describe('new enemies', () => {
+  it('Golem: splits into 2 medium Golems, then each into 2 small ones', () => {
     const s = arena();
     const g = put(s, 'golem', 400, 0);
     damageEnemy(s, s.enemies.indexOf(g), 1e6, 0, 0, 0);
     step(s, [0]);
     const mid = alive(s, 'golem_medium');
     expect(mid.length).toBe(2);
-    // Ils partent chacun de leur côté.
+    // They head off in different directions.
     expect(Math.abs(mid[0].y - mid[1].y)).toBeGreaterThan(10);
     for (const e of mid) damageEnemy(s, s.enemies.indexOf(e), 1e6, 0, 0, 0);
     step(s, [0]);
@@ -45,7 +45,7 @@ describe('nouveaux ennemis', () => {
     expect(s.enemyCount).toBe(0);
   });
 
-  it('Meneur : les voisins vont plus vite, plus du tout une fois le Meneur gelé', () => {
+  it('Leader: neighbours move faster, and stop being boosted once the Leader is frozen', () => {
     const s = arena();
     const m = put(s, 'leader', 400, 0, 100);
     const a = put(s, 'block', 460, 0, 100);
@@ -53,8 +53,8 @@ describe('nouveaux ennemis', () => {
     step(s, [0]);
     expect(a.boostUntil).toBeGreaterThan(s.tick);
     expect(far.boostUntil).toBe(0);
-    expect(m.boostUntil).toBe(0); // il ne s'accélère pas lui-même
-    // Même Bloc, avec et sans Meneur : celui qui est galvanisé avance plus.
+    expect(m.boostUntil).toBe(0); // it does not boost itself
+    // Same Block, with and without a Leader: the boosted one moves further.
     const b = arena();
     const ref = put(b, 'block', 460, 0, 100);
     put(b, 'block', -400, 0, 100);
@@ -70,7 +70,7 @@ describe('nouveaux ennemis', () => {
     expect(a.boostUntil).toBeLessThanOrEqual(s.tick);
   });
 
-  it('Téléporteur : marque le sol sous le joueur, y atterrit et blesse qui est resté', () => {
+  it('Teleporter: marks the ground under the player, lands there and hurts whoever stayed', () => {
     const s = arena();
     const p = s.players[0];
     const t = put(s, 'teleporter', 300, 0, 100);
@@ -86,18 +86,18 @@ describe('nouveaux ennemis', () => {
     expect(p.hp).toBeLessThan(hp0);
   });
 
-  it('Téléporteur : on esquive en sortant du cercle', () => {
+  it('Teleporter: dodged by leaving the circle', () => {
     const s = arena();
     const p = s.players[0];
     put(s, 'teleporter', 300, 0, 100);
     step(s, [0]);
     const hp0 = p.hp;
-    // On fuit vers le bas pendant l’avertissement (code 1 + 16 : un quart de tour sur 64 directions).
+    // Flee downwards during the warning (code 1 + 16: a quarter turn out of 64 directions).
     for (let i = 0; i < def('teleporter').fuse! * TICK_RATE + 2; i++) step(s, [17]);
     expect(p.hp).toBe(hp0);
   });
 
-  it('Orbiteur : tourne autour du joueur en se rapprochant', () => {
+  it('Orbiter: circles the player while closing in', () => {
     const s = arena();
     const p = s.players[0];
     const o = put(s, 'orbiter', 380, 0, 100);
@@ -111,14 +111,14 @@ describe('nouveaux ennemis', () => {
   });
 });
 
-describe('vagues lisibles', () => {
-  it('jamais plus de 3 types dans le flux à la fois, et les nouveaux types finissent par sortir', () => {
+describe('readable waves', () => {
+  it('never more than 3 types in the stream at once, and new types eventually show up', () => {
     for (let diff = 0; diff < DIFFICULTIES.length; diff++) {
       const seen = new Set<number>();
       for (let slot = 0; slot < 40; slot++) {
         const m = MIXES[mixAt(12345, diff, slot)];
         expect(m.types.length).toBeLessThanOrEqual(3);
-        // Tous les types du mélange sont déjà arrivés.
+        // Every type in the mix has already been unlocked.
         for (const t of m.types) expect(UNLOCK_SLOT[diff][t]).toBeLessThanOrEqual(slot);
         m.types.forEach((t) => seen.add(t));
       }
@@ -126,15 +126,15 @@ describe('vagues lisibles', () => {
     }
   });
 
-  it('un nouveau type est mis en vedette à son arrivée, et le mélange ne se répète pas', () => {
+  it('a new type is featured when it arrives, and the mix never repeats', () => {
     const t = enemyId('golem');
     const slot = UNLOCK_SLOT[1][t];
     expect(MIXES[mixAt(7, 1, slot)].types).toContain(t);
-    // (dès qu'il y a le choix : au tout début, seuls les Chasseurs existent)
+    // (once there is a choice: at the very start, only Hunters exist)
     for (let k = UNLOCK_SLOT[1][enemyId('rusher')] + 1; k < 40; k++) expect(mixAt(7, 1, k)).not.toBe(mixAt(7, 1, k - 1));
   });
 
-  it('Golem : nombre en vie plafonné', () => {
+  it('Golem: number alive is capped', () => {
     const s = createGame({ seed: 'GOLEMS', sandbox: { ...defaultSandbox().rules, invincible: true, enemyMul: 5, bosses: false, enemies: ['golem'], weapons: [] } });
     for (let i = 0; i < 40 * TICK_RATE; i++) step(s, [0]);
     expect(alive(s, 'golem').length).toBeLessThanOrEqual(def('golem').capStart! + 1);
@@ -142,8 +142,8 @@ describe('vagues lisibles', () => {
   });
 });
 
-describe('ennemis semés et plafond', () => {
-  it('un ennemi semé loin du joueur disparaît, sans gemme ni kill', () => {
+describe('outrun enemies and cap', () => {
+  it('an enemy left far behind the player despawns, with no gem and no kill', () => {
     const s = arena();
     put(s, 'hunter', WAVES.lostDistance + 200, 0);
     put(s, 'hunter', 300, 0);
@@ -153,7 +153,7 @@ describe('ennemis semés et plafond', () => {
     expect(s.players[0].kills).toBe(0);
   });
 
-  it('les vagues ne dépassent jamais le plafond, même avec beaucoup d’ennemis demandés', () => {
+  it('waves never exceed the cap, even when many enemies are requested', () => {
     const s = createGame({ seed: 'PLAFOND', sandbox: { ...defaultSandbox().rules, startWave: 11, enemyMul: 10, bosses: false, weapons: [] } });
     let max = 0;
     for (let i = 0; i < 90 * TICK_RATE; i++) {
@@ -161,7 +161,7 @@ describe('ennemis semés et plafond', () => {
       max = Math.max(max, s.enemyCount);
     }
     expect(max).toBeGreaterThan(WAVES.fluxCap - 20);
-    // + quelques caisses bonus, qui ne comptent pas
+    // + a few bonus crates, which do not count
     expect(max).toBeLessThanOrEqual(WAVES.enemyCap + WAVES.props.max);
   });
 });

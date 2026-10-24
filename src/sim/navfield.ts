@@ -1,10 +1,10 @@
 /**
- * Champ de navigation des ennemis : une grille locale centrée sur le joueur d'ancrage, où chaque case
- * connaît sa distance (en contournant les obstacles) jusqu'au joueur. Un ennemi qui ne voit pas le
- * joueur en ligne droite descend ce champ : il contourne les obstacles au lieu de s'y coller.
+ * Enemy navigation field: a local grid centred on the anchor player, where each cell
+ * knows its distance (going around obstacles) to the player. An enemy that cannot see the
+ * player in a straight line descends this field: it goes around obstacles instead of sticking to them.
  *
- * Cache dérivé (non sérialisé) : il ne dépend que de la carte et de la case du joueur, il est donc
- * recalculé à l'identique après une restauration.
+ * Derived cache (not serialized): it only depends on the map and the player's cell, so it is
+ * recomputed identically after a restore.
  */
 import { CHUNK } from './constants';
 import { obstacleTouches, type WorldMap } from './map';
@@ -13,18 +13,18 @@ const CELL = 32;
 const HALF = 48;
 const SIZE = HALF * 2 + 1;
 const N = SIZE * SIZE;
-/** marge autour des obstacles : les chemins passent au large */
+/** margin around obstacles: paths give them a wide berth */
 const INFLATE = 10;
 const SQRT2 = 1.4142135623730951;
 const FAR = 1e9;
 
-// 8 voisins : orthogonaux d'abord.
+// 8 neighbours: orthogonal first.
 const NX = [1, -1, 0, 0, 1, 1, -1, -1];
 const NY = [0, 0, 1, -1, 1, -1, 1, -1];
 const NCOST = [1, 1, 1, 1, SQRT2, SQRT2, SQRT2, SQRT2];
 
 export class NavField {
-  /** case (monde) du joueur au dernier calcul ; NaN = jamais calculé */
+  /** player's (world) cell at the last computation; NaN = never computed */
   private kx = NaN;
   private ky = NaN;
   private map: WorldMap | null = null;
@@ -35,11 +35,11 @@ export class NavField {
   private heapIdx = new Int32Array(N * 8 + 8);
   private heapKey = new Float64Array(N * 8 + 8);
   private heapN = 0;
-  /** direction conseillée (sortie de `dir`) */
+  /** suggested direction (output of `dir`) */
   x = 0;
   y = 0;
 
-  /** Recalcule le champ si le joueur a changé de case. */
+  /** Recomputes the field if the player changed cell. */
   update(m: WorldMap, px: number, py: number): void {
     const kx = Math.floor(px / CELL);
     const ky = Math.floor(py / CELL);
@@ -87,7 +87,7 @@ export class NavField {
     }
   }
 
-  /** Dijkstra 8-connexe depuis la case du joueur. */
+  /** 8-connected Dijkstra from the player's cell. */
   private solve(sx: number, sy: number): void {
     const d = this.dist;
     const b = this.blocked;
@@ -109,7 +109,7 @@ export class NavField {
         if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
         const ni = ny * SIZE + nx;
         if (b[ni]) continue;
-        // Diagonale : pas à travers un coin bouché des deux côtés.
+        // Diagonal: not through a corner blocked on both sides.
         if (k >= 4 && b[cy * SIZE + nx] && b[ny * SIZE + cx]) continue;
         const nd = cd + NCOST[k];
         if (nd < d[ni]) {
@@ -174,8 +174,8 @@ export class NavField {
   }
 
   /**
-   * Direction de descente depuis (x, y), visée deux cases plus loin pour lisser la trajectoire.
-   * Écrit dans this.x / this.y ; false si le point est hors du champ ou sans chemin.
+   * Descent direction from (x, y), aimed two cells ahead to smooth the path.
+   * Writes into this.x / this.y; false if the point is outside the field or has no path.
    */
   dir(x: number, y: number): boolean {
     const ix = Math.floor((x - this.ox) / CELL);

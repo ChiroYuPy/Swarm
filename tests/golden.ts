@@ -71,7 +71,7 @@ const maxed = (w: (typeof ALL_WEAPONS)[number]) => ({ id: w.id, level: w.levels.
 export function scenarios(): Scenario[] {
   const out: Scenario[] = [];
   // Full games driven by the bot, on every difficulty.
-  DIFFICULTIES.forEach((d, i) =>
+  DIFFICULTIES.forEach((_d, i) =>
     out.push({ name: `bot-${i}`, cfg: { seed: `GOLDEN-BOT-${i}`, difficulty: i }, seconds: i === 1 ? 300 : 150, driver: 'bot' }),
   );
   // Every weapon (base and evolved) at max level, MAX_WEAPON_SLOTS at a time.

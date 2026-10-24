@@ -1,6 +1,6 @@
 /* Scrollbars. */
 
-/* ---------- Barres de défilement ---------- */
+/* ---------- Scrollbars ---------- */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(150, 130, 255, 0.4) transparent;

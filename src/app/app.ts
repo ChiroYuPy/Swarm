@@ -1,6 +1,6 @@
 /**
- * Application : relie sim, rendu, entrées, audio, interface et stockage.
- * Boucle : simulation à pas fixe (60 Hz, accumulateur) découplée du rendu (interpolation).
+ * Application: wires sim, rendering, input, audio, UI and storage together.
+ * Loop: fixed-step simulation (60 Hz, accumulator) decoupled from rendering (interpolation).
  */
 import {
   createGame,
@@ -43,9 +43,9 @@ const params = new URLSearchParams(location.search);
 
 export class App implements AppApi {
   save: SaveData = loadSave();
-  /** configuration de la partie en cours (la seed reste interne : elle sert à la relecture) */
+  /** config of the current run (the seed stays internal: it is used for the replay) */
   private config: GameConfig = { seed: randomSeed(), difficulty: this.save.difficulty };
-  /** record à battre affiché dans le HUD (même difficulté) */
+  /** best score to beat shown in the HUD (same difficulty) */
   private bestAtStart = 0;
 
   private mode: Mode = 'menu';
@@ -53,19 +53,19 @@ export class App implements AppApi {
   private state: GameState;
   private demo = true;
   private readonly menuDemo: MenuDemo;
-  /** début de la chute du héros (performance.now), -1 hors chute */
+  /** start of the hero's fall (performance.now), -1 outside the fall */
   private dropAt = -1;
   private readonly log = new InputLog();
-  /** dernière partie terminée, rejouable depuis l'écran de fin (en mémoire uniquement) */
+  /** last finished run, replayable from the end screen (in memory only) */
   private lastRun: { config: GameConfig; codes: Uint8Array } | null = null;
   private replay: { cursor: ReplayCursor; speed: number } | null = null;
-  /** l'objet activable a été demandé (Espace) : appliqué au prochain pas de sim */
+  /** the active item was requested (Space): applied on the next sim step */
   private usePending = false;
   private acc = 0;
   private last = performance.now();
   private deathTimer = 0;
   private deathTotal = 1;
-  /** évite d'enregistrer deux fois la même partie */
+  /** avoids recording the same run twice */
   private runFinished = false;
   private readonly fps = new FpsMeter();
   private time = 0;
@@ -90,7 +90,7 @@ export class App implements AppApi {
       },
     });
     this.ui = new UI(this);
-    // Le canvas n'utilise une police que si elle est déjà chargée : on la précharge pour le HUD.
+    // The canvas only uses a font that is already loaded: preload it for the HUD.
     for (const f of ['500 13px "Chakra Petch"', '600 13px "Chakra Petch"', '700 30px "Chakra Petch"']) void document.fonts?.load(f).catch(() => {});
     if (params.get('fps') === '1') this.save.settings.showFps = true;
     // ?lang=en: language override (kept like any other setting once the options are touched).
@@ -99,7 +99,7 @@ export class App implements AppApi {
     // Applies the language too, before the first screen is drawn.
     this.applySettings(this.save.settings, false);
 
-    // Partie de démonstration jouée par le bot derrière le menu, préparée pendant l'intro.
+    // Demo game played by the bot behind the menu, prepared during the intro.
     this.menuDemo = new MenuDemo('DEMO-NEONAWAK', (next) => {
       if (this.mode === 'menu') {
         this.state = next;
@@ -122,7 +122,7 @@ export class App implements AppApi {
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
 
-    // ?seed=…&difficulty=… : outils de test uniquement.
+    // ?seed=…&difficulty=…: test tools only.
     const seedParam = params.get('seed');
     if (seedParam) this.config.seed = seedParam;
     const dParam = params.get('difficulty');
@@ -142,13 +142,13 @@ export class App implements AppApi {
     this.audio.play(kind);
   }
 
-  /** Le joueur allume l'écran : ce geste autorise le son, toute la bande-son de l'intro part. */
+  /** The player turns the screen on: this gesture unlocks sound, the whole intro soundtrack starts. */
   introPowerOn(): void {
     this.audio.unlock();
     this.audio.playIntro();
   }
 
-  /** Fin de l'intro (ou intro passée) : le menu arrive, la musique démarre avec un accord. */
+  /** End of the intro (or intro skipped): the menu comes in, the music starts with a chord. */
   introDone(): void {
     this.audio.unlock();
     this.audio.stopIntro();
@@ -162,11 +162,11 @@ export class App implements AppApi {
     this.start({ seed: randomSeed(), difficulty });
   }
 
-  /** Bac à sable : réglages libres, jamais classé. Les réglages sont gardés pour la prochaine fois. */
+  /** Sandbox: free settings, never ranked. The settings are kept for next time. */
   playSandbox(setup: SandboxSetup): void {
     this.save.sandbox = setup;
     writeSave(this.save);
-    // Copie : l'écran Sandbox modifie ses réglages en place, la partie (et sa relecture) ne doit pas suivre.
+    // Copy: the Sandbox screen edits its settings in place, the run (and its replay) must not follow.
     this.start({ seed: randomSeed(), difficulty: setup.difficulty, sandbox: structuredClone(setup.rules) });
   }
 
@@ -192,7 +192,7 @@ export class App implements AppApi {
     this.acc = 0;
     this.last = performance.now();
     this.mode = 'playing';
-    // Arrivée : le héros est lâché d'en haut et atterrit pile sur l'impact de la musique.
+    // Arrival: the hero is dropped from above and lands right on the music's impact.
     this.dropAt = this.botMode || this.stressMode ? -1 : performance.now();
     this.ui.hide();
     this.input.clear();
@@ -232,7 +232,7 @@ export class App implements AppApi {
   }
 
   quit(): void {
-    // Abandonner = fin de partie (le score est enregistré, comme une mort).
+    // Quitting = end of run (the score is recorded, like a death).
     this.finishRun();
   }
 
@@ -281,15 +281,15 @@ export class App implements AppApi {
     if (persist) writeSave(this.save);
   }
 
-  // ---------------- Logique ----------------
+  // ---------------- Logic ----------------
   private onAction(a: UiAction): void {
     this.ui.noteActivity();
-    // Pendant l'intro, n'importe quelle touche (ou bouton de manette) allume l'écran puis la passe.
+    // During the intro, any key (or gamepad button) turns the screen on, then skips it.
     if (this.ui.introActive) {
       this.ui.introInput();
       return;
     }
-    // Mode démo : le premier geste ramène le menu, sans autre effet.
+    // Attract mode: the first input brings the menu back, with no other effect.
     if (this.ui.attractActive) {
       this.ui.exitAttract();
       return;
@@ -305,7 +305,7 @@ export class App implements AppApi {
     const dir = a === 'left' || a === 'up' || a === 'right' || a === 'down' ? a : null;
     switch (this.mode) {
       case 'playing':
-        if (this.dropAt >= 0) break; // pendant la chute, la partie n'a pas encore commencé
+        if (this.dropAt >= 0) break; // during the fall, the run has not started yet
         if (a === 'pause') this.pause();
         else if (a === 'use' || a === 'confirm') this.usePending = true;
         break;
@@ -344,7 +344,7 @@ export class App implements AppApi {
         else if (a === 'confirm') this.ui.activate();
         break;
       case 'dying':
-        // Entrée / Échap : passer l'animation de fin
+        // Enter / Esc: skip the end animation
         if (a === 'confirm' || a === 'pause' || a === 'back') this.deathTimer = 0;
         break;
       case 'dead':
@@ -358,7 +358,7 @@ export class App implements AppApi {
     }
   }
 
-  /** `instant` : pause automatique, l'écran est posé sans animation (voir UI.mount). */
+  /** `instant`: automatic pause, the screen is shown without animation (see UI.mount). */
   private pause(instant = false): void {
     if (this.mode !== 'playing' && this.mode !== 'levelup') return;
     this.pauseFrom = this.mode;
@@ -368,7 +368,7 @@ export class App implements AppApi {
   }
 
   private autoPause(): void {
-    if (params.get('nopause') === '1' || !this.save.settings.autoPause) return; // outil de test / réglage
+    if (params.get('nopause') === '1' || !this.save.settings.autoPause) return; // test tool / setting
     if (this.mode === 'playing' || this.mode === 'levelup') this.pause(true);
   }
 
@@ -378,7 +378,7 @@ export class App implements AppApi {
     this.ui.showLevelUp(p.offerLevel, p.offers, owned, { weapons: p.weapons.length, passives: p.passives.length }, swapInfo(p));
   }
 
-  /** Échange d'arme : un pas « zéro » enregistré, puis on réaffiche les propositions. */
+  /** Weapon swap: a recorded zero-time step, then the offers are shown again. */
   startSwap(slot: number): void {
     this.swapStep(swapCode(slot));
   }
@@ -401,18 +401,18 @@ export class App implements AppApi {
     return buildInfo(this.state);
   }
 
-  /** Un pas de simulation en jeu. L'objet activable est un pas « zéro » enregistré juste avant. */
+  /** One in-game simulation step. The active item is a recorded zero-time step just before it. */
   private simStep(): void {
     const s = this.state;
     if (this.usePending && !this.botMode) {
       this.usePending = false;
-      if (s.players[0].activable >= 0) {
+      if (s.players[0].activeItem >= 0) {
         this.log.push(INPUT_USE);
         step(s, [INPUT_USE]);
         this.fx.consume(s);
       }
     }
-    // Visée manuelle : un pas « zéro » enregistré seulement quand la direction visée change.
+    // Manual aim: a recorded zero-time step, only when the aim direction changes.
     if (!this.botMode) {
       const aim = this.input.aim();
       if (aim !== s.players[0].aim) {
@@ -479,13 +479,13 @@ export class App implements AppApi {
     this.showDeathScreen(makeScoreRecord(this.state, new Date().toISOString()), 0, 0, true);
   }
 
-  /** Fin de la chute : secousse, ondes de choc et éclats autour du héros. */
+  /** End of the fall: shake, shockwaves and sparks around the hero. */
   private land(): void {
     this.dropAt = -1;
     landingFx(this.fx, this.state.players[0]);
   }
 
-  /** Avancement de la chute (0 → 1), ou -1 hors chute. */
+  /** Fall progress (0 → 1), or -1 outside the fall. */
   private dropProgress(now: number): number {
     return this.dropAt < 0 || this.mode !== 'playing' ? -1 : Math.min(1, (now - this.dropAt) / (START_RISE * 1000));
   }
@@ -503,7 +503,7 @@ export class App implements AppApi {
       case 'menu': {
         this.menuDemo.prepare(this.time);
         this.ui.idleTick(now);
-        // Démo en arrière-plan. Pendant l'intro (et sa préparation) elle est masquée et figée.
+        // Background demo. During the intro (and while it is prepared) it is hidden and frozen.
         if (this.ui.introActive || this.menuDemo.next?.state === this.state) {
           this.acc = 0;
           break;
@@ -521,7 +521,7 @@ export class App implements AppApi {
         break;
       }
       case 'playing': {
-        // Chute : la simulation attend l'atterrissage (rien n'est enregistré, la partie reste identique).
+        // Fall: the simulation waits for the landing (nothing is recorded, the run stays identical).
         if (this.dropAt >= 0) {
           if (now - this.dropAt < START_RISE * 1000) {
             this.acc = 0;
@@ -539,8 +539,8 @@ export class App implements AppApi {
             break;
           }
           if (++n >= PLAY_CATCHUP) {
-            // Machine trop lente : on ne rattrape pas indéfiniment (sinon chaque image coûte encore plus
-            // cher que la précédente, et tout rame, curseur compris). La partie ralentit un peu à la place.
+            // Machine too slow: do not catch up forever (otherwise each frame costs even more than the
+            // previous one and everything lags, cursor included). The game slows down a little instead.
             this.acc = 0;
             break;
           }
@@ -558,7 +558,7 @@ export class App implements AppApi {
           if (c < 0) break;
           this.fx.consume(this.state);
           this.audio.setIntensity(musicIntensity(this.state));
-          if (isZeroTimeCode(c)) continue; // choix et objets ne consomment pas de temps
+          if (isZeroTimeCode(c)) continue; // choices and items take no time
           this.acc -= STEP_MS;
           n++;
         }
@@ -579,17 +579,17 @@ export class App implements AppApi {
         break;
     }
 
-    // Résolution dynamique : seulement quand la partie tourne vraiment (pas en pause ni au menu).
+    // Dynamic resolution: only while the run is really going (not paused, not in the menu).
     if (this.mode === 'playing' && this.dropAt < 0) this.renderer.adaptResolution(dtMs);
-    // Les effets cosmétiques continuent de s'estomper même en pause (la sim, elle, est figée).
+    // Cosmetic effects keep fading even when paused (the sim itself is frozen).
     this.fx.update(this.mode === 'dying' ? dt * 0.4 : dt);
-    // Chute : on voit toute la zone de haut, puis la caméra plonge de plus en plus vite sur le héros.
+    // Fall: the whole area is seen from above, then the camera dives faster and faster onto the hero.
     const drop = this.dropProgress(now);
     const zoom = cameraZoom(drop, this.demo);
     this.renderer.render(this.state, alpha, this.fx, {
       quality: this.save.settings.quality,
       time: this.time,
-      // En pause, le résumé reprend tout ce qu'affiche le HUD : on le masque.
+      // When paused, the summary repeats everything the HUD shows: hide it.
       hud: !this.demo && drop < 0 && this.mode !== 'paused',
       zoom,
       drop: drop >= 0 ? drop : undefined,

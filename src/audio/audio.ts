@@ -1,7 +1,7 @@
 /**
- * Audio 100 % synthétisé avec WebAudio : aucun fichier.
- * Effets courts (oscillateurs + bruit filtré), une réverbération et un écho partagés, et deux boucles
- * séquencées à la volée, au même tempo : le menu et la partie (couches qui s'ajoutent avec l'intensité).
+ * 100% synthesized audio with WebAudio: no files.
+ * Short effects (oscillators + filtered noise), a shared reverb and echo, and two loops sequenced
+ * on the fly at the same tempo: the menu and the game (layers that add up with intensity).
  */
 import type { SfxName } from '../render/effects';
 
@@ -12,7 +12,7 @@ type Track = 'menu' | 'game';
 interface Filter {
   type: BiquadFilterType;
   freq: number;
-  /** fréquence d'arrivée (rampe exponentielle sur la durée du son) */
+  /** target frequency (exponential ramp over the sound's duration) */
   f1?: number;
   q?: number;
 }
@@ -21,23 +21,23 @@ interface ToneOpts {
   bus?: Bus | null;
   filter?: Filter;
   detune?: number;
-  /** exp : attaque et chute exponentielles (sons percussifs) ; lin : attaque, palier, chute linéaires */
+  /** exp: exponential attack and decay (percussive sounds); lin: linear attack, sustain, release */
   shape?: 'exp' | 'lin';
   attack?: number;
-  /** durée de la chute (lin), par défaut tout ce qui suit l'attaque */
+  /** release duration (lin), defaults to everything after the attack */
   release?: number;
-  /** position stéréo, ou glissement [départ, arrivée] sur la durée du son */
+  /** stereo position, or a [start, end] slide over the sound's duration */
   pan?: number | [number, number];
-  /** envois vers la réverbération et l'écho */
+  /** sends to the reverb and the echo */
   rev?: number;
   dly?: number;
   glide?: 'exp' | 'lin';
   glideTime?: number;
-  /** résonance du filtre (bruit) */
+  /** filter resonance (noise) */
   q?: number;
 }
 
-/** Une sortie et ses deux envois (réverbération, écho) : on règle ou coupe les trois ensemble. */
+/** An output and its two sends (reverb, echo): the three are set or cut together. */
 interface Bus {
   out: GainNode;
   rev: GainNode;
@@ -69,8 +69,8 @@ const THROTTLE: Partial<Record<SfxName | 'ui', number>> = {
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 const lp = (freq: number): Filter => ({ type: 'lowpass', freq });
 
-// ---------------- Musique ----------------
-/** double-croche à 112 BPM : les deux boucles partagent le tempo, les transitions tombent en rythme */
+// ---------------- Music ----------------
+/** sixteenth note at 112 BPM: both loops share the tempo, so transitions land on the beat */
 const STEP = 60 / 112 / 4;
 const AM = [57, 60, 64];
 const F = [53, 57, 60];
@@ -78,19 +78,19 @@ const C = [48, 52, 55];
 const G = [55, 59, 62];
 const DM = [50, 53, 57];
 const E = [52, 56, 59];
-/** boucle historique (une mesure par accord), reprise par le menu */
+/** original loop (one bar per chord), used by the menu */
 const LOOP = [AM, F, C, G];
-/** partie : A (la boucle historique) puis B qui monte en tension vers Mi majeur */
+/** game: A (the original loop) then B, which builds tension towards E major */
 const GAME_PROG = [AM, F, C, G, DM, F, G, E];
 const LOOP_STEPS = 128;
 
 // ---------------- Intro ----------------
-/** instants (s) où chaque lettre du logo s'allume, voir letter-on dans style.css */
+/** times (s) at which each logo letter flickers, see letter-on in styles/intro.css */
 const FLICK = [0, 0.18, 0.348];
-/** Lancement d'une partie : durée (s) de la montée avant l'impact, qui est aussi l'atterrissage du héros. */
+/** Run start: duration (s) of the rise before the impact, which is also the hero's landing. */
 export const START_RISE = 1.3;
 
-/** Intro : allumage de l'écran, puis l'essaim forme le logo, puis les lettres s'allument (ms, alignés sur ui.ts). */
+/** Intro: the screen turns on, then the swarm forms the logo, then the letters light up (ms, shared with ui/screens/intro.ts). */
 export const INTRO_TIMING = { crt: 1050, swarm: 1600, letterGap: 200 };
 
 export class AudioEngine {
@@ -100,9 +100,9 @@ export class AudioEngine {
   private dlyIn: GainNode | null = null;
   private sfx: Bus | null = null;
   private music: Bus | null = null;
-  /** sons de l'intro, coupés d'un coup si le joueur la passe */
+  /** intro sounds, cut at once if the player skips it */
   private intro: Bus | null = null;
-  /** fondu et filtre de la musique (transitions) */
+  /** music fade and filter (transitions) */
   private musicFade: GainNode | null = null;
   private musicLp: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
@@ -114,16 +114,16 @@ export class AudioEngine {
   private duck = 1;
   private musicOn = false;
   private track: Track = 'menu';
-  /** changement de boucle programmé (instant du contexte audio) */
+  /** scheduled loop change (audio context time) */
   private pending: { track: Track; at: number } | null = null;
   private nextNote = 0;
   private stepIdx = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
-  /** 0 = calme … 1 = boss ; suit `intensityTarget` en douceur */
+  /** 0 = calm … 1 = boss; follows `intensityTarget` smoothly */
   private intensity = 0;
   private intensityTarget = 0;
 
-  /** Crée / réveille le contexte audio (doit suivre un geste de l'utilisateur). */
+  /** Creates / resumes the audio context (must follow a user gesture). */
   unlock(): void {
     if (!this.ctx) {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -132,13 +132,13 @@ export class AudioEngine {
       this.ctx = ctx;
       this.master = ctx.createGain();
       this.master.connect(ctx.destination);
-      // Réverbération : réponse impulsionnelle générée (bruit qui décroît), toujours la même.
+      // Reverb: generated impulse response (decaying noise), always the same.
       const rev = ctx.createConvolver();
       rev.buffer = this.impulse(2.6, 2.4);
       this.revIn = ctx.createGain();
       this.revIn.connect(rev);
       rev.connect(this.master);
-      // Écho à la croche pointée, assourdi à chaque retour.
+      // Dotted-eighth echo, damped on each repeat.
       const dly = ctx.createDelay(2);
       dly.delayTime.value = STEP * 3;
       const fb = ctx.createGain();
@@ -219,12 +219,12 @@ export class AudioEngine {
   isMuted(): boolean {
     return this.muted;
   }
-  /** Baisse la musique (pause, menus). */
+  /** Lowers the music (pause, menus). */
   setDuck(d: number): void {
     this.duck = d;
     this.applyVolumes();
   }
-  /** Intensité voulue pour la musique de partie (0 = calme … 1 = boss). */
+  /** Target intensity for the game music (0 = calm … 1 = boss). */
   setIntensity(v: number): void {
     this.intensityTarget = v;
   }
@@ -247,8 +247,8 @@ export class AudioEngine {
 
   private env(p: AudioParam, t: number, dur: number, gain: number, o: ToneOpts): void {
     const a = o.attack ?? 0.005;
-    // Sans ça, le gain vaut 1 jusqu'au premier événement : selon l'arrondi, le son démarre un
-    // échantillon trop tôt, à plein volume, et claque.
+    // Without this, the gain is 1 until the first event: depending on rounding, the sound starts one
+    // sample too early, at full volume, and clicks.
     p.value = 0;
     if (o.shape === 'lin') {
       const rel = o.release ?? dur - a;
@@ -263,7 +263,7 @@ export class AudioEngine {
     }
   }
 
-  /** Branche un son enveloppé sur son bus (panoramique, envois). */
+  /** Connects an enveloped sound to its bus (panning, sends). */
   private route(node: AudioNode, bus: Bus, t: number, dur: number, o: ToneOpts): void {
     const ctx = this.ctx!;
     let n = node;
@@ -445,13 +445,13 @@ export class AudioEngine {
         this.tone('square', 1500, 700, 0.04, 0.02, 0, { filter: lp(3500) });
         break;
       case 'shatter':
-        // Verre qui se brise : souffle aigu et deux tintements
+        // Breaking glass: high hiss and two chimes
         this.noiseHit(0.12, 0.06, 'highpass', 5000);
         this.tone('sine', 2600, 2400, 0.08, 0.03);
         this.tone('sine', 3400, 3100, 0.06, 0.02, 0.03);
         break;
       case 'clock':
-        // Tic-tac qui ralentit, sur une note grave qui descend
+        // Slowing tick-tock over a falling low note
         [0, 0.22, 0.5, 0.86].forEach((t, i) => this.tone('square', i % 2 ? 1250 : 1650, i % 2 ? 1200 : 1600, 0.03, 0.04, t, { filter: lp(4000) }));
         this.tone('sine', 220, 110, 1.1, 0.08);
         break;
@@ -460,12 +460,12 @@ export class AudioEngine {
         this.tone('sine', 446, 666, 0.25, 0.05, 0.05);
         break;
       case 'blink':
-        // Distorsion qui « aspire » puis claque
+        // Distortion that sucks in, then snaps
         this.tone('sawtooth', 1400, 180, 0.16, 0.04, 0, { filter: lp(2400) });
         this.noiseHit(0.1, 0.05, 'highpass', 3000);
         break;
       case 'wave':
-        // Gong court : une vague arrive
+        // Short gong: a wave is coming
         this.tone('triangle', 330, 330, 0.25, 0.06);
         this.tone('triangle', 495, 495, 0.35, 0.05, 0.1);
         break;
@@ -474,12 +474,12 @@ export class AudioEngine {
         this.noiseHit(0.06, 0.04, 'highpass', 4000);
         break;
       case 'bossLaser':
-        // Rayon qui monte en puissance puis balaie
+        // Beam that powers up, then sweeps
         this.tone('sawtooth', 120, 480, 0.9, 0.07, 0, { filter: lp(1800) });
         this.tone('square', 240, 960, 0.9, 0.03, 0, { filter: lp(2400) });
         break;
       case 'cage':
-        // Murs qui sortent du sol
+        // Walls rising from the ground
         this.noiseHit(0.5, 0.12, 'lowpass', 900, 80);
         [0, 0.08, 0.16].forEach((t) => this.tone('square', 160, 120, 0.07, 0.05, t));
         break;
@@ -487,7 +487,7 @@ export class AudioEngine {
         this.noiseHit(0.5, 0.12, 'lowpass', 2000, 120);
         [392, 494, 587, 784, 988].forEach((f, i) => this.tone('triangle', f, f, 0.5, 0.06, 0.1 + i * 0.07));
         break;
-      // Interface « holo-mécanique » : clics secs d'écran tactile, petit choc grave pour valider.
+      // "Holo-mechanical" interface: dry touchscreen clicks, a small low thud to confirm.
       case 'uiMove':
         this.noiseHit(0.012, 0.05, 'highpass', 5000);
         this.tone('sine', 2400, 2400, 0.015, 0.02);
@@ -502,7 +502,7 @@ export class AudioEngine {
         this.tone('triangle', 1320, 660, 0.1, 0.03);
         break;
       case 'powerOn':
-        // Fin de l'intro : montée électrique puis accord, comme un néon qui s'allume en grand.
+        // End of the intro: electric rise then a chord, like a big neon sign turning on.
         this.tone('sawtooth', 70, 420, 0.45, 0.06, 0, { filter: lp(1400) });
         this.noiseHit(0.25, 0.06, 'highpass', 3500);
         [262, 392, 523, 784].forEach((f, i) => this.tone('triangle', f, f, 0.7, 0.045, 0.28 + i * 0.05));
@@ -512,8 +512,8 @@ export class AudioEngine {
 
   // ---------------- Intro ----------------
   /**
-   * Toute la bande-son de l'intro, programmée d'un coup au moment où le joueur allume l'écran :
-   * allumage cathodique, essaim en tourbillon qui forme le logo, grésillement de chaque lettre.
+   * The whole intro soundtrack, scheduled at once when the player turns the screen on:
+   * CRT power-on, swirling swarm that forms the logo, crackle of each letter.
    */
   playIntro(): void {
     const ctx = this.ctx;
@@ -524,7 +524,7 @@ export class AudioEngine {
     const swarm = INTRO_TIMING.crt / 1000;
     const letters = swarm + INTRO_TIMING.swarm / 1000;
 
-    // 1. Télé cathodique : claquement, « thoum » de démagnétisation, grésillement, l'image s'ouvre.
+    // 1. CRT TV: snap, degaussing "thoom", crackle, the picture opens.
     this.noiseHit(0.03, 0.35, 'highpass', 1500, 1500, 0, o);
     this.tone('square', 140, 50, 0.04, 0.12, 0, { ...o, filter: lp(800) });
     const hum = this.tone('sawtooth', 60, 52, 1.2, 0.2, 0.04, { ...o, filter: lp(280), attack: 0.02 });
@@ -544,7 +544,7 @@ export class AudioEngine {
     this.noiseHit(0.65, 0.07, 'lowpass', 400, 7000, 0.45, { ...o, shape: 'lin', attack: 0.45, release: 0.2 });
     this.tone('sine', 11000, 11000, 2.2, 0.01, 0.45, { ...o, shape: 'lin', attack: 0.3 });
 
-    // 2. L'essaim : deux souffles qui tournent d'une oreille à l'autre de plus en plus vite, puis impact.
+    // 2. The swarm: two whooshes circling from ear to ear faster and faster, then impact.
     const dur = INTRO_TIMING.swarm / 1000;
     const t0 = ctx.currentTime + swarm;
     for (const [f0, f1, side] of [
@@ -578,7 +578,7 @@ export class AudioEngine {
     this.tone('sine', 85, 35, 0.6, 0.3, letters, o);
     this.noiseHit(0.5, 0.1, 'lowpass', 4000, 150, letters, { ...o, rev: 0.4 });
 
-    // 3. Les lettres : chaque vacillement grésille, la lettre bourdonne une fois allumée.
+    // 3. The letters: each flicker crackles, the letter hums once lit.
     for (let i = 0; i < 5; i++)
       FLICK.forEach((f, k) => {
         const at = letters + (i * INTRO_TIMING.letterGap) / 1000 + f;
@@ -590,12 +590,12 @@ export class AudioEngine {
       });
   }
 
-  /** Coupe ce qui reste de la bande-son de l'intro (intro passée). */
+  /** Cuts what is left of the intro soundtrack (intro skipped). */
   stopIntro(): void {
     if (this.intro) this.setBus(this.intro, 0, 0.04);
   }
 
-  // ---------------- Musique ----------------
+  // ---------------- Music ----------------
   startMusic(track: Track = this.track): void {
     if (!this.ctx) return;
     if (this.musicOn) {
@@ -618,8 +618,8 @@ export class AudioEngine {
   }
 
   /**
-   * Lancement d'une partie : un claquement, la musique en cours se ferme (filtre) pendant une montée
-   * de souffle, puis impact : la musique de partie démarre pile dessus.
+   * Run start: a snap, the current music closes up (filter) during a rising whoosh,
+   * then impact: the game music starts right on it.
    */
   startGame(): void {
     const ctx = this.ctx;
@@ -641,7 +641,7 @@ export class AudioEngine {
     this.switchTrack('game', true, rise);
   }
 
-  /** Change de boucle : en filtrant (montée vers l'impact) ou par un court fondu. */
+  /** Switches loop: with a filter sweep (rise to the impact) or a short crossfade. */
   switchTrack(track: Track, sweep: boolean, delay = 0.3): void {
     const ctx = this.ctx;
     if (!ctx || !this.musicLp || !this.musicFade) return;
@@ -678,7 +678,7 @@ export class AudioEngine {
         this.nextNote = Math.max(this.pending.at, ctx.currentTime);
         this.takePending();
       }
-      // L'intensité suit sa cible en quelques secondes ; le boss la fait sauter d'un coup.
+      // Intensity follows its target over a few seconds; a boss makes it jump at once.
       const target = this.intensityTarget;
       this.intensity = target >= 0.95 ? target : this.intensity + (target - this.intensity) * 0.04;
       const when = this.nextNote - ctx.currentTime;
@@ -715,7 +715,7 @@ export class AudioEngine {
     this.tone('sawtooth', midi(n), midi(n), dur, g, when, { bus: this.music, filter: { type: 'lowpass', freq: cut, q: 2 } });
   }
 
-  /** Menu : la boucle historique (basse, arpège, kick, charleston), sans mélodie. */
+  /** Menu: the original loop (bass, arpeggio, kick, hi-hat), no melody. */
   private menuNote(step: number, when: number): void {
     const bus = this.music;
     const chord = LOOP[Math.floor(step / 16) % 4];
@@ -731,8 +731,8 @@ export class AudioEngine {
   }
 
   /**
-   * Partie : 8 mesures (A puis B), sans mélodie. L'intensité ajoute des couches : charleston (25 %),
-   * arpège rapide et clap (50 %), basse en double-croches (75 %), puis basse doublée et galop pour le boss.
+   * Game: 8 bars (A then B), no melody. Intensity adds layers: hi-hat (25%),
+   * fast arpeggio and clap (50%), sixteenth-note bass (75%), then doubled bass and gallop for the boss.
    */
   private gameNote(step: number, when: number, I: number): void {
     const bus = this.music;

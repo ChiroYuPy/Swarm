@@ -10,10 +10,10 @@ import { EF_BOSS, EV_SHOOT, emit, type GameState, type Player, type WeaponInst }
 import { RETRY_TICKS, cdTicks, facing, inCone, target } from './common';
 
 export const WHIP_FX_TICKS = 16;
-/** écart entre deux lanières du Fouet (1/20 de tour) */
+/** gap between two Whip lashes (1/20 of a turn) */
 const WHIP_STEP = TWO_PI / 20;
 
-/** Fouet : des lanières en éventail devant toi (1/5 de tour au plus), qui blessent et repoussent loin dans leur axe. */
+/** Whip: lashes fanned out in front of you (1/5 of a turn at most) that hurt and knock far back along their axis. */
 export function whip(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;
   w.timer -= 1;
@@ -31,7 +31,7 @@ export function whip(s: GameState, p: Player, w: WeaponInst, _slot: number, L: W
   const dmg = L.damage * p.stats.might;
   const g = s.grid;
   for (let k = 0; k < n; k++) {
-    // Éventail centré devant toi : 18° entre deux lanières, 72° pour 5.
+    // Fan centred in front of you: 18° between two lashes, 72° for 5.
     const a = base + (k - (n - 1) / 2) * WHIP_STEP;
     w.angles[k] = a;
     const ux = dcos(a);
@@ -62,8 +62,8 @@ export function whip(s: GameState, p: Player, w: WeaponInst, _slot: number, L: W
 export const SCYTHE_FX_TICKS = 18;
 
 /**
- * Faux : un coup instantané tout autour de toi, qui enlève une part des PV max de chaque cible (moins sur
- * les boss) : autant de coups pour un petit que pour un gros. Elle achève les ennemis presque morts.
+ * Scythe: an instant hit all around you that removes a share of each target's max HP (less on
+ * bosses): as many hits for a small one as for a big one. It finishes off nearly dead enemies.
  */
 export function scythe(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   if (w.activeTicks > 0) w.activeTicks--;

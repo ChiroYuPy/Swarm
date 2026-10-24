@@ -1,6 +1,6 @@
 /* Equipment lists: final build items (game over) and the pause summary (gear rows, stat grid). */
 
-/* ---------- Équipement (fin de partie) ---------- */
+/* ---------- Gear (end of run) ---------- */
 .build .items {
   display: flex;
   flex-wrap: wrap;
@@ -30,7 +30,7 @@
   color: var(--gold);
 }
 
-/* ---------- Pause : résumé de la partie ---------- */
+/* ---------- Pause: run summary ---------- */
 .screen-pause {
   width: min(1100px, 100%);
   gap: 16px;
@@ -51,7 +51,7 @@
 .pause-stats h3 {
   margin-bottom: 6px;
 }
-/* Une ligne d'équipement : icône, nom + niveau en pastilles, chiffres, évolution. */
+/* A gear row: icon, name + level pips, figures, evolution. */
 .gear {
   --c: #fff;
   display: flex;
@@ -104,7 +104,7 @@
   opacity: 1;
   text-shadow: 0 0 10px rgba(255, 210, 58, 0.45);
 }
-/* Stats : trois colonnes « libellé valeur » ; celles qui ont un bonus en couleur, avec leurs sources. */
+/* Stats: three "label value" columns; those with a bonus in color, with their sources. */
 .pause-stats {
   width: 100%;
 }

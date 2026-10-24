@@ -1,4 +1,4 @@
-/** Point d'entrée de la simulation (logique pure, sans DOM). */
+/** Simulation entry point (pure logic, no DOM). */
 export * from './constants';
 export * from './state';
 export {

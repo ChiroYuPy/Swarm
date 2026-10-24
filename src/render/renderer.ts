@@ -1,11 +1,11 @@
 /**
- * Rendu Canvas 2D néon.
- * Performances :
- * - les entités nombreuses (ennemis, gemmes, balles, particules) sont des sprites pré-rendus avec leur
- *   lueur (ImageBitmap), dessinés groupés par texture : ~6x moins cher pour le GPU que des tracés épais ;
- * - les éléments rares (murs, boss, ondes, éclairs, orbites) restent vectoriels, lueur = trait large
- *   translucide en mode additif (jamais de shadowBlur) ;
- * - seules les entités visibles sont dessinées.
+ * Neon Canvas 2D rendering.
+ * Performance:
+ * - numerous entities (enemies, gems, bullets, particles) are sprites pre-rendered with their glow
+ *   (ImageBitmap), drawn batched by texture: ~6x cheaper for the GPU than thick strokes;
+ * - rare elements (walls, bosses, rings, lightning, orbits) stay vector, glow = wide translucent
+ *   stroke in additive mode (never shadowBlur);
+ * - only visible entities are drawn.
  */
 import type { GameState } from '../sim';
 import { COLORS } from './palette';
@@ -22,19 +22,19 @@ import { drawGameOver, drawSpeedLines } from './draw-screen';
 
 export interface RenderOptions extends HudOptions {
   quality: 'high' | 'low';
-  /** temps réel en secondes (animations décoratives) */
+  /** real time in seconds (decorative animations) */
   time: number;
-  /** HUD affiché (masqué pendant la démo du menu) */
+  /** HUD shown (hidden during the menu demo) */
   hud: boolean;
-  /** < 1 : caméra reculée (démo du menu, chute du héros au lancement) */
+  /** < 1: camera pulled back (menu demo, hero's fall at run start) */
   zoom?: number;
-  /** 0 → 1 : avancement de la chute du héros au lancement d'une partie */
+  /** 0 → 1: progress of the hero's fall at the start of a run */
   drop?: number;
-  /** 0..1 : progression de l'animation de mort (assombrissement + GAME OVER) */
+  /** 0..1: progress of the death animation (darkening + GAME OVER) */
   deathFade: number;
 }
 
-/** Résolution dynamique : plancher, pas, et seuils (ms par image, moyenne glissante). */
+/** Dynamic resolution: floor, step, and thresholds (ms per frame, moving average). */
 const RES_MIN = 0.55;
 const RES_STEP = 0.15;
 const RES_SLOW_MS = 20;
@@ -42,13 +42,13 @@ const RES_FAST_MS = 17.5;
 
 /** Owns the canvas and camera state (see RenderView) and orchestrates the draw order of a frame. */
 export class Renderer extends RenderView {
-  /** échelle sans le zoom de la caméra */
+  /** scale without the camera zoom */
   private baseScale = 1;
   private resScale = 1;
   private frameAvg = 1000 / 60;
   private slowMs = 0;
   private fastMs = 0;
-  /** temps fluide requis avant de remonter la résolution (doublé à chaque rechute) */
+  /** smooth time required before raising the resolution again (doubled on each relapse) */
   private raiseAfterMs = 4000;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -62,18 +62,18 @@ export class Renderer extends RenderView {
     this.resize();
   }
 
-  /** Part de la résolution native utilisée (résolution dynamique), entre RES_MIN et 1. */
+  /** Fraction of the native resolution in use (dynamic resolution), between RES_MIN and 1. */
   get resolution(): number {
     return this.resScale;
   }
 
   /**
-   * Résolution dynamique : quand les images ralentissent pendant une seconde (souvent la carte graphique,
-   * débordée par les centaines d'ennemis à mélanger), on dessine en un peu moins de pixels ; on remonte
-   * quand tout est redevenu fluide, de plus en plus prudemment si ça rechute.
+   * Dynamic resolution: when frames slow down for a second (often the GPU, overwhelmed by the
+   * hundreds of enemies to blend), draw with slightly fewer pixels; go back up once everything
+   * is smooth again, more and more cautiously if it keeps relapsing.
    */
   adaptResolution(dtMs: number): void {
-    if (dtMs <= 0 || dtMs > 100) return; // pause, onglet caché, saccade isolée : on ignore
+    if (dtMs <= 0 || dtMs > 100) return; // pause, hidden tab, isolated hitch: ignored
     this.frameAvg += (dtMs - this.frameAvg) * 0.1;
     if (this.frameAvg > RES_SLOW_MS) {
       this.slowMs += dtMs;
@@ -110,7 +110,7 @@ export class Renderer extends RenderView {
     this.canvas.height = this.ch;
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
-    // Surface monde visible à peu près constante, quelle que soit la résolution.
+    // Roughly constant visible world area, whatever the resolution.
     this.scale = this.baseScale = Math.min(this.cw / 1400, this.ch / 860);
   }
 
@@ -154,7 +154,7 @@ export class Renderer extends RenderView {
     drawTexts(this, fx);
     drawIndicators(this, s);
 
-    // Écran
+    // Screen
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const W = this.cw / this.dpr;
     const H = this.ch / this.dpr;
@@ -168,7 +168,7 @@ export class Renderer extends RenderView {
       ctx.fillRect(0, 0, W, H);
     }
     if (s.clockUntil > s.tick) {
-      // Horloge : voile bleuté et bords sombres, qui s'estompent sur la dernière demi-seconde.
+      // Clock: bluish veil and dark edges, fading out over the last half second.
       const k = Math.min(1, (s.clockUntil - s.tick) / 30);
       const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
       g.addColorStop(0, `rgba(110, 140, 255, ${0.05 * k})`);

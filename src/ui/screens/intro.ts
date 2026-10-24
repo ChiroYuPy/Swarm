@@ -8,25 +8,25 @@ import { t } from '../../i18n';
 import { reducedMotion } from '../html';
 import type { UI } from '../ui';
 
-/** Durée de l'allumage cathodique (ms), alignée sur style.css. */
+/** CRT power-on duration (ms), matching styles/intro.css. */
 const CRT_MS = 1100;
-/** début de l'allumage des lettres (ms après l'allumage de l'écran), aligné sur letter-on dans style.css */
+/** start of the letters lighting up (ms after the screen turns on), matching letter-on in styles/intro.css */
 const LETTERS_AT = INTRO_TIMING.crt + INTRO_TIMING.swarm;
-/** l'intro se termine seule une fois le logo allumé (dernière lettre + un temps de pose) */
+/** the intro ends on its own once the logo is lit (last letter + a pause) */
 const INTRO_END_MS = LETTERS_AT + 4 * INTRO_TIMING.letterGap + 600 + 600;
-/** inactivité sur le menu avant de passer en mode démo (ms) */
+/** idle time on the menu before switching to attract mode (ms) */
 const ATTRACT_MS = 20000;
 
-// ---------- Intro (premier chargement) ----------
+// ---------- Intro (first load) ----------
 /**
- * Intro en trois temps :
- * 0. veille : écran noir, un voyant au centre, « Appuie pour allumer ». Ce geste autorise le son :
- *    toute l'intro est sonorisée ;
- * 1. allumage façon vieux téléviseur : le voyant devient un point lumineux qui s'étire en trait,
- *    puis l'image s'ouvre jusqu'à plein écran ;
- * 2. un essaim de particules arrive en tourbillon de tous les bords et forme le logo, dont les
- *    lettres s'allument ensuite une par une comme des néons ;
- * 3. le logo remonte à sa place et les boutons du menu se déroulent (seul, ou dès qu'on appuie).
+ * Intro in three stages:
+ * 0. standby: black screen, an LED in the center, "Press to turn on". This gesture unlocks sound:
+ *    the whole intro has sound;
+ * 1. old-TV style power-on: the LED becomes a bright dot that stretches into a line,
+ *    then the picture opens up to full screen;
+ * 2. a particle swarm swirls in from every edge and forms the logo, whose
+ *    letters then light up one by one like neon signs;
+ * 3. the logo moves up into place and the menu buttons unroll (on their own, or as soon as a key is pressed).
  */
 export function showIntro(ui: UI): void {
   const body = document.body;
@@ -35,7 +35,7 @@ export function showIntro(ui: UI): void {
     ui.showMenu();
     return;
   }
-  // Capturées avant InputManager : pendant l'intro, une touche ou un clic ne fait rien d'autre.
+  // Captured before InputManager: during the intro, a key or click does nothing else.
   const onKey = (e: KeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -44,7 +44,7 @@ export function showIntro(ui: UI): void {
   const onPointer = (e: PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Le clic qui suit ce geste ne doit rien déclencher d'autre (un bouton du menu, etc.).
+    // The click that follows this gesture must not trigger anything else (a menu button, etc.).
     const block = (c: Event) => {
       c.preventDefault();
       c.stopPropagation();
@@ -55,9 +55,9 @@ export function showIntro(ui: UI): void {
   };
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('pointerdown', onPointer, true);
-  // Fond uni pendant l'intro : la partie de démonstration n'apparaît qu'avec le menu.
+  // Plain background during the intro: the demo game only appears with the menu.
   body.classList.add('intro-bg');
-  // Écran noir tant que la police du titre n'est pas là (sinon on verrait le logo changer de police).
+  // Black screen until the title font is loaded (otherwise the logo would visibly change font).
   const fontReady = document.fonts?.load('700 88px "Chakra Petch"') ?? Promise.resolve();
   const ready = Promise.race([fontReady, new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
   const intro: NonNullable<UI['intro']> = {
@@ -80,7 +80,7 @@ export function showIntro(ui: UI): void {
   });
 }
 
-/** Une touche, un clic ou un bouton de manette pendant l'intro : allume l'écran, ou passe la suite. */
+/** A key, click or gamepad button during the intro: turns the screen on, or skips the rest. */
 export function introInput(ui: UI): void {
   const intro = ui.intro;
   if (!intro) return;
@@ -89,7 +89,7 @@ export function introInput(ui: UI): void {
     return;
   }
   intro.stage = 'on';
-  // Dans le geste lui-même : c'est ce qui autorise le navigateur à jouer du son.
+  // Inside the gesture itself: that is what allows the browser to play sound.
   ui.app.introPowerOn();
   void intro.ready.then(() => {
     if (ui.intro !== intro) return;
@@ -97,10 +97,10 @@ export function introInput(ui: UI): void {
     document.querySelector('.standby')?.remove();
     ui.showMenu();
     const el = ui.screenEl!;
-    // Pas de glissement : l'écran est déjà en place quand l'image s'allume.
+    // No slide: the screen is already in place when the picture turns on.
     el.classList.remove('enter-fwd');
     el.classList.add('intro');
-    // Le point qui devient trait, puis les deux lignes qui s'écartent (voir style.css).
+    // The dot that becomes a line, then the two lines moving apart (see styles/intro.css).
     const lines = ['crt-line', 'crt-edge up', 'crt-edge down'].map((c) => {
       const d = document.createElement('div');
       d.className = c;
@@ -127,9 +127,9 @@ export function introInput(ui: UI): void {
 }
 
 /**
- * L'essaim qui forme le logo : des particules aux couleurs des ennemis arrivent en spirale de
- * tous les bords et se posent sur le dessin des lettres, puis s'effacent quand chaque lettre
- * s'allume. Retourne de quoi tout arrêter.
+ * The swarm that forms the logo: particles in the enemies' colors spiral in from every edge
+ * and settle on the letter shapes, then fade out as each letter lights up.
+ * Returns a function that stops everything.
  */
 function swarmLogo(screen: HTMLElement): () => void {
   const title = screen.querySelector<HTMLElement>('.title');
@@ -145,7 +145,7 @@ function swarmLogo(screen: HTMLElement): () => void {
   document.body.appendChild(cv);
   const ctx = cv.getContext('2d')!;
 
-  // Cibles : le dessin des lettres, à leur place et à leur taille à l'écran (logo agrandi compris).
+  // Targets: the letter shapes, at their on-screen position and size (enlarged logo included).
   const zoom = title.getBoundingClientRect().width / title.offsetWidth || 1;
   const size = parseFloat(getComputedStyle(title).fontSize) * zoom;
   const off = document.createElement('canvas');
@@ -191,7 +191,7 @@ function swarmLogo(screen: HTMLElement): () => void {
   const frame = () => {
     const t = (performance.now() - start) / 1000;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Traînées : l'image précédente s'efface en partie.
+    // Trails: the previous frame is partly erased.
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = `rgba(0,0,0,${t < T ? 0.32 : 0.6})`;
     ctx.fillRect(0, 0, W, H);
@@ -199,7 +199,7 @@ function swarmLogo(screen: HTMLElement): () => void {
     for (const p of ps) {
       const k = Math.min(1, Math.max(0, (t - p.d) / (T - p.d)));
       const e = k * k * (3 - 2 * k);
-      // Chaque lettre s'éteint côté essaim quand le néon prend le relais (fin de son allumage).
+      // Each letter's swarm fades out when the neon takes over (end of its power-on).
       const lit = T + p.l * letterGap + 0.35;
       const alpha = t < lit ? 1 : Math.max(0, 1 - (t - lit) / 0.3);
       if (alpha <= 0) continue;
@@ -212,7 +212,7 @@ function swarmLogo(screen: HTMLElement): () => void {
       const sz = e > 0.85 ? gap * 0.7 : 2;
       ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
     }
-    // Onde de choc quand l'essaim se pose (en même temps que l'impact sonore).
+    // Shockwave when the swarm settles (together with the sound impact).
     if (t > T && t < T + 0.5) {
       const k = (t - T) / 0.5;
       ctx.globalAlpha = 0.6 * (1 - k);
@@ -233,14 +233,14 @@ function swarmLogo(screen: HTMLElement): () => void {
   };
 }
 
-/** Termine l'intro (ou la passe si elle est encore en cours) et révèle le menu. */
+/** Ends the intro (or skips it if still running) and reveals the menu. */
 export function finishIntro(ui: UI): void {
   const intro = ui.intro;
   if (!intro) return;
   ui.intro = null;
   intro.stop();
   const body = document.body;
-  // Passée pendant l'allumage : l'image se remet d'un coup, sans écran noir. La démo apparaît en fondu.
+  // Skipped during power-on: the picture comes back at once, no black screen. The demo fades in.
   body.classList.remove('booting', 'crt-on', 'intro-bg');
   document.querySelectorAll('.crt-line, .crt-edge, .standby, .swarm-intro').forEach((d) => d.remove());
   ui.noteActivity();
@@ -254,7 +254,7 @@ export function finishIntro(ui: UI): void {
   const first = brand.getBoundingClientRect();
   el.classList.remove('intro');
   el.classList.add('intro-out');
-  // Le logo glisse du centre jusqu'à sa place (FLIP : on part de l'ancienne position).
+  // The logo slides from the center to its place (FLIP: start from the old position).
   const last = brand.getBoundingClientRect();
   const dy = first.top + first.height / 2 - (last.top + last.height / 2);
   const sc = first.width / last.width;
@@ -266,8 +266,8 @@ export function finishIntro(ui: UI): void {
   ui.app.introDone();
 }
 
-// ---------- Mode démo (inactivité sur le menu) ----------
-/** Appelé à chaque image sur le menu : passé un moment sans rien toucher, la démo prend tout l'écran. */
+// ---------- Attract mode (idle on the menu) ----------
+/** Called every frame on the menu: after a while without input, the demo takes the whole screen. */
 export function idleTick(ui: UI, now: number): void {
   if (ui.attract || ui.intro || ui.current !== 'menu' || reducedMotion()) return;
   if (now - ui.lastActivity < ATTRACT_MS) return;

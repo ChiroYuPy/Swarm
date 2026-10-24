@@ -28,7 +28,7 @@ function deathLine(d: DeathInfo): string {
   return t('death.lines.overwhelmed', { time: formatTime(time) });
 }
 
-/** Équipement en ligne, icônes à nu (fin de partie). */
+/** Gear in a row, bare icons (end of run). */
 function buildHtml(b: BuildInfo): string {
   const w = b.weapons
     .map((x) => {
@@ -48,10 +48,10 @@ function buildHtml(b: BuildInfo): string {
   return `<div class="items">${w}${p}</div>`;
 }
 
-// ---------- Fin de partie ----------
+// ---------- End of run ----------
 /**
- * Un bandeau en pente arrive de la gauche (rouge, doré si record), puis le texte arrive de la droite ;
- * le score défile une fois le texte posé, puis le reste de l'écran apparaît en cascade.
+ * A sloped banner comes in from the left (red, gold on a record), then the text comes in from the right;
+ * the score counts up once the text is in place, then the rest of the screen cascades in.
  */
 export function showDeath(ui: UI, d: DeathInfo): void {
   const r = d.record;
@@ -100,10 +100,10 @@ export function showDeath(ui: UI, d: DeathInfo): void {
   el.querySelector('#edit')?.addEventListener('click', () => ui.app.toMenu('sandbox'));
   el.querySelector('#watch')?.addEventListener('click', () => ui.app.watchLastRun());
   el.querySelector('#menu')!.addEventListener('click', () => ui.app.toMenu());
-  // Le score défile comme sur une borne, une fois le bandeau posé.
+  // The score counts up like on an arcade cabinet, once the banner is in place.
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const out = el.querySelector<HTMLElement>('#count')!;
-  // une fois le texte arrivé (il suit le bandeau, voir content-in dans style.css)
+  // once the text has arrived (it follows the banner, see content-in in styles/death.css)
   const delay = reduced ? 0 : 1050;
   const dur = reduced ? 1 : Math.min(1400, 300 + r.score / 8);
   el.querySelector<HTMLElement>('.stamp')?.style.setProperty('animation-delay', `${delay + dur}ms`);

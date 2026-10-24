@@ -9,8 +9,8 @@ import { BEHAVIOR, ENEMY_BEHAVIOR } from '../registry';
 import { PJ_DRONE, type GameState, type Player, type WeaponInst } from '../state';
 
 /**
- * Drones / Escadrille / Kamikazes : des agents autonomes (projectiles PJ_DRONE, voir projectiles.ts).
- * L'arme ne fait que compléter l'effectif : un drone abattu revient près de toi après `respawn` s.
+ * Drone / Squadron / Kamikaze drones: autonomous agents (PJ_DRONE projectiles, see projectiles.ts).
+ * The weapon only refills the squad: a downed drone comes back near you after `respawn` s.
  */
 export function drone(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   const n = L.count ?? 1;
@@ -44,16 +44,16 @@ export function drone(s: GameState, p: Player, w: WeaponInst, slot: number, L: W
   b.d = alive;
   b.life = DRONE_LIFE;
   b.pierce = -1;
-  w.burstTimer = 15; // les drones manquants arrivent un par un
+  w.burstTimer = 15; // missing drones arrive one by one
 }
-/** durée de vie « infinie » d'un drone (il meurt abattu, ou quand l'arme disparaît) */
+/** "infinite" drone lifetime (it dies when shot down, or when the weapon goes away) */
 export const DRONE_LIFE = 1 << 30;
 
 /**
- * Cible de drone, la plus proche de (x, y) dans cet ordre : un gênant libre, un ennemi libre, un gênant déjà pris,
- * un ennemi déjà pris. « Pris » = déjà visé par un autre de tes drones (ids dans `claimed[0..nClaimed)`).
+ * Drone target, the nearest to (x, y) in this order: a free nuisance, a free enemy, an already-claimed nuisance,
+ * an already-claimed enemy. "Claimed" = already targeted by another of your drones (ids in `claimed[0..nClaimed)`).
  */
-// the « gênants », by behavior: shooters, leaders, blinkers, bombs
+// the nuisances, by behavior: shooters, leaders, blinkers, bombs
 const PRIORITY_BEHAVIORS: number[] = [BEHAVIOR.SHOOTER, BEHAVIOR.LEADER, BEHAVIOR.BLINKER, BEHAVIOR.KAMIKAZE];
 const PRIORITY: number[] = ENEMY_BEHAVIOR.flatMap((b, t) => (PRIORITY_BEHAVIORS.includes(b) ? [t] : []));
 export function huntTarget(

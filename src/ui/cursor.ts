@@ -1,14 +1,14 @@
 /**
- * Curseur néon dessiné dans la page (le curseur système est masqué) :
- * - dans les menus, une flèche (pleine sur ce qui se clique) ;
- * - en partie, un point, qui s'efface quand la souris ne bouge plus, et un viseur (anneau) tant
- *   qu'on maintient le clic pour viser ;
- * - rien pendant la veille et l'allumage, ni au clavier, ni au doigt.
- * La flèche, le point et l'anneau ont la même structure (quatre courbes, voir style.css) : on passe de l'un à
- * l'autre en morphing, et le curseur apparaît / disparaît en fondu.
+ * Neon cursor drawn in the page (the system cursor is hidden):
+ * - in menus, an arrow (filled over what can be clicked);
+ * - in game, a dot that fades out when the mouse stops moving, and a crosshair (ring) while
+ *   the button is held to aim;
+ * - nothing during standby and power-on, nor with the keyboard, nor with touch.
+ * The arrow, the dot and the ring share the same structure (four curves, see styles/cursor.css): they
+ * morph into one another, and the cursor fades in / out.
  */
 
-/** En partie, le point s'efface après ce délai sans mouvement (ms). */
+/** In game, the dot fades out after this long without movement (ms). */
 const IDLE_MS = 1200;
 
 type CursorState = 'off' | 'arrow' | 'hover' | 'dot' | 'aim';
@@ -24,7 +24,7 @@ export function initCursor(): void {
   let inside = false;
   let hover = false;
   let movedAt = -Infinity;
-  /** clic gauche maintenu sur le jeu (visée manuelle, voir input.ts) */
+  /** left button held on the game (manual aim, see input/input.ts) */
   let aiming = false;
   const clickable = (t: EventTarget | null) => t instanceof Element && !!t.closest('button:not(:disabled), .track');
 
@@ -33,7 +33,7 @@ export function initCursor(): void {
     (e) => {
       mouse = e.pointerType === 'mouse';
       inside = true;
-      // Point actif = pointe de la flèche = centre du point (5, 4 dans le dessin).
+      // Hotspot = arrow tip = dot center (5, 4 in the drawing).
       el.style.transform = `translate(${e.clientX - 5}px, ${e.clientY - 4}px)`;
       if (e.movementX || e.movementY) movedAt = performance.now();
       hover = clickable(e.target);
@@ -49,7 +49,7 @@ export function initCursor(): void {
   });
   window.addEventListener('pointercancel', () => (aiming = false));
   window.addEventListener('blur', () => (aiming = false));
-  // Un écran qui glisse sous le pointeur immobile change ce qu'il survole.
+  // A screen sliding under a still pointer changes what it hovers.
   window.addEventListener('mouseover', (e) => {
     hover = clickable(e.target);
   });

@@ -1,9 +1,9 @@
 /**
- * Armes de base et leurs évolutions (arme + passif).
+ * Base weapons and their evolutions (weapon + passive).
  *
- * Chaque arme a un `behavior` (le code qui l'anime dans src/sim/weapons/) et une liste de niveaux.
- * Les niveaux sont CUMULATIFS : `prog(base, d2, d3, ...)` part de la base et applique chaque delta
- * par-dessus le précédent. Les durées sont en secondes, les distances en unités monde.
+ * Each weapon has a `behavior` (the code that drives it in src/sim/weapons/) and a list of levels.
+ * Levels are CUMULATIVE: `prog(base, d2, d3, ...)` starts from the base and applies each delta
+ * on top of the previous one. Durations are in seconds, distances in world units.
  */
 
 export type Behavior =
@@ -46,7 +46,7 @@ export interface WeaponLevel {
   range?: number;
   knockback?: number;
   slow?: number;
-  /** durée du ralentissement laissé par une onde (s) */
+  /** duration of the slow left by a wave (s) */
   slowTime?: number;
   trigger?: number;
   branch?: number;
@@ -61,37 +61,37 @@ export interface WeaponLevel {
   burstEvery?: number;
   burstCount?: number;
   rotStep?: number;
-  /** demi-angle d'un cône ou d'un coup de fouet (radians) */
+  /** half-angle of a cone or a whip lash (radians) */
   arc?: number;
-  /** achève les ennemis (hors boss) tombés sous cette part de leurs PV */
+  /** finishes off enemies (bosses excluded) that fall below this share of their HP */
   execute?: number;
-  /** dégâts en part des PV max de la cible (× Puissance) au lieu de `damage`, et cette part sur les boss */
+  /** damage as a share of the target's max HP (× Might) instead of `damage`, and this share on bosses */
   pctHp?: number;
   bossPct?: number;
-  /** cadence de tir d'une tourelle (s) */
+  /** turret fire interval (s) */
   fireEvery?: number;
-  /** tourelle : onde de recul toutes les `ringEvery` s (rayon `radius`) */
+  /** turret: knockback wave every `ringEvery` s (radius `radius`) */
   ringEvery?: number;
-  /** rebonds d'un disque ricochet */
+  /** bounces of a ricochet disc */
   bounces?: number;
-  /** cratère en feu (Météores) : dégâts par seconde, rayon, durée (s) */
+  /** burning crater (Meteors): damage per second, radius, duration (s) */
   blazeDamage?: number;
   blazeRadius?: number;
   blazeLife?: number;
-  /** jets de flammes qui tournent en continu (rad/s) au lieu de viser */
+  /** flame jets spinning continuously (rad/s) instead of aiming */
   spin?: number;
-  /** drones : PV, délai de réapparition (s), portée d'attaque, vitesse des tirs */
+  /** drones: HP, respawn delay (s), attack range, shot speed */
   hp?: number;
   respawn?: number;
   attackRange?: number;
   shotSpeed?: number;
-  /** drones kamikazes : foncent et explosent (1) */
+  /** kamikaze drones: charge in and explode (1) */
   dive?: number;
-  /** obus qui tombent du ciel (Météores) : 1 */
+  /** shells falling from the sky (Meteors): 1 */
   meteor?: number;
-  /** virage max (radians par seconde) des drones et du Phénix : ils tournent en avançant */
+  /** max turn rate (radians per second) of drones: they turn while moving forward */
   turn?: number;
-  /** drones qui tournent autour de leur cible à bonne distance (Escadrille) : 1 */
+  /** drones circling their target at a safe distance (Squadron): 1 */
   orbit?: number;
 }
 
@@ -102,7 +102,7 @@ export interface WeaponDef {
   color: string;
   levels: WeaponLevel[];
   fusion?: boolean;
-  /** Poids dans le tirage des propositions de level-up. */
+  /** Weight in the level-up offer draw. */
   weight?: number;
 }
 

@@ -1,6 +1,6 @@
 /**
- * Outils de test de charge. N'est utilisé que par le mode `?stress=1` (parties non classées).
- * Reste déterministe : positions calculées, aucun aléa.
+ * Load-testing tools. Only used by the `?stress=1` mode (unranked games).
+ * Stays deterministic: computed positions, no randomness.
  */
 import { TWO_PI, dcos, dsin } from './dmath';
 import { circleHitsObstacle } from './map';
@@ -20,12 +20,12 @@ export function debugSpawnHorde(s: GameState, count: number): void {
     const x = p.x + dcos(a) * ring;
     const y = p.y + dsin(a) * ring;
     if (circleHitsObstacle(s.map, x, y, 14)) continue;
-    // PV très élevés : la horde doit tenir pour mesurer les perfs avec 500+ ennemis à l'écran.
+    // Very high HP: the horde must survive to measure performance with 500+ enemies on screen.
     spawnEnemy(s, types[i % types.length], x, y, 60, 0.3, 1, 0);
   }
 }
 
-/** Donne un gros build au héros (pour mesurer les perfs avec beaucoup de projectiles). */
+/** Gives the hero a big build (to measure performance with lots of projectiles). */
 export function debugBigBuild(s: GameState): void {
   const p = s.players[0];
   p.weapons.length = 0;

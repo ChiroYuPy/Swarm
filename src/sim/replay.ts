@@ -1,8 +1,8 @@
-/** Relecture : rejoue une partie à partir de sa configuration (seed, difficulté) et du journal d'entrées. */
+/** Replay: replays a game from its configuration (seed, difficulty) and its input log. */
 import { createGame, step, type GameConfig } from './game';
 import type { GameState } from './state';
 
-/** Rejoue tout le journal sans interface et renvoie l'état final. */
+/** Replays the whole log headless and returns the final state. */
 export function replayToEnd(cfg: GameConfig, codes: Uint8Array): GameState {
   const s = createGame(cfg);
   const input = [0];
@@ -13,7 +13,7 @@ export function replayToEnd(cfg: GameConfig, codes: Uint8Array): GameState {
   return s;
 }
 
-/** Lecteur pas à pas, utilisé par le mode relecture du client. */
+/** Step-by-step player, used by the client's replay mode. */
 export class ReplayCursor {
   readonly state: GameState;
   private i = 0;
@@ -30,7 +30,7 @@ export class ReplayCursor {
   get progress(): number {
     return this.codes.length ? this.i / this.codes.length : 1;
   }
-  /** Avance d'un code. Renvoie le code joué (ou -1 si fini). */
+  /** Advances by one code. Returns the code played (or -1 when finished). */
   next(): number {
     if (this.done) return -1;
     const c = this.codes[this.i++];

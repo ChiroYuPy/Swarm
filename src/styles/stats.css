@@ -1,6 +1,6 @@
 /* Label / value stat tiles (.stats, .stats.mini) shared by game over, pause, codex and difficulty, plus the final build layout. */
 
-/* Chiffres « libellé / valeur » séparés par un filet, sans cadre (fin de partie, pause, codex…). */
+/* "Label / value" figures separated by a rule, no frame (end of run, pause, codex…). */
 .stats {
   display: flex;
   flex-wrap: wrap;
@@ -18,7 +18,7 @@
 .stats > * + * {
   border-left: 1px solid var(--line);
 }
-/* Version compacte, alignée à gauche (fiches du codex, record d'une difficulté). */
+/* Compact version, left-aligned (codex sheets, a difficulty's record). */
 .stats.mini {
   justify-content: flex-start;
   margin: 14px 0 4px;
@@ -41,7 +41,7 @@
   font-size: var(--fs-m);
   color: var(--muted);
 }
-/* valeurs en texte (passifs) : plus petites, sur plusieurs lignes */
+/* text values (passives): smaller, on several lines */
 .stats.mini.wide > * {
   flex: 1;
 }
@@ -65,7 +65,7 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-/* Équipement final : les icônes à nu, centrées. */
+/* Final build: bare icons, centered. */
 .final-build {
   display: flex;
   flex-direction: column;

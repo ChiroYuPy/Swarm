@@ -5,16 +5,16 @@ import { formatTime, glowText, FONT } from './hud';
 import type { RenderView } from './view';
 import { t } from '../i18n';
 
-/** Fin de partie : l'écran s'assombrit proprement et un GAME OVER s'allume. */
+/** End of run: the screen darkens smoothly and a GAME OVER lights up. */
 export function drawGameOver(view: RenderView, s: GameState, W: number, H: number, f: number, time: number): void {
   const ctx = view.ctx;
   const e = f * f * (3 - 2 * f);
   ctx.fillStyle = `rgba(7,6,15,${0.8 * e})`;
   ctx.fillRect(0, 0, W, H);
-  // Lignes de balayage CRT
+  // The text only shows once the screen is a quarter dark.
   const k = Math.max(0, (f - 0.25) / 0.75);
   if (k <= 0) return;
-  // Allumage façon néon : quelques clignotements avant de rester allumé.
+  // Neon-style power-on: a few flickers before staying lit.
   const on = k > 0.45 || Math.floor(time * 18) % 3 !== 0;
   if (!on) return;
   ctx.textAlign = 'center';
@@ -29,7 +29,7 @@ export function drawGameOver(view: RenderView, s: GameState, W: number, H: numbe
   ctx.globalAlpha = 1;
 }
 
-/** Lignes de vitesse pendant la plongée de la caméra (repère écran), de plus en plus marquées. */
+/** Speed lines during the camera dive (screen space), stronger and stronger. */
 export function drawSpeedLines(view: RenderView, W: number, H: number, k: number, time: number): void {
   const f = Math.max(0, (k - 0.35) / 0.65);
   if (f <= 0) return;

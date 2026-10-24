@@ -8,13 +8,13 @@ import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_BLAZE, PJ_SHELL, emit, type GameState, type Player, type WeaponInst } from '../state';
 import { RETRY_TICKS, cdTicks, isExcludedHit, pushHit, resetHits, target, ticks } from './common';
 
-/** le Mortier ne vise pas les ennemis plus près que ça de toi */
+/** the Mortar does not target enemies closer to you than this */
 const MORTAR_MIN = 200;
 
-/** Candidats du Mortier (copiés : la recherche de voisins réutilise la grille). */
+/** Mortar candidates (copied: the neighbour search reuses the grid). */
 const CAND = new Int32Array(24);
 
-/** Le Mortier vise le groupe le plus dense à portée (hors des ennemis tout près de toi), ou le plus proche. */
+/** The Mortar targets the densest group in range (excluding enemies right next to you), or the nearest one. */
 function mortarTarget(s: GameState, p: Player, range: number, minDist: number): number {
   const g = s.grid;
   const m = g.query(s.enemies, p.x, p.y, range);
@@ -40,7 +40,7 @@ function mortarTarget(s: GameState, p: Player, range: number, minDist: number): 
   return best >= 0 ? best : target(s, p.x, p.y, range);
 }
 
-/** Mortier / Météores : des obus (ou des météores) sur les groupes d'ennemis. */
+/** Mortar / Meteors: shells (or meteors) onto groups of enemies. */
 export function mortar(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
@@ -53,7 +53,7 @@ export function mortar(s: GameState, p: Player, w: WeaponInst, slot: number, L: 
     if (t < 0) break;
     const e = s.enemies[t];
     pushHit(e.id);
-    // Un météore tombe du ciel pile sur sa cible ; un obus part de toi.
+    // A meteor falls from the sky right onto its target; a shell starts from you.
     const sx = L.meteor ? e.x : p.x;
     const sy = L.meteor ? e.y : p.y;
     spawnShell(
@@ -81,7 +81,7 @@ export function mortar(s: GameState, p: Player, w: WeaponInst, slot: number, L: 
   emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
 }
 
-/** Obus en vol de (sx, sy) vers (tx, ty) pendant `flight` ticks. `meteor` : laisse un cratère en feu. */
+/** Shell flying from (sx, sy) to (tx, ty) for `flight` ticks. `meteor`: leaves a burning crater. */
 export function spawnShell(
   s: GameState,
   owner: number,
@@ -118,7 +118,7 @@ export function spawnShell(
   b.pierce = -1;
 }
 
-/** Sol en feu du joueur (cratère de Météore) : `dps` dégâts par seconde aux ennemis dessus. */
+/** Player's burning ground (Meteor crater): `dps` damage per second to enemies on it. */
 export function spawnBlaze(s: GameState, owner: number, def: number, x: number, y: number, radius: number, dps: number, life: number): void {
   const b = spawnProjectile(s);
   if (!b) return;

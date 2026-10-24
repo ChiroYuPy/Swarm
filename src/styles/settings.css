@@ -1,6 +1,6 @@
 /* Options screen: setting rows and the custom controls (slider, switch, choice arrows). */
 
-/* ---------- Options : curseurs, interrupteurs, choix ---------- */
+/* ---------- Options: sliders, switches, choices ---------- */
 .screen-settings .panel.form {
   width: min(640px, 100%);
 }
@@ -67,7 +67,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
-/* Curseur */
+/* Slider */
 .track {
   position: relative;
   width: 220px;
@@ -112,7 +112,7 @@
   transform: scale(1.2);
   background: var(--accent);
 }
-/* Interrupteur */
+/* Switch */
 .switch {
   position: relative;
   width: 44px;
@@ -151,7 +151,7 @@
 .set.on[data-kind='toggle'] .val {
   color: var(--green);
 }
-/* Choix */
+/* Choice */
 .ctl .arrow {
   display: inline-flex;
   align-items: center;

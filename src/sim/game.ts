@@ -1,11 +1,11 @@
 /**
- * API publique de la simulation.
+ * Public API of the simulation.
  *
  *   const s = createGame({ seed: 'TOFU-FURIEUX-42' });
- *   step(s, [inputCode]);     // un pas = 1/60 s (ou un pas « zéro » si un level-up attend un choix)
- *   s.players[0].hp ...       // lecture directe de l'état
+ *   step(s, [inputCode]);     // one step = 1/60 s (or a "zero-time" step if a level-up awaits a choice)
+ *   s.players[0].hp ...       // direct read of the state
  *
- * La sim est une fonction pure de (seed, suite d'entrées) : aucun accès au DOM, à l'horloge, ni à Math.random.
+ * The sim is a pure function of (seed, input sequence): no access to the DOM, the clock, or Math.random.
  */
 import { HERO, SCORE, xpForLevel } from '../data/hero';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
@@ -30,15 +30,15 @@ import { applySandbox, type SandboxConfig } from './sandbox';
 
 export interface GameConfig {
   seed: string;
-  /** index dans data/difficulty.ts (Normal par défaut) */
+  /** index into data/difficulty.ts (Normal by default) */
   difficulty?: number;
-  /** nombre de joueurs dans la même partie (1 pour cette version) */
+  /** number of players in the same game (1 for this version) */
   players?: number;
-  /** réglages du bac à sable : partie libre, jamais classée */
+  /** sandbox settings: free game, never ranked */
   sandbox?: SandboxConfig;
 }
 
-/** Normalise une seed texte : majuscules, espaces retirés aux bords. */
+/** Normalizes a text seed: uppercase, surrounding spaces trimmed. */
 export function normalizeSeed(seed: string): string {
   const s = seed.trim().toUpperCase();
   return s.length > 0 ? s.slice(0, 40) : '0';
@@ -90,7 +90,7 @@ export function createGame(cfg: GameConfig): GameState {
     const p = new Player();
     p.index = i;
     p.r = HERO.radius;
-    // Le monde est centré sur l'origine, toujours dégagée.
+    // The world is centred on the origin, which is always clear.
     p.x = p.px = (i - (n - 1) / 2) * 40;
     p.y = p.py = 0;
     computeStats(p);
@@ -104,23 +104,23 @@ export function createGame(cfg: GameConfig): GameState {
   return s;
 }
 
-/** Point d'ancrage de la grille spatiale : le premier joueur vivant. */
+/** Anchor point of the spatial grid: the first living player. */
 function anchor(s: GameState): Player {
   for (const p of s.players) if (p.alive) return p;
   return s.players[0];
 }
 
-/** Le joueur attend-il un choix de level-up ? (la partie est alors figée) */
+/** Is the player waiting for a level-up choice? (the game is then frozen) */
 export function isAwaitingChoice(s: GameState, player = 0): boolean {
   const p = s.players[player];
   return !!p && p.alive && p.pendingLevels > 0 && p.offers.length > 0;
 }
 
 /**
- * Avance la simulation d'un pas. `inputs[i]` = code d'entrée du joueur i.
- * Si un joueur doit choisir une amélioration, le monde est figé : le pas ne fait qu'appliquer
- * un éventuel code de choix (200..202) sans faire avancer le temps.
- * Le code 210 (utiliser l'objet activable) et les codes de visée (130..194) sont eux aussi des pas « zéro ».
+ * Advances the simulation by one step. `inputs[i]` = input code of player i.
+ * If a player must pick an upgrade, the world is frozen: the step only applies
+ * a possible choice code (200..202) without advancing time.
+ * Code 210 (use the active item) and the aim codes (130..194) are "zero-time" steps too.
  */
 export function step(s: GameState, inputs: ArrayLike<number>): void {
   s.eventCount = 0;
@@ -128,7 +128,7 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
   let consumed = false;
   for (let i = 0; i < s.players.length; i++) {
     const p = s.players[i];
-    // Filet de sécurité : un niveau en attente a toujours des propositions.
+    // Safety net: a pending level always has offers.
     if (p.alive && p.pendingLevels > 0 && p.offers.length === 0) rollOffers(s, p);
     const code = inputs[i] ?? 0;
     if (p.alive && p.pendingLevels > 0 && p.offers.length > 0 && code >= INPUT_CHOICE_BASE && code < INPUT_CHOICE_BASE + 3) {
@@ -157,7 +157,7 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
 
 function tick(s: GameState, inputs: ArrayLike<number>): void {
   s.tick++;
-  // Clones : ils disparaissent à l'heure, ou avec leur modèle.
+  // Clones: they vanish on time, or along with their original.
   for (const c of s.players) {
     if (c.master < 0 || !c.alive) continue;
     if (s.tick >= c.expires || !s.players[c.master].alive) {
@@ -190,7 +190,7 @@ function tick(s: GameState, inputs: ArrayLike<number>): void {
   if (!anyAlive) s.over = true;
 }
 
-/** Temps de jeu écoulé en secondes. */
+/** Elapsed game time in seconds. */
 export function gameTime(s: GameState): number {
   return s.tick * DT;
 }
@@ -216,7 +216,7 @@ export function computeScore(s: GameState, player = 0): ScoreResult {
   };
 }
 
-/** Score d'une partie (classement local). La seed est gardée pour pouvoir revalider la partie plus tard. */
+/** Score of a game (local leaderboard). The seed is kept so the game can be revalidated later. */
 export interface ScoreRecord {
   seed: string;
   difficulty: number;
@@ -242,7 +242,7 @@ export function makeScoreRecord(s: GameState, dateIso: string, player = 0): Scor
   };
 }
 
-/** Le boss vivant, s'il y en a un (pour l'interface). */
+/** The living boss, if any (for the UI). */
 export function findBoss(s: GameState) {
   if (s.bossId < 0) return null;
   for (let i = 0; i < s.enemyCount; i++) {

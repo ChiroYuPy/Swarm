@@ -1,5 +1,5 @@
-/** Palette néon : fond sombre, couleurs vives limitées et très contrastées. */
-/** Teintes des contours d'obstacles (variante choisie par la génération). */
+/** Neon palette: dark background, a few bright, high-contrast colors. */
+/** Obstacle outline tints (variant picked by the map generation). */
 export const OBSTACLE_TINTS = ['#5a7dff', '#a46bff', '#3de0c8'];
 
 export const COLORS = {
@@ -21,14 +21,14 @@ export const COLORS = {
   text: '#f2eaff',
   muted: '#9a8fc0',
   gold: '#ffd23a',
-  /** parties de bac à sable (même teinte que dans l'interface) */
+  /** sandbox runs (same tint as in the UI) */
   sandbox: '#b48cff',
 };
 
-/** Palette indexée des particules (dessin groupé par couleur). */
+/** Indexed particle palette (drawing is batched by color). */
 export const FX_COLORS = [
   '#ffffff', // 0
-  '#38f6ff', // 1 joueur
+  '#38f6ff', // 1 player
   '#ff3366', // 2
   '#ffe14d', // 3
   '#ff8a1f', // 4
@@ -43,16 +43,16 @@ export const FX_COLORS = [
   '#ffb347', // 13
   '#a43cff', // 14
   '#f4f4ff', // 15
-  '#9feaff', // 16 glace
+  '#9feaff', // 16 ice
   '#5cf2d6', // 17 clone
-  '#7f9cff', // 18 horloge
-  '#b8ff3d', // 19 fièvre
-  '#3dffb4', // 20 orbiteur
-  '#c8ff3d', // 21 diviseur
-  '#3d9bff', // 22 gardien
-  '#8f5bff', // 23 téléporteur
-  '#3dffe0', // 24 hexagone bâtisseur
-  '#ff4d6d', // 25 œil laser
+  '#7f9cff', // 18 clock
+  '#b8ff3d', // 19 fever
+  '#3dffb4', // 20 orbiter
+  '#c8ff3d', // 21 splitter
+  '#3d9bff', // 22 guardian
+  '#8f5bff', // 23 teleporter
+  '#3dffe0', // 24 builder hexagon
+  '#ff4d6d', // 25 laser eye
 ];
 
 export function fxColorIndex(hex: string): number {

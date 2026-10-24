@@ -13,14 +13,14 @@ function sources(dir: string): { file: string; code: string }[] {
     .map((f) => f.replace(/\\/g, '/'))
     .map((f) => ({
       file: f,
-      // On retire les commentaires pour ne pas déclencher sur la doc.
+      // Strip comments so that documentation does not trigger a match.
       code: readFileSync(join(dir, f), 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/\/\/.*$/gm, ''),
     }));
 }
 
-describe('pureté de la simulation', () => {
+describe('simulation purity', () => {
   const forbidden = [
     /Math\.random/,
     /Date\.now/,
@@ -33,12 +33,12 @@ describe('pureté de la simulation', () => {
     /localStorage/,
   ];
   for (const { file, code } of [...sources(SIM_DIR), ...sources(DATA_DIR)]) {
-    it(`${file} n'utilise aucune source non déterministe ni le DOM`, () => {
-      for (const re of forbidden) expect(code, `${file} contient ${re}`).not.toMatch(re);
+    it(`${file} uses no non-deterministic source and no DOM`, () => {
+      for (const re of forbidden) expect(code, `${file} contains ${re}`).not.toMatch(re);
     });
   }
 
-  it('les maths déterministes sont précises', () => {
+  it('deterministic math is accurate', () => {
     for (let a = -10; a <= 10; a += 0.37) {
       expect(Math.abs(dsin(a) - Math.sin(a))).toBeLessThan(1e-8);
       expect(Math.abs(dcos(a) - Math.cos(a))).toBeLessThan(1e-8);

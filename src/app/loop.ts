@@ -2,11 +2,11 @@
 import { TICK_RATE, type GameState } from '../sim';
 
 export const STEP_MS = 1000 / TICK_RATE;
-/** pas de simulation rattrapés au plus par image (en partie / démo du menu) */
+/** max simulation steps caught up per frame (in game / menu demo) */
 export const PLAY_CATCHUP = 4;
 export const MENU_CATCHUP = 2;
 
-/** Intensité de la musique de partie : monte avec le temps et le nombre d'ennemis, 1 pendant un boss. */
+/** Game music intensity: rises with time and enemy count, 1 during a boss. */
 export function musicIntensity(s: GameState): number {
   if (s.bossId >= 0) return 1;
   const minutes = s.tick / TICK_RATE / 60;

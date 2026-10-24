@@ -1,7 +1,7 @@
 /**
- * Sprites pré-rendus (lueur néon comprise) pour les entités nombreuses.
- * Dessiner une image est bien plus rapide pour le GPU que de tesseler des centaines de tracés épais.
- * Chaque sprite est rendu à SPRITE_RES pixels par unité monde puis converti en ImageBitmap.
+ * Pre-rendered sprites (neon glow included) for the numerous entities.
+ * Drawing an image is much faster for the GPU than tessellating hundreds of thick strokes.
+ * Each sprite is rendered at SPRITE_RES pixels per world unit, then converted to an ImageBitmap.
  */
 import { ENEMIES, type EnemyDef } from '../data/enemies';
 import { ALL_WEAPONS } from '../data/weapons';
@@ -13,7 +13,7 @@ export const SPRITE_RES = 2;
 
 export interface Sprite {
   img: CanvasImageSource;
-  /** taille en unités monde */
+  /** size in world units */
   w: number;
   h: number;
 }
@@ -31,8 +31,8 @@ function glowStroke(ctx: CanvasRenderingContext2D, color: string, width: number)
 }
 
 /**
- * Crée un sprite centré de demi-taille `half` (unités monde), puis le rogne à ses pixels visibles
- * (en restant centré, pour que la rotation tombe juste) : moins de pixels à mélanger pour le GPU.
+ * Creates a centered sprite of half-size `half` (world units), then trims it to its visible pixels
+ * (staying centered, so rotation stays exact): fewer pixels for the GPU to blend.
  */
 function make(half: number, paint: Painter): Sprite {
   const size = Math.ceil(half * 2 * SPRITE_RES);
@@ -49,7 +49,7 @@ function make(half: number, paint: Painter): Sprite {
   let hy = half;
   const trim = visibleHalfExtents(ctx, size);
   if (trim) {
-    // +1 px de marge pour le filtrage bilinéaire
+    // +1 px margin for bilinear filtering
     const px = Math.min(size / 2, trim[0] + 1);
     const py = Math.min(size / 2, trim[1] + 1);
     if (px < size / 2 || py < size / 2) {
@@ -63,7 +63,7 @@ function make(half: number, paint: Painter): Sprite {
     }
   }
   const sp: Sprite = { img: cv, w: hx * 2, h: hy * 2 };
-  // Conversion asynchrone en ImageBitmap (texture immuable, la plus rapide à dessiner).
+  // Async conversion to ImageBitmap (immutable texture, the fastest to draw).
   if (typeof createImageBitmap === 'function') {
     createImageBitmap(cv).then(
       (bmp) => (sp.img = bmp),
@@ -73,7 +73,7 @@ function make(half: number, paint: Painter): Sprite {
   return sp;
 }
 
-/** Demi-largeur et demi-hauteur (pixels, depuis le centre) de ce qui est réellement visible. */
+/** Half-width and half-height (pixels, from the center) of what is actually visible. */
 function visibleHalfExtents(ctx: CanvasRenderingContext2D, size: number): [number, number] | null {
   let data: Uint8ClampedArray;
   try {
@@ -96,7 +96,7 @@ function visibleHalfExtents(ctx: CanvasRenderingContext2D, size: number): [numbe
   return mx > 0 || my > 0 ? [Math.ceil(mx + 0.5), Math.ceil(my + 0.5)] : null;
 }
 
-/** Forme d'ennemi orientée vers +x (rotation appliquée au dessin). */
+/** Enemy shape facing +x (rotation is applied when drawing). */
 function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
   const r = d.radius;
   ctx.beginPath();
@@ -132,7 +132,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
     case 'box':
       ctx.rect(-r * 0.9, -r * 0.9, r * 1.8, r * 1.8);
       break;
-    case 'trapeze':
+    case 'trapezoid':
       ctx.moveTo(-r * 1.1, r * 0.7);
       ctx.lineTo(r * 1.1, r * 0.7);
       ctx.lineTo(r * 0.6, -r * 0.8);
@@ -140,7 +140,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       ctx.closePath();
       break;
     case 'rock': {
-      // Bloc de pierre irrégulier.
+      // Irregular stone block.
       const k = [1, 0.84, 0.96, 0.8, 1, 0.86, 0.94, 0.82];
       for (let i = 0; i < 8; i++) {
         const a = (i * Math.PI) / 4 + Math.PI / 8;
@@ -151,7 +151,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       break;
     }
     case 'sun':
-      // Soleil : un disque et des rayons (il rayonne sur ses voisins).
+      // Sun: a disc and rays (it radiates onto its neighbors).
       ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
       for (let i = 0; i < 8; i++) {
         const a = (i * Math.PI) / 4;
@@ -160,7 +160,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       }
       break;
     case 'ring':
-      // Portail : deux anneaux.
+      // Portal: two rings.
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.moveTo(r * 0.55, 0);
       ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
@@ -174,7 +174,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       break;
     case 'hexagon':
     case 'block':
-      // Hexagone (le boss : un second, plus petit, au centre ; le mur : à plat, pour s'emboîter en nid d'abeille).
+      // Hexagon (the boss: a second, smaller one in the center; the wall: flat, to tile as a honeycomb).
       polygon(ctx, 6, r, d.shape === 'block' ? 0 : Math.PI / 6);
       if (d.shape === 'hexagon') polygon(ctx, 6, r * 0.5, 0);
       break;
@@ -214,7 +214,7 @@ function polygon(ctx: CanvasRenderingContext2D, n: number, r: number, a0: number
   ctx.closePath();
 }
 
-/** Œil en amande orienté vers (fx, fy). */
+/** Almond-shaped eye oriented towards (fx, fy). */
 export function eyePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fx: number, fy: number): void {
   const ax = fx * r * 1.25;
   const ay = fy * r * 1.25;
@@ -226,7 +226,7 @@ export function eyePath(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   ctx.closePath();
 }
 
-/** Reine : un corps rond et une couronne à trois pointes (toujours à l'endroit). */
+/** Queen: a round body and a three-pointed crown (always upright). */
 export function queenPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   ctx.moveTo(x + r * 0.85, y + r * 0.2);
   ctx.arc(x, y + r * 0.2, r * 0.85, 0, Math.PI * 2);
@@ -239,10 +239,10 @@ export function queenPath(ctx: CanvasRenderingContext2D, x: number, y: number, r
   ctx.lineTo(x + r * 0.7, y - r * 0.45);
 }
 
-/** Toujours dessinés à l'endroit, sans yeux : caisse, murs, œufs, Reine. */
+/** Always drawn upright, without eyes: crate, walls, eggs, Queen. */
 const UPRIGHT = (d: EnemyDef) => d.behavior === 'prop' || d.behavior === 'wall' || d.behavior === 'egg' || d.shape === 'queen';
 
-/** Dessine un ennemi (orienté vers +x) au style tube néon. */
+/** Draws an enemy (facing +x) in neon tube style. */
 export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: string, halo = true): void {
   const r = d.radius;
   const lw = d.radius > 15 ? 2.6 : 2;
@@ -250,7 +250,7 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
     enemyShape(ctx, d);
     neon(ctx, color, lw, d.shape === 'dot' ? 0.45 : 0.14, halo);
     if (d.behavior === 'prop') {
-      // Caisse bonus : point d'interrogation façon bloc d'arcade
+      // Bonus crate: arcade-block style question mark
       ctx.beginPath();
       ctx.arc(0, -r * 0.25, r * 0.32, Math.PI, Math.PI * 0.35, false);
       ctx.quadraticCurveTo(0, r * 0.05, 0, r * 0.25);
@@ -258,7 +258,7 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
       ctx.lineTo(0, r * 0.56);
       neon(ctx, color === '#ffffff' ? color : '#ffd23a', 2.4, 0, halo);
     }
-    // Yeux, tournés vers l'avant
+    // Eyes, facing forward
     if (r >= 9 && !UPRIGHT(d) && d.shape !== 'eye') {
       ctx.beginPath();
       const er = r * 0.16;
@@ -277,7 +277,7 @@ function enemySprite(d: EnemyDef, color: string, halo: boolean): Sprite {
   return make(d.radius * 1.5 + 8, (ctx) => paintEnemy(ctx, d, color, halo));
 }
 
-/** Petit canvas d'aperçu d'un ennemi pour l'interface (aide, codex). */
+/** Small enemy preview canvas for the UI (help, codex). */
 export function enemyPreview(id: string, size: number): HTMLCanvasElement {
   const d = ENEMIES.find((e) => e.id === id)!;
   const [cv, ctx] = makeCanvas(size);
@@ -295,18 +295,18 @@ export class SpriteBank {
   enemy: Sprite[] = [];
   enemyFlash: Sprite[] = [];
   readonly gem: Sprite[] = [];
-  /** balle du joueur par arme, dessinée pour un rayon 6 (mise à l'échelle) */
+  /** player bullet per weapon, drawn for radius 6 (scaled) */
   readonly bullet: Sprite[] = [];
   readonly enemyBullet: Sprite;
-  /** balle de Tireur, cassable */
+  /** Shooter bullet, destructible */
   readonly breakableBullet: Sprite;
   readonly mine: Sprite;
   readonly miniMine: Sprite;
   readonly mineLight: Sprite;
   readonly boomerang: Sprite[] = [];
-  /** objets ramassables, indexés par code PK_* */
+  /** pickups, indexed by PK_* code */
   readonly pickup: Sprite[];
-  /** particule ronde par couleur de FX_COLORS */
+  /** round particle per FX_COLORS color */
   readonly particle: Sprite[] = [];
 
   private enemyHalo = true;
@@ -360,7 +360,7 @@ export class SpriteBank {
         }),
       );
     }
-    // Un sprite par objet, dans l'ordre des codes PK_* (data/loot.ts).
+    // One sprite per pickup, in PK_* code order (data/loot.ts).
     this.pickup = PICKUPS.map((d) => {
       const size = d.kind === 'chest' ? 38 : 30;
       return make(size * 0.9, (ctx) => drawPickupIcon(ctx, d.id as PickupIcon, 0, 0, size));
@@ -397,13 +397,13 @@ export class SpriteBank {
       ctx.fillStyle = '#ffffff';
       ctx.fill();
     });
-    const crepe = (r: number): Painter => (ctx) => {
+    const minePainter = (r: number): Painter => (ctx) => {
       ctx.beginPath();
       mineShape(ctx, 0, 0, r * 1.15);
       neon(ctx, '#ffb347', 2, 0.25);
     };
-    this.mine = make(18, crepe(10));
-    this.miniMine = make(14, crepe(7));
+    this.mine = make(18, minePainter(10));
+    this.miniMine = make(14, minePainter(7));
     this.mineLight = make(6, (ctx) => {
       ctx.beginPath();
       ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
@@ -427,7 +427,7 @@ export class SpriteBank {
     }
   }
 
-  /** Sans halo (qualité basse) : les ennemis, très nombreux, coûtent bien moins de pixels. */
+  /** Without halo (low quality): enemies, very numerous, cost far fewer pixels. */
   setEnemyHalo(halo: boolean): void {
     if (halo === this.enemyHalo) return;
     this.enemyHalo = halo;

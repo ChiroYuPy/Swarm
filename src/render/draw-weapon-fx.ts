@@ -7,8 +7,8 @@ import { SCYTHE_FX_TICKS, WHIP_FX_TICKS } from '../sim/weapons';
 import { hash01, lerp, type RenderView } from './view';
 
 /**
- * Fouet : la lanière se déroule en ondulant (t de 0 à 0,45), claque au bout (étincelle), puis s'efface.
- * Tracée comme une courbe qui s'affine vers la pointe.
+ * Whip: the lash unrolls with a wave (t from 0 to 0.45), cracks at the tip (spark), then fades.
+ * Drawn as a curve that thins towards the tip.
  */
 function drawWhip(view: RenderView, x: number, y: number, angles: Float64Array, n: number, len: number, width: number, t: number, color: string): void {
   const ctx = view.ctx;
@@ -20,7 +20,7 @@ function drawWhip(view: RenderView, x: number, y: number, angles: Float64Array, 
     const ux = Math.cos(angles[b]);
     const uy = Math.sin(angles[b]);
     const side = b % 2 === 0 ? 1 : -1;
-    // Trois traits de plus en plus fins vers la pointe.
+    // Three strokes, thinner and thinner towards the tip.
     for (let part = 0; part < 3; part++) {
       ctx.beginPath();
       for (let k = (part * SEG) / 3; k <= ((part + 1) * SEG) / 3; k++) {
@@ -35,7 +35,7 @@ function drawWhip(view: RenderView, x: number, y: number, angles: Float64Array, 
       ctx.globalAlpha = fade;
       view.glow(color, 3.2 - part * 0.9);
     }
-    // Claquement : une étincelle au bout, au moment où la lanière se tend.
+    // Crack: a spark at the tip, when the lash snaps taut.
     if (t > 0.35 && t < 0.7) {
       const k = 1 - Math.abs(t - 0.5) / 0.2;
       const tx = x + ux * len;
@@ -54,8 +54,8 @@ function drawWhip(view: RenderView, x: number, y: number, angles: Float64Array, 
 }
 
 /**
- * Jet de flammes : des bouffées qui partent du joueur, grossissent, passent du blanc-jaune
- * à la couleur de l'arme puis s'éteignent. Purement décoratif (aucun aléa de la simulation).
+ * Flame jet: puffs leaving the player, growing, going from yellowish white
+ * to the weapon color, then dying out. Purely decorative (no simulation randomness).
  */
 function drawFlameJet(view: RenderView, x: number, y: number, a: number, len: number, arc: number, color: string, time: number, seed: number): void {
   const ctx = view.ctx;
@@ -72,7 +72,7 @@ function drawFlameJet(view: RenderView, x: number, y: number, a: number, len: nu
     const d = len * t;
     const fx = x + Math.cos(a + off + wob) * d;
     const fy = y + Math.sin(a + off + wob) * d;
-    // Les bouffées grossissent en s'éloignant, passent du blanc-jaune à la couleur puis au rouge, et s'éteignent.
+    // Puffs grow as they move away, go from yellowish white to the color then to red, and die out.
     const R = (5 + 15 * t) * scale;
     ctx.globalAlpha = Math.min(1, (1 - t) * 1.4) * 0.75;
     ctx.drawImage(t < 0.25 ? core : t < 0.65 ? mid : end, fx - R, fy - R, R * 2, R * 2);
@@ -81,16 +81,16 @@ function drawFlameJet(view: RenderView, x: number, y: number, a: number, len: nu
 }
 
 /**
- * Onde de choc : un front épais qui file (rapide puis freiné), une bande d'air comprimé derrière lui,
- * deux échos plus fins et des stries de poussière soufflées vers l'extérieur. `quake` (Séisme, qui ralentit
- * fort) : le sol se fissure en étoile sous l'onde. `f` = avancement (0..1).
+ * Shockwave: a thick front racing outwards (fast, then slowing), a band of compressed air behind it,
+ * two thinner echoes and dust streaks blown outwards. `quake` (Earthquake, which slows down
+ * hard): the ground cracks in a star under the wave. `f` = progress (0..1).
  */
 export function drawShockwave(view: RenderView, x: number, y: number, maxR: number, f: number, color: string, quake: boolean, seed: number): void {
   const ctx = view.ctx;
   const e = 1 - (1 - f) * (1 - f);
   const R = Math.max(2, maxR * e);
   const fade = 1 - f;
-  // Bande d'air comprimé, plus dense contre le front.
+  // Compressed air band, denser near the front.
   for (let k = 0; k < 3; k++) {
     const r0 = R * (1 - 0.1 * (k + 1));
     const r1 = R * (1 - 0.1 * k);
@@ -101,7 +101,7 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
     ctx.globalAlpha = (0.2 - k * 0.06) * fade;
     ctx.fill();
   }
-  // Échos
+  // Echoes
   for (const [k, w] of [
     [0.84, 1.5],
     [0.7, 1],
@@ -118,7 +118,7 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
   ctx.arc(x, y, R, 0, Math.PI * 2);
   ctx.globalAlpha = 0.4 + 0.6 * fade;
   view.glow(color, 2 + 4 * fade);
-  // Stries de poussière juste devant le front.
+  // Dust streaks just ahead of the front.
   ctx.beginPath();
   const N = 18;
   for (let k = 0; k < N; k++) {
@@ -133,7 +133,7 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
   ctx.globalAlpha = 0.6 * fade;
   ctx.stroke();
   if (quake) {
-    // Fissures en zigzag, du centre jusqu'au front.
+    // Zigzag cracks, from the center to the front.
     ctx.beginPath();
     for (let c = 0; c < 7; c++) {
       let a = ((c + hash01(seed * 13 + c)) / 7) * Math.PI * 2;
@@ -156,8 +156,8 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
 }
 
 /**
- * Faux : la lame fait un tour complet autour de toi (rapide puis freinée), suivie d'une traînée
- * en éventail qui s'efface. `t` = avancement de l'animation (0..1).
+ * Scythe: the blade makes a full turn around the player (fast, then slowing), followed by a fading
+ * fan-shaped trail. `t` = animation progress (0..1).
  */
 function drawScythe(view: RenderView, x: number, y: number, angles: Float64Array, n: number, R: number, t: number, color: string): void {
   const ctx = view.ctx;
@@ -165,7 +165,7 @@ function drawScythe(view: RenderView, x: number, y: number, angles: Float64Array
   const fade = t < 0.7 ? 1 : (1 - t) / 0.3;
   for (let b = 0; b < n; b++) {
     const a = angles[b] + ease * Math.PI * 2;
-    // Traînée : des tranches d'anneau de plus en plus pâles derrière la lame.
+    // Trail: ring slices, paler and paler behind the blade.
     const trail = Math.min(ease * Math.PI * 2, 2.4);
     const SEG = 12;
     ctx.fillStyle = color;
@@ -179,14 +179,14 @@ function drawScythe(view: RenderView, x: number, y: number, angles: Float64Array
       ctx.globalAlpha = 0.28 * (1 - k / SEG) * (1 - k / SEG) * fade;
       ctx.fill();
     }
-    // Bord tranchant de la traînée
+    // Sharp edge of the trail
     ctx.beginPath();
     ctx.arc(x, y, R, a - trail * 0.8, a);
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.6 * fade;
     ctx.stroke();
-    // Manche, puis la lame en croissant qui se recourbe vers l'avant.
+    // Handle, then the crescent blade curving forward.
     const P = (r: number, ang: number): [number, number] => [x + Math.cos(ang) * r, y + Math.sin(ang) * r];
     ctx.beginPath();
     ctx.moveTo(...P(R * 0.15, a));
@@ -214,7 +214,7 @@ function drawScythe(view: RenderView, x: number, y: number, angles: Float64Array
   ctx.globalAlpha = 1;
 }
 
-/** Phénix : corps, ailes qui battent, queue de flammes. (vx, vy) = sens du vol. */
+/** Phoenix: body, flapping wings, flame tail. (vx, vy) = flight direction. */
 export function drawPhoenix(view: RenderView, x: number, y: number, vx: number, vy: number, r: number, color: string, time: number): void {
   const ctx = view.ctx;
   const n = Math.hypot(vx, vy) || 1;
@@ -225,7 +225,7 @@ export function drawPhoenix(view: RenderView, x: number, y: number, vx: number, 
   const flap = Math.sin(time * 0.45);
   r *= 0.9;
   const P = (f: number, s: number): [number, number] => [x + ux * f * r + nx * s * r, y + uy * f * r + ny * s * r];
-  // Traînée de feu derrière lui.
+  // Fire trail behind it.
   const core = view.softPuff('#fff3c4');
   const mid = view.softPuff(color);
   const end = view.softPuff('#ff3d1a');
@@ -237,7 +237,7 @@ export function drawPhoenix(view: RenderView, x: number, y: number, vx: number, 
     ctx.drawImage(t < 0.2 ? core : t < 0.55 ? mid : end, px - R, py - R, R * 2, R * 2);
   }
   ctx.globalAlpha = 1;
-  // Ailes
+  // Wings
   ctx.beginPath();
   for (const side of [-1, 1]) {
     const [ax, ay] = P(0.1, 0);
@@ -253,7 +253,7 @@ export function drawPhoenix(view: RenderView, x: number, y: number, vx: number, 
   ctx.fill();
   ctx.globalAlpha = 1;
   view.glow(color, 1.6);
-  // Corps et tête
+  // Body and head
   ctx.beginPath();
   const [hx, hy] = P(0.55, 0);
   const [tx, ty] = P(-0.55, 0);

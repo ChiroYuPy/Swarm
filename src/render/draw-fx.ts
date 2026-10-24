@@ -7,7 +7,7 @@ import type { RenderView } from './view';
 
 export function drawFx(view: RenderView, fx: Effects): void {
   const ctx = view.ctx;
-  // Éclairs en zigzag
+  // Zigzag lightning
   for (let i = 0; i < fx.lCount; i++) {
     let seed = fx.lseed[i];
     const x1 = fx.lx1[i];
@@ -35,7 +35,7 @@ export function drawFx(view: RenderView, fx: Effects): void {
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  // Ondes
+  // Rings
   for (let i = 0; i < fx.rCount; i++) {
     const f = 1 - fx.rlife[i] / fx.rmax[i];
     ctx.beginPath();
@@ -44,7 +44,7 @@ export function drawFx(view: RenderView, fx: Effects): void {
     view.glow(FX_COLORS[fx.rcol[i]], 3);
     ctx.globalAlpha = 1;
   }
-  // Particules : sprites groupés par couleur
+  // Particles: sprites batched by color
   for (let c = 0; c < FX_COLORS.length; c++) {
     const sp = view.sprites.particle[c];
     for (let i = 0; i < fx.pCount; i++) {
@@ -73,7 +73,7 @@ export function drawTexts(view: RenderView, fx: Effects): void {
   ctx.globalAlpha = 1;
 }
 
-/** Flèches en bord d'écran vers le coffre et le boss hors champ. */
+/** Screen-edge arrows towards the off-screen chest and boss. */
 export function drawIndicators(view: RenderView, s: GameState): void {
   const ctx = view.ctx;
   const targets: [number, number, string][] = [];

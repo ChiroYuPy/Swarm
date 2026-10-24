@@ -34,18 +34,18 @@ function givePassive(p: Player, id: string, level: number) {
   p.passives.push(x);
 }
 
-/** Force une proposition de level-up au prochain pas et choisit l'offre 0. */
+/** Forces a level-up offer on the next step and picks offer 0. */
 function levelUpAndPickFirst(s: GameState): void {
   const p = s.players[0];
   p.pendingLevels = 1;
   p.offers = [];
-  step(s, [0]); // tire les propositions
+  step(s, [0]); // rolls the offers
   expect(isAwaitingChoice(s)).toBe(true);
   step(s, [200]);
 }
 
 describe('fusions', () => {
-  it('au moins 4 fusions définies, toutes cohérentes', () => {
+  it('at least 4 fusions defined, all consistent', () => {
     expect(FUSIONS.length).toBeGreaterThanOrEqual(4);
     for (const f of FUSION_TABLE) {
       expect(weaponDef(f.result).fusion).toBe(true);
@@ -53,17 +53,17 @@ describe('fusions', () => {
     }
   });
 
-  it('pas de fusion tant que les deux objets ne sont pas au niveau max', () => {
+  it('no fusion until both items are at max level', () => {
     const s = createGame({ seed: 'FUSION-1' });
     const p = s.players[0];
-    p.weapons[0].level = 4; // Pistolet à Confettis niv. 4
+    p.weapons[0].level = 4; // Blaster level 4
     givePassive(p, 'overclock', 5);
     expect(availableFusions(p)).toEqual([]);
     p.weapons[0].level = 5;
     expect(availableFusions(p).length).toBe(1);
   });
 
-  it('arme + passif : l’arme est remplacée par la fusion, le passif reste', () => {
+  it('weapon + passive: the weapon is replaced by the fusion, the passive stays', () => {
     const s = createGame({ seed: 'FUSION-2' });
     const p = s.players[0];
     p.weapons[0].level = 5;
@@ -71,11 +71,11 @@ describe('fusions', () => {
     levelUpAndPickFirst(s);
     expect(p.weapons.map((w) => weaponDef(w.def).id)).toEqual(['spiral']);
     expect(p.passives.map((x) => PASSIVES[x.def].id)).toEqual(['overclock']);
-    // L'arme de base ne peut plus être reproposée.
+    // The base weapon can no longer be offered again.
     expect(p.banned).toContain(wIdx('blaster'));
   });
 
-  it('toute évolution = une arme de base + un passif, et chaque évolution a sa recette', () => {
+  it('every evolution = one base weapon + one passive, and every evolution has a recipe', () => {
     for (const f of FUSIONS) {
       expect(PASSIVES.some((x) => x.id === f.with), f.result).toBe(true);
       expect(ALL_WEAPONS.find((w) => w.id === f.weapon)?.fusion, f.result).toBeFalsy();
@@ -83,7 +83,7 @@ describe('fusions', () => {
     for (const w of ALL_WEAPONS.filter((x) => x.fusion)) expect(FUSIONS.some((f) => f.result === w.id), w.id).toBe(true);
   });
 
-  it('une évolution garde l’emplacement de son arme, et le passif reste', () => {
+  it('an evolution keeps its weapon slot, and the passive stays', () => {
     const s = createGame({ seed: 'FUSION-3' });
     const p = s.players[0];
     giveWeapon(p, 'electric_arc', 5);
@@ -98,7 +98,7 @@ describe('fusions', () => {
     expect(p.passives.some((x) => PASSIVES[x.def].id === 'overclock')).toBe(true);
   });
 
-  it('chaque arme fusionnée a un comportement qui inflige des dégâts', () => {
+  it('every fused weapon has a behaviour that deals damage', () => {
     for (const f of FUSIONS) {
       const s = createGame({ seed: `FUSION-DPS-${f.result}` });
       const p = s.players[0];
@@ -109,12 +109,12 @@ describe('fusions', () => {
     }
   });
 
-  it('le coffre du boss donne la fusion garantie quand elle est possible', () => {
+  it('the boss chest grants the guaranteed fusion when one is possible', () => {
     const s = createGame({ seed: 'COFFRE' });
     const p = s.players[0];
     p.weapons[0].level = 5;
     givePassive(p, 'overclock', 5);
-    // Pose un coffre sous les pieds du héros.
+    // Put a chest right under the hero.
     s.pickups[0].kind = PK_CHEST;
     s.pickups[0].life = -1;
     s.pickups[0].x = p.x;

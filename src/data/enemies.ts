@@ -1,4 +1,4 @@
-/** Ennemis. Les PV / dégâts / vitesses sont multipliés par les courbes de difficulté de waves.ts. */
+/** Enemies. HP / damage / speeds are multiplied by the difficulty curves of waves.ts. */
 
 export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'leader' | 'blinker' | 'orbiter' | 'wall' | 'egg';
 export type EnemyShape =
@@ -9,7 +9,7 @@ export type EnemyShape =
   | 'circle'
   | 'dot'
   | 'box'
-  | 'trapeze'
+  | 'trapezoid'
   | 'rock'
   | 'sun'
   | 'ring'
@@ -35,21 +35,21 @@ interface EnemyBase {
   damage: number;
   radius: number;
   xp: number;
-  /** 0 = subit tout le recul, 1 = insensible */
+  /** 0 = takes full knockback, 1 = immune */
   kbResist: number;
-  /** absent du codex et du bac à sable (n'apparaît que via un autre ennemi) */
+  /** absent from the codex and the sandbox (only appears through another enemy) */
   hidden?: boolean;
-  /** à sa mort, se coupe en `splitCount` ennemis `splitInto` */
+  /** on death, splits into `splitCount` `splitInto` enemies */
   splitInto?: string;
   splitCount?: number;
-  /** nombre maximal en vie : `capStart` à son arrivée, + `capPerMinute` par minute ensuite, au plus `capMax` */
+  /** max number alive: `capStart` on arrival, + `capPerMinute` per minute afterwards, at most `capMax` */
   capStart?: number;
   capPerMinute?: number;
   capMax?: number;
-  // meneur : les autres ennemis à moins de `auraRadius` vont `auraSpeed` plus vite
+  // leader: other enemies within `auraRadius` go `auraSpeed` faster
   auraRadius?: number;
   auraSpeed?: number;
-  // téléporteur : marque le sol sous le joueur, s'y téléporte après `fuse` s (dégâts de zone), toutes les `blinkEvery` s
+  // teleporter: marks the ground under the player, teleports there after `fuse` s (area damage), every `blinkEvery` s
   blinkEvery?: number;
   // shooter
   keepMin?: number;
@@ -86,18 +86,18 @@ export interface BossPhase {
 }
 
 /**
- * Renforts d'un boss (phase 'summon') : un gros paquet d'un seul type, autour du boss ou en cercle
- * autour du joueur. Rien s'il reste déjà `maxAlive` ennemis : il faut toujours une fenêtre pour le taper.
+ * A boss's reinforcements ('summon' phase): a big pack of a single type, around the boss or in a circle
+ * around the player. Nothing if `maxAlive` enemies are already left: there must always be a window to hit it.
  */
 export interface BossSummon {
   type: string;
   count: number;
-  /** ennemis en plus par boss déjà apparu */
+  /** extra enemies per boss already spawned */
   perBoss: number;
   around: 'self' | 'player';
   radius: number;
   maxAlive: number;
-  /** PV des renforts × hp (1 par défaut) */
+  /** reinforcement HP × hp (1 by default) */
   hp?: number;
 }
 
@@ -121,7 +121,7 @@ export interface BossConfig extends Partial<BossSpiral> {
   summon?: BossSummon;
 }
 
-/** Trapèze : une séquence de phases qui boucle. */
+/** Trapezoid: a looping sequence of phases. */
 export const TRAPEZOID_BOSS = {
   pattern: [
     { kind: 'chase', duration: 2.5 },
@@ -137,17 +137,17 @@ export const TRAPEZOID_BOSS = {
   spiralTurn: 0.23,
   bulletSpeed: 175,
   bulletDamage: 10,
-  /** durée de la ligne d'avertissement (s) ; ensuite il fonce jusqu'au bout de la ligne */
+  /** duration of the warning line (s); then it charges to the end of the line */
   chargeTelegraph: 0.9,
   chargeSpeed: 700,
-  /** portée de la charge (= longueur de la ligne d'avertissement) */
+  /** charge range (= length of the warning line) */
   chargeLength: 560,
-  /** dégâts de contact × chargeDamage pendant qu'il fonce */
+  /** contact damage × chargeDamage while it charges */
   chargeDamage: 1.8,
   summon: { type: 'hunter', count: 10, perBoss: 2, around: 'self', radius: 90, maxAlive: 20 } as BossSummon,
 };
 
-/** Hexagone bâtisseur : cage de murs cassables autour du joueur, puis tirs à travers. */
+/** Builder hexagon: cage of breakable walls around the player, then shots through it. */
 export const BUILDER_HEXAGON_BOSS = {
   pattern: [
     { kind: 'chase', duration: 2.0 },
@@ -157,14 +157,14 @@ export const BUILDER_HEXAGON_BOSS = {
     { kind: 'chase', duration: 2.0 },
     { kind: 'summon', duration: 1.0 },
   ] as BossPhase[],
-  /** rayon de la cage (hexagone) et écart entre deux murs */
+  /** cage (hexagon) radius and gap between two walls */
   cageRadius: 210,
   wallSpacing: 27,
-  /** une cage seulement tous les N cycles */
+  /** a cage only every N cycles */
   cageEvery: 2,
-  /** murs manquants au milieu de deux côtés opposés (les sorties) */
+  /** walls missing in the middle of two opposite sides (the exits) */
   gapWalls: 3,
-  /** durée de vie d'un mur, dont la montée (pas encore solide) */
+  /** lifetime of a wall, including its rise (not solid yet) */
   wallLife: 6.5,
   wallRise: 0.6,
   spiralEvery: 0.2,
@@ -178,7 +178,7 @@ export const BUILDER_HEXAGON_BOSS = {
   summon: { type: 'block', count: 5, perBoss: 1, around: 'player', radius: 420, maxAlive: 12 } as BossSummon,
 };
 
-/** Étoile ricochet : vise (ligne), fonce en rebondissant dans une boîte autour du joueur, laisse du feu. */
+/** Ricochet star: aims (line), dashes bouncing inside a box around the player, leaves fire behind. */
 export const RICOCHET_STAR_BOSS = {
   pattern: [
     { kind: 'chase', duration: 1.4 },
@@ -189,17 +189,17 @@ export const RICOCHET_STAR_BOSS = {
     { kind: 'burst', duration: 1.4 },
     { kind: 'summon', duration: 0.8 },
   ] as BossPhase[],
-  /** vitesse et durée des ruées : 3 à 4 rebonds par ruée dans la boîte */
+  /** speed and duration of the dashes: 3 to 4 bounces per dash in the box */
   dashSpeed: 620,
-  /** demi-côté de la boîte de rebond, centrée là où était le joueur quand elle a visé */
+  /** half-side of the bounce box, centred where the player was when it aimed */
   box: 340,
-  /** dégâts de contact × dashDamage pendant qu'elle fonce */
+  /** contact damage × dashDamage while it dashes */
   dashDamage: 1.6,
-  /** une flamme toutes les `fireEvery` images */
+  /** one flame every `fireEvery` frames */
   fireEvery: 3,
   fireRadius: 20,
   fireLife: 3.2,
-  /** dégâts par seconde passée dans les flammes */
+  /** damage per second spent in the flames */
   fireDps: 22,
   burstArms: 10,
   bulletSpeed: 180,
@@ -207,7 +207,7 @@ export const RICOCHET_STAR_BOSS = {
   summon: { type: 'rusher', count: 12, perBoss: 2, around: 'self', radius: 80, maxAlive: 20 } as BossSummon,
 };
 
-/** Œil laser : garde ses distances, annonce un cône puis le balaie avec un rayon. */
+/** Laser eye: keeps its distance, telegraphs a cone then sweeps it with a beam. */
 export const LASER_EYE_BOSS = {
   pattern: [
     { kind: 'watch', duration: 2.0 },
@@ -225,13 +225,13 @@ export const LASER_EYE_BOSS = {
   bulletDamage: 9,
   beamLength: 520,
   beamWidth: 16,
-  /** ouverture du balayage (radians) */
+  /** sweep aperture (radians) */
   arc: 1.6,
   beamDamage: 28,
   summon: { type: 'orbiter', count: 8, perBoss: 2, around: 'player', radius: 520, maxAlive: 14 } as BossSummon,
 };
 
-/** Reine de l'essaim : fuit (plus lente que toi) et pond des œufs qui éclosent en Essaim. */
+/** Swarm queen: flees (slower than you) and lays eggs that hatch into Swarm. */
 export const SWARM_QUEEN_BOSS = {
   pattern: [
     { kind: 'flee', duration: 0.9 },
@@ -244,18 +244,18 @@ export const SWARM_QUEEN_BOSS = {
   ] as BossPhase[],
   keepMin: 260,
   keepMax: 400,
-  /** une ponte sur `bigEvery` est triple */
+  /** one laying out of `bigEvery` is triple */
   bigEvery: 2,
   hatchAfter: 2.6,
   hatchCount: 7,
   maxEggs: 14,
-  /** PV de l'Essaim qui éclot (× les PV normaux) : un peu plus solide qu'un Essaim ordinaire */
+  /** HP of the hatched Swarm (× normal HP): a bit sturdier than an ordinary Swarm */
   broodHp: 1.5,
-  /** gerbe de dards en spirale */
+  /** spiral spray of darts */
   spiralEvery: 0.12,
   spiralArms: 3,
   spiralTurn: 0.38,
-  /** à chaque ponte, une salve vers le joueur */
+  /** on each laying, a volley toward the player */
   volleyCount: 3,
   volleySpread: 0.22,
   bulletSpeed: 190,
@@ -337,7 +337,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'trapezoid',
-    behavior: 'boss', boss: TRAPEZOID_BOSS, shape: 'trapeze', color: '#ff3df5',
+    behavior: 'boss', boss: TRAPEZOID_BOSS, shape: 'trapezoid', color: '#ff3df5',
     hp: 2000, speed: 68, damage: 20, radius: 46, xp: 0, kbResist: 1,
   },
   {
@@ -375,6 +375,6 @@ export const ENEMIES: EnemyDef[] = [
 /** Bosses always come in this order, then loop around as "Mk II", "Mk III"... (their names: bossName in src/i18n/content.ts). */
 export const BOSS_ORDER = ['trapezoid', 'builder_hexagon', 'ricochet_star', 'laser_eye', 'swarm_queen'];
 
-/** PV du k-ième boss × (1 + BOSS_HP_GROWTH × k) */
+/** HP of the k-th boss × (1 + BOSS_HP_GROWTH × k) */
 export const BOSS_HP_GROWTH = 0.9;
 

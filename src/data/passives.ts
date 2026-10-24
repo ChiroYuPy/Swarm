@@ -1,27 +1,27 @@
-/** Bonus passifs. Chaque niveau ajoute `perLevel` aux stats du héros (max 5 niveaux). */
+/** Passive bonuses. Each level adds `perLevel` to the hero's stats (max 5 levels). */
 
 export interface PassiveDef {
   /** Name, description and per-level effect live in src/i18n/locales, keyed by this id. */
   id: string;
   color: string;
   perLevel: {
-    /** réduction de recharge (0.06 = -6 %) */
+    /** cooldown reduction (0.06 = -6%) */
     cooldown?: number;
-    /** bonus de vitesse (0.06 = +6 %) */
+    /** speed bonus (0.06 = +6%) */
     speed?: number;
-    /** bonus de rayon de collecte (0.25 = +25 %) */
+    /** pickup radius bonus (0.25 = +25%) */
     magnet?: number;
-    /** bonus de dégâts */
+    /** damage bonus */
     might?: number;
-    /** bonus de zone (rayons, tailles) */
+    /** area bonus (radii, sizes) */
     area?: number;
-    /** PV max en plus */
+    /** extra max HP */
     maxHp?: number;
-    /** PV / seconde en plus */
+    /** extra HP / second */
     regen?: number;
-    /** réduction des dégâts subis (0.05 = -5 %) */
+    /** damage taken reduction (0.05 = -5%) */
     armor?: number;
-    /** bonus de chance d'obtenir des objets (0.2 = +20 %) */
+    /** item drop chance bonus (0.2 = +20%) */
     luck?: number;
   };
   weight?: number;
