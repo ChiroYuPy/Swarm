@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, step, TICK_RATE, EV_FLEE, EV_WAVE, PJ_FIRE, type GameState } from '../src/sim';
 import { spawnEnemy } from '../src/sim/entities';
-import { BOSS_PATTERNS, BOSS_TICKS, BOSS_TYPES, MIX_TICKS, WAVE_TICKS, enemyId } from '../src/sim/registry';
+import { BOSS_PATTERNS, BOSS_TICKS, BOSS_TYPES, MIX_TICKS, WALL_RISE, WAVE_TICKS, enemyId } from '../src/sim/registry';
 import { damageEnemy } from '../src/sim/combat';
 import { TRAPEZOID_BOSS, BOSS_ORDER, BUILDER_HEXAGON_BOSS, LASER_EYE_BOSS, SWARM_QUEEN_BOSS } from '../src/data/enemies';
 import { bossName } from '../src/i18n/content';
@@ -93,7 +93,7 @@ describe('waves and bosses', () => {
       p.hp = p.stats.maxHp;
       p.invulnUntil = 0;
     }
-    expect(x0 - e.x).toBeGreaterThan(TRAPEZOID_BOSS.chargeLength - 20);
+    expect(x0 - e.x).toBeGreaterThan(TRAPEZOID_BOSS.charge.length - 20);
     // And it crushes: a hit mid-charge is worth more than its normal contact damage.
     const t = arena();
     const q = t.players[0];
@@ -112,12 +112,12 @@ describe('waves and bosses', () => {
     const walls = alive(s, 'wall');
     expect(walls.length).toBeGreaterThan(30);
     for (const w of walls)
-      expect(Math.abs(Math.hypot(w.x - p.x, w.y - p.y) - BUILDER_HEXAGON_BOSS.cageRadius)).toBeLessThan(BUILDER_HEXAGON_BOSS.cageRadius * 0.15);
-    for (let i = 0; i < BUILDER_HEXAGON_BOSS.wallRise * TICK_RATE + 2; i++) step(s, [0]);
+      expect(Math.abs(Math.hypot(w.x - p.x, w.y - p.y) - BUILDER_HEXAGON_BOSS.cage.radius)).toBeLessThan(BUILDER_HEXAGON_BOSS.cage.radius * 0.15);
+    for (let i = 0; i < WALL_RISE * TICK_RATE + 2; i++) step(s, [0]);
     // Rush to the right: the player stays inside the cage.
     for (let i = 0; i < 3 * TICK_RATE; i++) step(s, [1]);
-    expect(Math.hypot(p.x, p.y)).toBeLessThan(BUILDER_HEXAGON_BOSS.cageRadius);
-    for (let i = 0; i < BUILDER_HEXAGON_BOSS.wallLife * TICK_RATE; i++) step(s, [0]);
+    expect(Math.hypot(p.x, p.y)).toBeLessThan(BUILDER_HEXAGON_BOSS.cage.radius);
+    for (let i = 0; i < BUILDER_HEXAGON_BOSS.cage.wallLife * TICK_RATE; i++) step(s, [0]);
     expect(alive(s, 'wall').length).toBe(0);
   });
 
@@ -131,7 +131,7 @@ describe('waves and bosses', () => {
       .sort((x, y) => x - y);
     // The exits: large angle gaps between two neighbouring walls (wrap-around included).
     const gaps = angles.map((a, i) => (i + 1 < angles.length ? angles[i + 1] - a : angles[0] + 2 * Math.PI - a));
-    const big = gaps.filter((g) => g * BUILDER_HEXAGON_BOSS.cageRadius > 60);
+    const big = gaps.filter((g) => g * BUILDER_HEXAGON_BOSS.cage.radius > 60);
     expect(big.length).toBe(2);
     for (const w of alive(s, 'wall')) w.alive = false;
     // Next cycle: no cage.
@@ -187,12 +187,12 @@ describe('waves and bosses', () => {
     const e = boss(t, 'laser_eye', 300, 0, 'focus');
     step(t, [0]);
     // The player moves beyond the beam's range.
-    q.x = e.x - LASER_EYE_BOSS.beamLength - 80;
+    q.x = e.x - LASER_EYE_BOSS.laser.length - 80;
     q.px = q.x;
     const hq = q.hp;
     for (let i = 0; i < 2.0 * TICK_RATE; i++) {
       step(t, [0]);
-      q.x = q.px = e.x - LASER_EYE_BOSS.beamLength - 80;
+      q.x = q.px = e.x - LASER_EYE_BOSS.laser.length - 80;
       q.y = q.py = e.y;
     }
     expect(q.hp).toBe(hq);
@@ -206,7 +206,7 @@ describe('waves and bosses', () => {
     expect(eggs.length).toBeGreaterThan(1);
     damageEnemy(s, s.enemies.indexOf(eggs[0]), 1e6, 0, 0, 0);
     const swarm0 = alive(s, 'swarm').length;
-    for (let i = 0; i < SWARM_QUEEN_BOSS.hatchAfter * TICK_RATE; i++) step(s, [0]);
+    for (let i = 0; i < SWARM_QUEEN_BOSS.lay.hatchAfter * TICK_RATE; i++) step(s, [0]);
     expect(alive(s, 'swarm').length).toBeGreaterThan(swarm0);
   });
 });

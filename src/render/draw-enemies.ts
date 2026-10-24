@@ -2,19 +2,23 @@
  * Enemies: sprites batched by type, frozen shells, leader zones and speed trails, blinker targets,
  * rising walls, kamikaze blast zones, then the boss on top.
  */
-import { ENEMIES, BUILDER_HEXAGON_BOSS } from '../data/enemies';
-import { EF_BOSS, WALL_TYPE, EGG_TYPE, MAX_ENEMIES, TICK_RATE, type GameState, type Enemy } from '../sim';
+import { ENEMIES } from '../data/enemies';
+import { BEHAVIOR, EF_BOSS, ENEMY_BEHAVIOR, RALLY_TYPE, WALL_RISE, WALL_TYPE, EGG_TYPE, MAX_ENEMIES, TICK_RATE, type GameState, type Enemy } from '../sim';
 import { drawBoss } from './draw-bosses';
 import { lerp, type RenderView } from './view';
 
-const ENEMY_KAMIKAZE = ENEMIES.findIndex((e) => e.behavior === 'kamikaze');
-const KAMIKAZE_BLAST = ENEMIES[ENEMY_KAMIKAZE]?.blastRadius ?? 80;
 const NUM_TYPES = ENEMIES.length;
-const ENEMY_BLINKER = ENEMIES.findIndex((e) => e.behavior === 'blinker');
-const ENEMY_LEADER = ENEMIES.findIndex((e) => e.behavior === 'leader');
-const BLINK_DEF = ENEMIES[ENEMY_BLINKER];
-const BLINK_FUSE = Math.round((BLINK_DEF?.fuse ?? 1) * TICK_RATE);
-const LEADER_DEF = ENEMIES[ENEMY_LEADER];
+/** Types by behaviour; each reads its own data (several types may share a behaviour). */
+const typesOf = (b: number) => ENEMY_BEHAVIOR.flatMap((x, t) => (x === b ? [t] : []));
+const KAMIKAZE_TYPES = typesOf(BEHAVIOR.KAMIKAZE);
+const LEADER_TYPES = typesOf(BEHAVIOR.LEADER);
+/** per-type blast radius (kamikaze), landing radius and fuse (blinker), aura radius (leader) */
+const KAMIKAZE_BLAST = ENEMIES.map((d) => d.blastRadius ?? 80);
+const BLINK_RADIUS = ENEMIES.map((d) => d.blastRadius ?? 52);
+const BLINK_FUSE = ENEMIES.map((d) => Math.round((d.fuse ?? 1) * TICK_RATE));
+const AURA_RADIUS = ENEMIES.map((d) => d.auraRadius ?? 170);
+/** Rallied enemies don't know which leader rallied them (see RALLY_TYPE): trails take the strongest leader's color. */
+const RALLY_COLOR = RALLY_TYPE >= 0 ? ENEMIES[RALLY_TYPE].color : '#ffffff';
 const WALL_COLOR = ENEMIES[WALL_TYPE].color;
 
 /** per-type scratch lists of visible enemy indices, refilled each frame */
@@ -22,36 +26,37 @@ const buckets: Int32Array[] = [];
 for (let t = 0; t < NUM_TYPES; t++) buckets.push(new Int32Array(MAX_ENEMIES));
 const bucketN = new Int32Array(NUM_TYPES);
 
-/** Leaders: their zone (dashed), and a trail behind every enemy they speed up. */
+/** Leaders: their zone (dashed, one path per leader type), and a trail behind every enemy they speed up. */
 function drawLeaders(view: RenderView, s: GameState, alpha: number, time: number): void {
-  if (ENEMY_LEADER < 0) return;
+  if (LEADER_TYPES.length === 0) return;
   const ctx = view.ctx;
   const tick = s.tick;
-  const color = LEADER_DEF.color;
-  const R = LEADER_DEF.auraRadius ?? 170;
-  let zones = false;
   let trails = false;
-  ctx.beginPath();
-  for (let i = 0; i < s.enemyCount; i++) {
-    const e = s.enemies[i];
-    if (!e.alive || e.type !== ENEMY_LEADER || e.frozenUntil > tick) continue;
-    const x = lerp(e.px, e.x, alpha);
-    const y = lerp(e.py, e.y, alpha);
-    if (!view.visible(x, y, R)) continue;
-    ctx.moveTo(x + R, y);
-    ctx.arc(x, y, R, 0, Math.PI * 2);
-    zones = true;
-  }
-  if (zones) {
-    ctx.globalAlpha = 0.25;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 10]);
-    ctx.lineDashOffset = -time * 20;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-    ctx.globalAlpha = 1;
+  for (const lt of LEADER_TYPES) {
+    const R = AURA_RADIUS[lt];
+    let zones = false;
+    ctx.beginPath();
+    for (let i = 0; i < s.enemyCount; i++) {
+      const e = s.enemies[i];
+      if (!e.alive || e.type !== lt || e.frozenUntil > tick) continue;
+      const x = lerp(e.px, e.x, alpha);
+      const y = lerp(e.py, e.y, alpha);
+      if (!view.visible(x, y, R)) continue;
+      ctx.moveTo(x + R, y);
+      ctx.arc(x, y, R, 0, Math.PI * 2);
+      zones = true;
+    }
+    if (zones) {
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = ENEMIES[lt].color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 10]);
+      ctx.lineDashOffset = -time * 20;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.beginPath();
   for (let i = 0; i < s.enemyCount; i++) {
@@ -76,24 +81,23 @@ function drawLeaders(view: RenderView, s: GameState, alpha: number, time: number
   }
   if (trails) {
     ctx.globalAlpha = 0.75;
-    view.glow(color, 1.6);
+    view.glow(RALLY_COLOR, 1.6);
     ctx.globalAlpha = 1;
   }
 }
 
-/** Teleporters: ground impact circle that fills up, linked to the teleporter. */
+/** Teleporters (every blinker type): ground impact circle that fills up, linked to the teleporter. */
 function drawBlinks(view: RenderView, s: GameState, alpha: number): void {
-  if (ENEMY_BLINKER < 0) return;
   const ctx = view.ctx;
-  const color = BLINK_DEF.color;
-  const R = BLINK_DEF.blastRadius ?? 52;
   for (let i = 0; i < s.enemyCount; i++) {
     const e = s.enemies[i];
-    if (!e.alive || e.type !== ENEMY_BLINKER || e.ai !== 1) continue;
+    if (!e.alive || ENEMY_BEHAVIOR[e.type] !== BEHAVIOR.BLINKER || e.ai !== 1) continue;
+    const color = ENEMIES[e.type].color;
+    const R = BLINK_RADIUS[e.type];
     const tx = e.aux;
     const ty = e.aux2;
     if (!view.visible(tx, ty, R)) continue;
-    const prog = Math.min(1, Math.max(0, 1 - e.timer / BLINK_FUSE));
+    const prog = Math.min(1, Math.max(0, 1 - e.timer / BLINK_FUSE[e.type]));
     const x = lerp(e.px, e.x, alpha);
     const y = lerp(e.py, e.y, alpha);
     ctx.beginPath();
@@ -145,6 +149,8 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
     const list = buckets[t];
     const shape = ENEMIES[t].shape;
     const rotates = shape !== 'box' && shape !== 'dot' && shape !== 'block' && shape !== 'egg';
+    // Kamikazes and teleporters blink while their fuse burns.
+    const fuses = ENEMY_BEHAVIOR[t] === BEHAVIOR.KAMIKAZE || ENEMY_BEHAVIOR[t] === BEHAVIOR.BLINKER;
     for (let pass = 0; pass < 2; pass++) {
       const sp = pass === 0 ? view.sprites.enemy[t] : view.sprites.enemyFlash[t];
       if (!rotates) view.worldTransform();
@@ -155,7 +161,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
         const flash =
           e.frozenUntil > tick ||
           tick - e.hitTick < 5 ||
-          ((t === ENEMY_KAMIKAZE || t === ENEMY_BLINKER) && e.ai === 1 && ((tick >> 2) & 1) === 1) ||
+          (fuses && e.ai === 1 && ((tick >> 2) & 1) === 1) ||
           (t === EGG_TYPE && e.timer < 50 && ((tick >> 2) & 1) === 1);
         if (flash !== (pass === 1)) continue;
         const x = lerp(e.px, e.x, alpha);
@@ -187,19 +193,22 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
   drawBlinks(view, s, alpha);
   if (n[WALL_TYPE] > 0) drawRisingWalls(view, s, time);
 
-  // Blast zone of the bubbles about to burst
-  if (ENEMY_KAMIKAZE >= 0 && n[ENEMY_KAMIKAZE] > 0) {
+  // Blast zone of the bubbles about to burst (every kamikaze type, each with its own radius)
+  if (KAMIKAZE_TYPES.some((t) => n[t] > 0)) {
     ctx.beginPath();
     let fusing = false;
-    const list = buckets[ENEMY_KAMIKAZE];
-    for (let k = 0; k < n[ENEMY_KAMIKAZE]; k++) {
-      const e = s.enemies[list[k]];
-      if (e.ai !== 1) continue;
-      const x = lerp(e.px, e.x, alpha);
-      const y = lerp(e.py, e.y, alpha);
-      ctx.moveTo(x + KAMIKAZE_BLAST, y);
-      ctx.arc(x, y, KAMIKAZE_BLAST, 0, Math.PI * 2);
-      fusing = true;
+    for (const t of KAMIKAZE_TYPES) {
+      const list = buckets[t];
+      const R = KAMIKAZE_BLAST[t];
+      for (let k = 0; k < n[t]; k++) {
+        const e = s.enemies[list[k]];
+        if (e.ai !== 1) continue;
+        const x = lerp(e.px, e.x, alpha);
+        const y = lerp(e.py, e.y, alpha);
+        ctx.moveTo(x + R, y);
+        ctx.arc(x, y, R, 0, Math.PI * 2);
+        fusing = true;
+      }
     }
     if (fusing) {
       ctx.globalAlpha = 0.35 + 0.25 * ((tick >> 2) & 1);
@@ -219,7 +228,7 @@ export function drawEnemies(view: RenderView, s: GameState, alpha: number, time:
 /** Walls rising from the ground: growing dashed outline. */
 function drawRisingWalls(view: RenderView, s: GameState, time: number): void {
   const ctx = view.ctx;
-  const rise = BUILDER_HEXAGON_BOSS.wallRise * TICK_RATE;
+  const rise = WALL_RISE * TICK_RATE;
   let any = false;
   ctx.beginPath();
   for (let i = 0; i < s.enemyCount; i++) {

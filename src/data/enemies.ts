@@ -62,6 +62,12 @@ interface EnemyBase {
   triggerRange?: number;
   blastRadius?: number;
   blastDamage?: number;
+  // wall (built by a 'build' boss phase): rises out of the ground for `rise` s, not solid yet
+  rise?: number;
+  // egg (laid by a 'lay' boss phase): hatches into `hatchCount` `hatchInto` enemies with `hatchHp` × their normal HP
+  hatchInto?: string;
+  hatchCount?: number;
+  hatchHp?: number;
 }
 
 export type BossPhaseKind =
@@ -80,9 +86,37 @@ export type BossPhaseKind =
   | 'flee'
   | 'lay';
 
-export interface BossPhase {
-  kind: BossPhaseKind;
+export interface BossPhase<K extends BossPhaseKind = BossPhaseKind> {
+  kind: K;
   duration: number;
+}
+
+/** Bullets of the shooting phases ('spiral', 'volley', 'burst', 'watch', 'lay'). */
+export interface BossBullets {
+  speed: number;
+  damage: number;
+}
+
+/** 'spiral': rings of bullets fired along rotating arms. */
+export interface BossSpiral {
+  /** one ring every `every` s */
+  every: number;
+  arms: number;
+  /** extra arms per boss already spawned */
+  armsPerBoss?: number;
+  /** rotation between two rings (radians) */
+  turn: number;
+}
+
+/** 'charge': a warning line, then a rush to its end. */
+export interface BossCharge {
+  /** duration of the warning line (s); then it charges to the end of the line */
+  telegraph: number;
+  speed: number;
+  /** charge range (= length of the warning line) */
+  length: number;
+  /** contact damage × damage while it charges */
+  damage: number;
 }
 
 /**
@@ -101,28 +135,142 @@ export interface BossSummon {
   hp?: number;
 }
 
-/** 'spiral' phase params. */
-export interface BossSpiral {
-  spiralEvery: number;
-  spiralArms: number;
-  /** extra arms per boss already spawned */
-  spiralArmsPerBoss?: number;
-  spiralTurn: number;
-  bulletSpeed: number;
-  bulletDamage: number;
+/** 'build': a hexagonal cage of breakable walls around the player. How long a wall rises is the wall type's `rise`. */
+export interface BossCage {
+  /** cage (hexagon) radius and gap between two walls */
+  radius: number;
+  wallSpacing: number;
+  /** a cage only every N cycles */
+  every: number;
+  /** walls missing in the middle of two opposite sides (the exits) */
+  gapWalls: number;
+  /** lifetime of a wall, including its rise (not solid yet) */
+  wallLife: number;
+}
+
+/** 'volley': a fan of bullets toward the player, every `every` s. */
+export interface BossVolley {
+  every: number;
+  count: number;
+  /** angle between two bullets (radians) */
+  spread: number;
+}
+
+/** 'aim' (direction and bounce box) then 'dash' (bounces inside the box, leaves flames). */
+export interface BossDash {
+  speed: number;
+  /** half-side of the bounce box, centred where the player was when it aimed */
+  box: number;
+  /** contact damage × damage while it dashes */
+  damage: number;
+  /** one flame every `fireEvery` frames */
+  fireEvery: number;
+  fireRadius: number;
+  fireLife: number;
+  /** damage per second spent in the flames */
+  fireDps: number;
+}
+
+/** 'burst': two rings of `arms` bullets, the second one offset by half a step. */
+export interface BossBurst {
+  arms: number;
+}
+
+/** 'watch': keeps its distance and shoots at the player every `shootEvery` s. */
+export interface BossWatch {
+  keepMin: number;
+  keepMax: number;
+  shootEvery: number;
+}
+
+/** 'focus' (telegraphed cone) then 'sweep' (the beam crosses it). */
+export interface BossLaser {
+  /** beam length and width */
+  length: number;
+  width: number;
+  /** sweep aperture (radians) */
+  arc: number;
+  damage: number;
+}
+
+/** 'flee': keeps its distance. */
+export interface BossFlee {
+  keepMin: number;
+  keepMax: number;
+}
+
+/** 'lay': eggs where it stands (what hatches is the egg type's `hatchInto`), plus a volley toward the player. */
+export interface BossLay {
+  /** one laying out of `bigEvery` is triple */
+  bigEvery: number;
+  /** time before an egg hatches (s) */
+  hatchAfter: number;
+  maxEggs: number;
+  volleyCount: number;
+  /** angle between two bullets of the volley (radians) */
+  volleySpread: number;
+}
+
+/** Every parameter group a boss phase can read. A boss declares only the groups its phases use. */
+export interface BossParams {
+  bullets: BossBullets;
+  spiral: BossSpiral;
+  charge: BossCharge;
+  summon: BossSummon;
+  cage: BossCage;
+  volley: BossVolley;
+  dash: BossDash;
+  burst: BossBurst;
+  watch: BossWatch;
+  laser: BossLaser;
+  flee: BossFlee;
+  lay: BossLay;
 }
 
 /**
- * What the registry compiles for every boss. A boss whose pattern has a 'spiral' phase must also
- * carry the BossSpiral fields (checked by tests/registry.test.ts); the other params are read by name.
+ * Parameter groups each phase reads (in the sim, the telegraphs and the bot). `bossConfig()` requires them
+ * at compile time; src/sim/registry.ts checks them again at load.
  */
-export interface BossConfig extends Partial<BossSpiral> {
+export const PHASE_PARAMS = {
+  chase: [],
+  spiral: ['spiral', 'bullets'],
+  charge: ['charge'],
+  summon: ['summon'],
+  build: ['cage'],
+  volley: ['volley', 'bullets'],
+  aim: ['dash'],
+  dash: ['dash'],
+  burst: ['burst', 'bullets'],
+  watch: ['watch', 'bullets'],
+  focus: ['laser'],
+  sweep: ['laser'],
+  flee: ['flee'],
+  lay: ['lay', 'bullets'],
+} as const satisfies Record<BossPhaseKind, readonly (keyof BossParams)[]>;
+
+/** The parameter groups needed by a set of phase kinds. */
+export type ParamsFor<K extends BossPhaseKind> = (typeof PHASE_PARAMS)[K][number];
+
+/**
+ * What a boss carries: a looping pattern and the parameter groups of its phases. Every phase reads the
+ * groups of the boss running it (BOSS_CONFIGS in src/sim/registry.ts).
+ */
+export interface BossConfig extends Partial<BossParams> {
   pattern: BossPhase[];
-  summon?: BossSummon;
+}
+
+/**
+ * Builds a boss config. The phase kinds of `pattern` decide which groups are required (PHASE_PARAMS):
+ * a missing group, or a group none of its phases reads, is a type error.
+ */
+export function bossConfig<K extends BossPhaseKind>(
+  cfg: { pattern: BossPhase<K>[] } & Pick<BossParams, ParamsFor<K>>,
+): BossConfig & Pick<BossParams, ParamsFor<K>> {
+  return cfg as BossConfig & Pick<BossParams, ParamsFor<K>>;
 }
 
 /** Trapezoid: a looping sequence of phases. */
-export const TRAPEZOID_BOSS = {
+export const TRAPEZOID_BOSS = bossConfig({
   pattern: [
     { kind: 'chase', duration: 2.5 },
     { kind: 'spiral', duration: 3.0 },
@@ -130,25 +278,15 @@ export const TRAPEZOID_BOSS = {
     { kind: 'charge', duration: 1.9 },
     { kind: 'charge', duration: 1.9 },
     { kind: 'summon', duration: 1.2 },
-  ] as BossPhase[],
-  spiralEvery: 0.1,
-  spiralArms: 4,
-  spiralArmsPerBoss: 1,
-  spiralTurn: 0.23,
-  bulletSpeed: 175,
-  bulletDamage: 10,
-  /** duration of the warning line (s); then it charges to the end of the line */
-  chargeTelegraph: 0.9,
-  chargeSpeed: 700,
-  /** charge range (= length of the warning line) */
-  chargeLength: 560,
-  /** contact damage × chargeDamage while it charges */
-  chargeDamage: 1.8,
-  summon: { type: 'hunter', count: 10, perBoss: 2, around: 'self', radius: 90, maxAlive: 20 } as BossSummon,
-};
+  ],
+  bullets: { speed: 175, damage: 10 },
+  spiral: { every: 0.1, arms: 4, armsPerBoss: 1, turn: 0.23 },
+  charge: { telegraph: 0.9, speed: 700, length: 560, damage: 1.8 },
+  summon: { type: 'hunter', count: 10, perBoss: 2, around: 'self', radius: 90, maxAlive: 20 },
+});
 
 /** Builder hexagon: cage of breakable walls around the player, then shots through it. */
-export const BUILDER_HEXAGON_BOSS = {
+export const BUILDER_HEXAGON_BOSS = bossConfig({
   pattern: [
     { kind: 'chase', duration: 2.0 },
     { kind: 'build', duration: 1.0 },
@@ -156,30 +294,16 @@ export const BUILDER_HEXAGON_BOSS = {
     { kind: 'volley', duration: 2.0 },
     { kind: 'chase', duration: 2.0 },
     { kind: 'summon', duration: 1.0 },
-  ] as BossPhase[],
-  /** cage (hexagon) radius and gap between two walls */
-  cageRadius: 210,
-  wallSpacing: 27,
-  /** a cage only every N cycles */
-  cageEvery: 2,
-  /** walls missing in the middle of two opposite sides (the exits) */
-  gapWalls: 3,
-  /** lifetime of a wall, including its rise (not solid yet) */
-  wallLife: 6.5,
-  wallRise: 0.6,
-  spiralEvery: 0.2,
-  spiralArms: 5,
-  spiralTurn: 0.1,
-  volleyEvery: 0.5,
-  volleyCount: 5,
-  volleySpread: 0.14,
-  bulletSpeed: 185,
-  bulletDamage: 10,
-  summon: { type: 'block', count: 5, perBoss: 1, around: 'player', radius: 420, maxAlive: 12 } as BossSummon,
-};
+  ],
+  cage: { radius: 210, wallSpacing: 27, every: 2, gapWalls: 3, wallLife: 6.5 },
+  bullets: { speed: 185, damage: 10 },
+  spiral: { every: 0.2, arms: 5, turn: 0.1 },
+  volley: { every: 0.5, count: 5, spread: 0.14 },
+  summon: { type: 'block', count: 5, perBoss: 1, around: 'player', radius: 420, maxAlive: 12 },
+});
 
 /** Ricochet star: aims (line), dashes bouncing inside a box around the player, leaves fire behind. */
-export const RICOCHET_STAR_BOSS = {
+export const RICOCHET_STAR_BOSS = bossConfig({
   pattern: [
     { kind: 'chase', duration: 1.4 },
     { kind: 'aim', duration: 0.9 },
@@ -188,27 +312,16 @@ export const RICOCHET_STAR_BOSS = {
     { kind: 'dash', duration: 3.4 },
     { kind: 'burst', duration: 1.4 },
     { kind: 'summon', duration: 0.8 },
-  ] as BossPhase[],
-  /** speed and duration of the dashes: 3 to 4 bounces per dash in the box */
-  dashSpeed: 620,
-  /** half-side of the bounce box, centred where the player was when it aimed */
-  box: 340,
-  /** contact damage × dashDamage while it dashes */
-  dashDamage: 1.6,
-  /** one flame every `fireEvery` frames */
-  fireEvery: 3,
-  fireRadius: 20,
-  fireLife: 3.2,
-  /** damage per second spent in the flames */
-  fireDps: 22,
-  burstArms: 10,
-  bulletSpeed: 180,
-  bulletDamage: 10,
-  summon: { type: 'rusher', count: 12, perBoss: 2, around: 'self', radius: 80, maxAlive: 20 } as BossSummon,
-};
+  ],
+  /** speed and box size: 3 to 4 bounces per dash */
+  dash: { speed: 620, box: 340, damage: 1.6, fireEvery: 3, fireRadius: 20, fireLife: 3.2, fireDps: 22 },
+  burst: { arms: 10 },
+  bullets: { speed: 180, damage: 10 },
+  summon: { type: 'rusher', count: 12, perBoss: 2, around: 'self', radius: 80, maxAlive: 20 },
+});
 
 /** Laser eye: keeps its distance, telegraphs a cone then sweeps it with a beam. */
-export const LASER_EYE_BOSS = {
+export const LASER_EYE_BOSS = bossConfig({
   pattern: [
     { kind: 'watch', duration: 2.0 },
     { kind: 'focus', duration: 1.1 },
@@ -217,22 +330,15 @@ export const LASER_EYE_BOSS = {
     { kind: 'sweep', duration: 1.0 },
     { kind: 'watch', duration: 1.6 },
     { kind: 'summon', duration: 0.8 },
-  ] as BossPhase[],
-  keepMin: 240,
-  keepMax: 330,
-  shootEvery: 0.45,
-  bulletSpeed: 210,
-  bulletDamage: 9,
-  beamLength: 520,
-  beamWidth: 16,
-  /** sweep aperture (radians) */
-  arc: 1.6,
-  beamDamage: 28,
-  summon: { type: 'orbiter', count: 8, perBoss: 2, around: 'player', radius: 520, maxAlive: 14 } as BossSummon,
-};
+  ],
+  watch: { keepMin: 240, keepMax: 330, shootEvery: 0.45 },
+  bullets: { speed: 210, damage: 9 },
+  laser: { length: 520, width: 16, arc: 1.6, damage: 28 },
+  summon: { type: 'orbiter', count: 8, perBoss: 2, around: 'player', radius: 520, maxAlive: 14 },
+});
 
 /** Swarm queen: flees (slower than you) and lays eggs that hatch into Swarm. */
-export const SWARM_QUEEN_BOSS = {
+export const SWARM_QUEEN_BOSS = bossConfig({
   pattern: [
     { kind: 'flee', duration: 0.9 },
     { kind: 'lay', duration: 0.3 },
@@ -241,27 +347,15 @@ export const SWARM_QUEEN_BOSS = {
     { kind: 'spiral', duration: 2.2 },
     { kind: 'flee', duration: 0.9 },
     { kind: 'summon', duration: 0.6 },
-  ] as BossPhase[],
-  keepMin: 260,
-  keepMax: 400,
-  /** one laying out of `bigEvery` is triple */
-  bigEvery: 2,
-  hatchAfter: 2.6,
-  hatchCount: 7,
-  maxEggs: 14,
-  /** HP of the hatched Swarm (× normal HP): a bit sturdier than an ordinary Swarm */
-  broodHp: 1.5,
-  /** spiral spray of darts */
-  spiralEvery: 0.12,
-  spiralArms: 3,
-  spiralTurn: 0.38,
+  ],
+  flee: { keepMin: 260, keepMax: 400 },
   /** on each laying, a volley toward the player */
-  volleyCount: 3,
-  volleySpread: 0.22,
-  bulletSpeed: 190,
-  bulletDamage: 10,
-  summon: { type: 'swarm', count: 18, perBoss: 4, around: 'self', radius: 70, maxAlive: 70, hp: 1.5 } as BossSummon,
-};
+  lay: { bigEvery: 2, hatchAfter: 2.6, maxEggs: 14, volleyCount: 3, volleySpread: 0.22 },
+  /** spiral spray of darts */
+  spiral: { every: 0.12, arms: 3, turn: 0.38 },
+  bullets: { speed: 190, damage: 10 },
+  summon: { type: 'swarm', count: 18, perBoss: 4, around: 'self', radius: 70, maxAlive: 70, hp: 1.5 },
+});
 
 export const ENEMIES: EnemyDef[] = [
   {
@@ -364,11 +458,14 @@ export const ENEMIES: EnemyDef[] = [
     id: 'wall',
     behavior: 'wall', shape: 'block', color: '#3dffe0', hidden: true,
     hp: 26, speed: 0, damage: 0, radius: 15, xp: 0, kbResist: 1,
+    rise: 0.6,
   },
   {
     id: 'egg',
     behavior: 'egg', shape: 'egg', color: '#ff9ecf', hidden: true,
     hp: 10, speed: 0, damage: 0, radius: 11, xp: 1, kbResist: 1,
+    // the hatched Swarm are a bit sturdier than ordinary ones
+    hatchInto: 'swarm', hatchCount: 7, hatchHp: 1.5,
   },
 ];
 
@@ -377,4 +474,3 @@ export const BOSS_ORDER = ['trapezoid', 'builder_hexagon', 'ricochet_star', 'las
 
 /** HP of the k-th boss × (1 + BOSS_HP_GROWTH × k) */
 export const BOSS_HP_GROWTH = 0.9;
-

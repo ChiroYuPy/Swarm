@@ -5,7 +5,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, type WeaponDef, type WeaponLevel } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { ENEMIES, BOSS_ORDER, type BossConfig, type BossPhase, type BossSpiral, type BossSummon, type EnemyBehavior } from '../data/enemies';
+import { ENEMIES, BOSS_ORDER, PHASE_PARAMS, type BossConfig, type BossPhase, type BossSummon, type EnemyBehavior } from '../data/enemies';
 import { WAVES } from '../data/waves';
 import { DIFFICULTIES } from '../data/difficulty';
 import { TICK_RATE } from './constants';
@@ -65,8 +65,21 @@ export const BEHAVIOR = {
 export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR[e.behavior.toUpperCase() as Uppercase<EnemyBehavior>]);
 /** Splitter: enemy type born on its death (-1: none). */
 export const SPLIT_INTO = ENEMIES.map((e) => (e.splitInto ? enemyId(e.splitInto) : -1));
-/** Leader: speed bonus of the enemies it rallies. */
-export const LEADER_SPEED = ENEMIES.find((e) => e.behavior === 'leader')?.auraSpeed ?? 0;
+/**
+ * Leaders: the leader type whose aura is the strongest (-1: none) and the speed bonus of a rallied enemy.
+ * A rallied enemy only stores until when it is rallied (`boostUntil`), not by which leader (a new Enemy
+ * field would change the state hash), so with several leader types the strongest `auraSpeed` applies to
+ * all of them. Each leader's own `auraRadius` is read per type.
+ */
+export const RALLY_TYPE = strongestLeader();
+function strongestLeader(): number {
+  let best = -1;
+  ENEMIES.forEach((e, i) => {
+    if (e.behavior === 'leader' && (best < 0 || (e.auraSpeed ?? 0) > (ENEMIES[best].auraSpeed ?? 0))) best = i;
+  });
+  return best;
+}
+export const RALLY_SPEED = RALLY_TYPE >= 0 ? (ENEMIES[RALLY_TYPE].auraSpeed ?? 0) : 0;
 
 export interface CompiledFusion {
   result: number;
@@ -144,31 +157,50 @@ MIXES.forEach((m, i) => {
 
 export const HORDE_TYPES = WAVES.horde.types.map(enemyId);
 
+/** Types of the swarm and ring highlights: named by id in WAVES (one type each by design), not found by behaviour. */
 export const SWARM_TYPE = enemyId(WAVES.swarm.type);
 export const RING_TYPE = enemyId(WAVES.ring.type);
 export const PROP_TYPE = uniqueType('prop');
 export const WALL_TYPE = uniqueType('wall');
 export const EGG_TYPE = uniqueType('egg');
+/** How long a wall rises out of the ground (s, not solid yet): a property of the wall type, whatever boss builds it. */
+export const WALL_RISE = ENEMIES[WALL_TYPE].rise ?? 0;
 /** Bosses in their arrival order. */
 export const BOSS_TYPES = BOSS_ORDER.map(enemyId);
 
 export interface CompiledSummon extends BossSummon {
   typeId: number;
 }
+/**
+ * Config of each boss, per enemy type (null for the others). Every phase reads its parameter groups from
+ * the config of the boss running it (`BOSS_CONFIGS[e.type]`), never from a specific boss.
+ */
+export const BOSS_CONFIGS: (BossConfig | null)[] = ENEMIES.map((e) => e.boss ?? null);
 /** Phases and reinforcements of each boss, per enemy type (empty for the others). */
 export const BOSS_PATTERNS: BossPhase[][] = ENEMIES.map((e) => e.boss?.pattern ?? []);
 export const BOSS_SUMMONS: (CompiledSummon | null)[] = ENEMIES.map((e) => {
   const sm = e.boss?.summon;
   return sm ? { ...sm, typeId: enemyId(sm.type) } : null;
 });
-/** 'spiral' phase params per enemy type (null when its config has none). */
-export const BOSS_SPIRALS: (BossSpiral | null)[] = ENEMIES.map((e) => (e.boss && isSpiral(e.boss) ? e.boss : null));
 
-function isSpiral(cfg: BossConfig): cfg is BossConfig & BossSpiral {
-  return cfg.spiralEvery !== undefined && cfg.spiralArms !== undefined && cfg.spiralTurn !== undefined && cfg.bulletSpeed !== undefined && cfg.bulletDamage !== undefined;
+/** Parameter groups a boss's phases need but its config lacks (PHASE_PARAMS). Empty when complete. */
+export function missingBossParams(cfg: BossConfig): string[] {
+  const out: string[] = [];
+  for (const ph of cfg.pattern) for (const g of PHASE_PARAMS[ph.kind]) if (cfg[g] === undefined && !out.includes(g)) out.push(g);
+  return out;
 }
+ENEMIES.forEach((e) => {
+  const missing = e.boss ? missingBossParams(e.boss) : [];
+  if (missing.length) throw new Error(`Boss '${e.id}' lacks the parameters of its phases: ${missing.join(', ')}`);
+});
 
-/** The only enemy type with this behavior (props, walls, eggs are spawned by type, not by id). */
+/** Egg: enemy type that hatches out of it (-1: none). */
+export const HATCH_INTO = ENEMIES.map((e) => (e.hatchInto ? enemyId(e.hatchInto) : -1));
+
+/**
+ * The only enemy type with this behavior. Props, walls and eggs are single by design: the spawner, the
+ * 'build' and 'lay' boss phases and the wall collisions spawn or match them by type, not by id.
+ */
 function uniqueType(b: EnemyBehavior): number {
   const types = ENEMIES.flatMap((e, i) => (e.behavior === b ? [i] : []));
   if (types.length !== 1) throw new Error(`Expected exactly one '${b}' enemy, found ${types.length}`);

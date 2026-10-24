@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as state from '../src/sim/state';
-import { BOSS_ORDER, ENEMIES } from '../src/data/enemies';
+import { BOSS_ORDER, ENEMIES, PHASE_PARAMS, bossConfig } from '../src/data/enemies';
 import { PICKUPS } from '../src/data/loot';
-import { BOSS_PATTERNS, BOSS_SPIRALS, BOSS_SUMMONS, ENEMY_INDEX } from '../src/sim/registry';
+import { BOSS_CONFIGS, BOSS_PATTERNS, BOSS_SUMMONS, ENEMY_INDEX, HATCH_INTO, missingBossParams } from '../src/sim/registry';
 
 describe('registry: content links', () => {
   it('every boss has a pattern and a slot in BOSS_ORDER, and BOSS_ORDER only lists bosses', () => {
@@ -21,9 +21,42 @@ describe('registry: content links', () => {
     });
   });
 
-  it('a boss with a spiral phase has spiral params', () => {
+  it('every boss declares the parameter groups of every phase in its pattern, and no other', () => {
     ENEMIES.forEach((e, t) => {
-      if (BOSS_PATTERNS[t].some((ph) => ph.kind === 'spiral')) expect(BOSS_SPIRALS[t], e.id).not.toBeNull();
+      const cfg = BOSS_CONFIGS[t];
+      if (e.behavior !== 'boss') return expect(cfg, e.id).toBeNull();
+      expect(cfg, e.id).not.toBeNull();
+      expect(missingBossParams(cfg!), e.id).toEqual([]);
+      const used = new Set<string>(cfg!.pattern.flatMap((ph) => PHASE_PARAMS[ph.kind]));
+      const declared = Object.keys(cfg!).filter((k) => k !== 'pattern');
+      expect(declared.filter((k) => !used.has(k)), `${e.id}: groups no phase reads`).toEqual([]);
+    });
+  });
+
+  it('bossConfig() rejects a missing or unused parameter group at compile time (npm run typecheck)', () => {
+    // @ts-expect-error a 'charge' phase without the 'charge' group
+    bossConfig({ pattern: [{ kind: 'chase', duration: 1 }, { kind: 'charge', duration: 1 }] });
+    // @ts-expect-error a 'spiral' phase needs 'bullets' too
+    bossConfig({ pattern: [{ kind: 'spiral', duration: 1 }], spiral: { every: 1, arms: 1, turn: 1 } });
+    // @ts-expect-error a 'laser' group that no phase reads
+    bossConfig({ pattern: [{ kind: 'chase', duration: 1 }], laser: { length: 1, width: 1, arc: 1, damage: 1 } });
+    const ok = bossConfig({ pattern: [{ kind: 'charge', duration: 1 }], charge: { telegraph: 1, speed: 1, length: 1, damage: 1 } });
+    expect(missingBossParams(ok)).toEqual([]);
+  });
+
+  it('a missing phase parameter group is reported', () => {
+    expect(missingBossParams({ pattern: [{ kind: 'charge', duration: 1 }, { kind: 'lay', duration: 1 }] })).toEqual(['charge', 'lay', 'bullets']);
+    expect(missingBossParams({ pattern: [{ kind: 'chase', duration: 1 }] })).toEqual([]);
+  });
+
+  it('walls rise and eggs hatch into a real, non-boss enemy', () => {
+    ENEMIES.forEach((e, t) => {
+      if (e.behavior === 'wall') expect(e.rise, e.id).toBeGreaterThan(0);
+      if (e.behavior === 'egg') {
+        expect(HATCH_INTO[t], e.id).toBeGreaterThanOrEqual(0);
+        expect(e.hatchCount, e.id).toBeGreaterThan(0);
+        expect(ENEMIES[HATCH_INTO[t]].behavior, e.id).not.toBe('boss');
+      }
     });
   });
 

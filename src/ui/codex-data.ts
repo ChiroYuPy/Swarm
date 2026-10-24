@@ -91,6 +91,7 @@ export function codexItems(tab: CodexTab): CodexItem[] {
         const group = t(`codex.groups.${g}`);
         for (const p of PICKUPS) if (PICKUP_GROUP[p.kind] === g) out.push({ tab, id: p.id, name: pickupName(p.id), color: p.color, icon: `pickup:${p.id}`, group });
       }
+      // The bonus crate: the only 'prop' type by design (uniqueType() in src/sim/registry.ts throws otherwise).
       const prop = ENEMIES.find((e) => e.behavior === 'prop')!;
       out.push({ tab, id: prop.id, name: enemyName(prop.id), color: prop.color, icon: `enemy:${prop.id}`, group: t('codex.groups.other') });
       return out;

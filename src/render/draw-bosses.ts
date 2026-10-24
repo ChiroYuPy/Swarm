@@ -1,6 +1,6 @@
 /** Bosses: vector body (enemy shape outline), eyes or pupil, and their attack telegraphs. */
-import { ENEMIES, TRAPEZOID_BOSS, RICOCHET_STAR_BOSS, LASER_EYE_BOSS } from '../data/enemies';
-import { BOSS_PATTERNS, TICK_RATE, type GameState, type Enemy } from '../sim';
+import { ENEMIES } from '../data/enemies';
+import { BOSS_CONFIGS, BOSS_PATTERNS, TICK_RATE, type GameState, type Enemy } from '../sim';
 import { eyePath, queenPath } from './sprites';
 import type { RenderView } from './view';
 
@@ -117,17 +117,19 @@ function enemyPath(view: RenderView, e: Enemy, type: number, x: number, y: numbe
 export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number, y: number, time: number): void {
   const ctx = view.ctx;
   const color = ENEMIES[boss.type].color;
+  // Telegraphs read the parameter groups of this boss's own config (PHASE_PARAMS in data/enemies.ts).
+  const cfg = BOSS_CONFIGS[boss.type];
   const ph = BOSS_PATTERNS[boss.type][boss.ai];
   const total = ph ? Math.round(ph.duration * TICK_RATE) : 1;
   const elapsed = total - boss.timer;
 
   // Warnings, under the boss.
-  if (ph?.kind === 'charge' && elapsed < TRAPEZOID_BOSS.chargeTelegraph * TICK_RATE) {
-    dangerLine(view, x, y, boss.aux, TRAPEZOID_BOSS.chargeLength, boss.r * 1.6, time);
+  if (ph?.kind === 'charge' && cfg?.charge && elapsed < cfg.charge.telegraph * TICK_RATE) {
+    dangerLine(view, x, y, boss.aux, cfg.charge.length, boss.r * 1.6, time);
   }
-  if (ph?.kind === 'aim' || ph?.kind === 'dash') {
-    // Star: the bounce box, and its direction while it aims.
-    const H = RICOCHET_STAR_BOSS.box;
+  if ((ph?.kind === 'aim' || ph?.kind === 'dash') && cfg?.dash) {
+    // Dash: the bounce box, and its direction while it aims.
+    const H = cfg.dash.box;
     ctx.beginPath();
     ctx.rect(boss.ax - H, boss.ay - H, H * 2, H * 2);
     ctx.setLineDash([10, 12]);
@@ -139,9 +141,10 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
     ctx.globalAlpha = 1;
     if (ph.kind === 'aim') dangerLine(view, x, y, boss.aux, 700, boss.r * 1.4, time);
   }
-  if (ph?.kind === 'focus' || ph?.kind === 'sweep') {
-    // Eye: the cone the beam will sweep, then the beam.
-    const L = LASER_EYE_BOSS.beamLength;
+  if ((ph?.kind === 'focus' || ph?.kind === 'sweep') && cfg?.laser) {
+    // Laser: the cone the beam will sweep, then the beam.
+    const L = cfg.laser.length;
+    const W = cfg.laser.width;
     const a0 = Math.min(boss.ax, boss.ay);
     const a1 = Math.max(boss.ax, boss.ay);
     ctx.beginPath();
@@ -164,13 +167,13 @@ export function drawBoss(view: RenderView, s: GameState, boss: Enemy, x: number,
       ctx.lineTo(x + Math.cos(boss.aux) * L, y + Math.sin(boss.aux) * L);
       ctx.strokeStyle = '#ff2b2b';
       ctx.globalAlpha = 0.35;
-      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 2.2;
+      ctx.lineWidth = W * 2.2;
       ctx.stroke();
       ctx.globalAlpha = 1;
-      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 0.8;
+      ctx.lineWidth = W * 0.8;
       ctx.stroke();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = LASER_EYE_BOSS.beamWidth * 0.3;
+      ctx.lineWidth = W * 0.3;
       ctx.stroke();
     }
   }

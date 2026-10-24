@@ -57,8 +57,9 @@ The sim is a pure function of `(GameConfig, input codes)`. That gives replays, t
 `src/data` refers to content by string id. `src/sim/registry.ts` compiles it once, at module load, into numeric tables so the hot loop never looks up a string:
 
 - `WEAPON_INDEX`, `PASSIVE_INDEX`, `ENEMY_INDEX` and `weaponId()` / `passiveId()` / `enemyId()` (throw on an unknown id).
-- `FUSION_TABLE`, `ENEMY_BEHAVIOR` (via the `BEHAVIOR` code table), `SPLIT_INTO`, `RATES_BY_DIFFICULTY`, `UNLOCK_SLOT`, `MIXES`, `DEBUT_MIX`, `HORDE_TYPES`, `BOSS_TYPES`, `BOSS_PATTERNS`, `BOSS_SUMMONS`, `BOSS_SPIRALS`.
-- Single-instance types found by behaviour (`PROP_TYPE`, `WALL_TYPE`, `EGG_TYPE`; exactly one each, or it throws).
+- `FUSION_TABLE`, `ENEMY_BEHAVIOR` (via the `BEHAVIOR` code table), `SPLIT_INTO`, `HATCH_INTO`, `RATES_BY_DIFFICULTY`, `UNLOCK_SLOT`, `MIXES`, `DEBUT_MIX`, `HORDE_TYPES`, `BOSS_TYPES`, `BOSS_CONFIGS`, `BOSS_PATTERNS`, `BOSS_SUMMONS`.
+- Per-type tables are indexed by `e.type`, so code checks an enemy's behaviour (`ENEMY_BEHAVIOR[e.type] === BEHAVIOR.X`) and reads that type's own data; several types may share a behaviour. Boss phases read the parameter groups of the running boss (`BOSS_CONFIGS[e.type]`), and the registry throws at load if a boss lacks a group one of its phases needs (`PHASE_PARAMS` in `src/data/enemies.ts`).
+- Single-instance types found by behaviour (`PROP_TYPE`, `WALL_TYPE`, `EGG_TYPE`; exactly one each, or it throws), and the swarm / ring highlight types named in `WAVES` (`SWARM_TYPE`, `RING_TYPE`). `RALLY_SPEED` is the strongest leader aura: a rallied enemy does not store which leader rallied it.
 - Ids the engine needs by name (`SQUADRON_WEAPON`, `KAMIKAZE_DRONES_WEAPON`, `BLACK_HOLE_WEAPON`, `BOT_FAVORITE_PASSIVES`), so a renamed id fails at load.
 
 Behaviour dispatch is by table, typed so a missing entry is a compile error:
@@ -106,7 +107,7 @@ All in `tests/`, run with `npm test` (Vitest, Node environment). `npm run typech
 | `i18n.test.ts` | Locales have the same keys and placeholders, every content id has its text (one line per weapon level), `t()` / `tn()`, sim/data never import i18n. |
 | `english-code.test.ts` | No French text outside the locales and the legacy id table. |
 | `icons.test.ts` | Every weapon, passive and pickup has an icon painter, and every painter has content. |
-| `registry.test.ts` | Bosses vs `BOSS_ORDER`, boss phases, spiral params, summons, `PK_*` codes vs `PICKUPS` order. |
+| `registry.test.ts` | Bosses vs `BOSS_ORDER`, boss phases and their parameter groups (`bossConfig()` type errors included), summons, wall rise and egg hatching, `PK_*` codes vs `PICKUPS` order. |
 | `content.test.ts` | Weapon level progression, enemy arrival over time, timed bonuses, active items as zero-time steps, difficulty effect. |
 | `weapons.test.ts` | Each newer weapon and evolution deals damage and behaves as designed. |
 | `fusion.test.ts` | Evolution recipes are consistent and applied correctly, boss chest grants them. |

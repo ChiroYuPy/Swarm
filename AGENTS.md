@@ -101,7 +101,9 @@ Caught: `registry.test.ts` (`PK_*` values and the active range), `icons.test.ts`
 3. To put it in the waves: `src/data/waves.ts`, an arrival time in `unlocks` and at least one entry in `mixes` that features it (the first mix containing it is its debut). Keep 2 or 3 types per mix, the new type a minority.
 4. The sprite, codex entry, sandbox tile and "new enemy" toast come from the data.
 
-Caught: `i18n.test.ts`; `enemies.test.ts` (at most 3 types at once, caps). Known limits: `src/render/draw-enemies.ts` and `src/ai/bot.ts` treat only the first `kamikaze`, `blinker` and `leader` type specially (fuse flash, landing marks, leader links, bot avoidance), and `LEADER_SPEED` in `registry.ts` comes from the first leader. A second enemy with one of those behaviours works in the sim but needs those spots updated. `prop`, `wall` and `egg` must stay unique (`uniqueType()` throws).
+Caught: `i18n.test.ts`; `enemies.test.ts` (at most 3 types at once, caps).
+
+Several types may share a behaviour: the sim, the telegraphs (`src/render/draw-enemies.ts`: fuse flash, blast zones, landing marks, leader zones) and the bot check `ENEMY_BEHAVIOR[e.type] === BEHAVIOR.X` and read that type's own fields (`blastRadius`, `fuse`, `auraRadius`...). One exception: a rallied enemy does not store which leader rallied it, so the rally bonus is the strongest `auraSpeed` among leader types (`RALLY_SPEED` / `RALLY_TYPE` in `registry.ts`, also the color of the speed trails); a per-leader bonus would need a new `Enemy` field (gameplay change). `prop`, `wall` and `egg` stay unique by design (`uniqueType()` throws): they are spawned and matched by type. The wall's `rise` and the egg's `hatchInto` / `hatchCount` / `hatchHp` live on those types, not on the boss.
 
 ### A new enemy behaviour
 
@@ -115,16 +117,31 @@ Caught: `i18n.test.ts`; `enemies.test.ts` (at most 3 types at once, caps). Known
 
 ### A boss
 
-1. `src/data/enemies.ts`: a config constant like `LASER_EYE_BOSS`, typed as a `BossConfig`: `pattern` (looping `{ kind, duration }` phases), `summon` (if a phase is `summon`), and the `BossSpiral` fields if a phase is `spiral`.
+1. `src/data/enemies.ts`: a config constant like `LASER_EYE_BOSS = bossConfig({ pattern, ...groups })`. `pattern` is the looping list of `{ kind, duration }` phases (no `as BossPhase[]` cast: `bossConfig()` infers the kinds). Then one parameter group per phase family, as listed in `PHASE_PARAMS`:
+
+   | Phases | Groups |
+   |---|---|
+   | `chase` | none (uses the enemy `speed`) |
+   | `spiral` | `spiral`, `bullets` |
+   | `charge` | `charge` |
+   | `summon` | `summon` |
+   | `build` | `cage` (the wall rise time is the `wall` type's `rise`) |
+   | `volley` | `volley`, `bullets` |
+   | `aim`, `dash` | `dash` |
+   | `burst` | `burst`, `bullets` |
+   | `watch` | `watch`, `bullets` |
+   | `focus`, `sweep` | `laser` |
+   | `flee` | `flee` |
+   | `lay` | `lay`, `bullets` (what hatches is the `egg` type's `hatchInto` / `hatchCount` / `hatchHp`) |
+
+   Every phase reads the groups of the boss running it (`BOSS_CONFIGS[e.type]` in the sim, the telegraphs and the bot), so phases can be mixed freely between bosses. `bullets` is shared by all the shooting phases of a boss.
 2. Same file: append to `ENEMIES` with `behavior: 'boss', boss: YOUR_CONFIG` and a shape that `enemyPath()` in `src/render/draw-bosses.ts` draws (bosses are drawn as paths; `rock`, `sun`, `ring`, `dart`, `block`, `egg` draw nothing there).
 3. Append the id to `BOSS_ORDER` (arrival order; the cycle then repeats as Mk II...).
 4. Locales: `enemies.<id>` with `name`, `short` (tiles and hints) and `desc`.
-5. New phase kinds: add to `BossPhaseKind`, handle them in `updateBoss()` and `enterPhase()` in `src/sim/enemies.ts` (exhaustive), draw their telegraph in `drawBoss()` (`src/render/draw-bosses.ts`), and adjust `bossContactMul()` if contact damage changes.
+5. New phase kinds: add to `BossPhaseKind` and `PHASE_PARAMS` (typecheck fails until you do); a new parameter group goes in `BossParams` with its interface. Handle the kind in `updateBoss()` and `enterPhase()` in `src/sim/enemies.ts` (exhaustive) reading `cfg.<group>!`, draw its telegraph in `drawBoss()` (`src/render/draw-bosses.ts`) from `BOSS_CONFIGS[boss.type]`, and adjust `bossContactMul()` if contact damage changes.
 6. Test in `tests/bosses.test.ts`.
 
-Warning: only `chase`, `spiral` (per-boss `BOSS_SPIRALS`) and `summon` (per-boss `BOSS_SUMMONS`) read the current boss's config. The other phases read a specific boss constant (`charge` → `TRAPEZOID_BOSS`, `build` / `volley` → `BUILDER_HEXAGON_BOSS`, `aim` / `dash` / `burst` → `RICOCHET_STAR_BOSS`, `watch` / `focus` / `sweep` → `LASER_EYE_BOSS`, `flee` / `lay` → `SWARM_QUEEN_BOSS`) in `src/sim/enemies.ts`, and some telegraphs do the same in `src/render/draw-bosses.ts` and `src/render/draw-enemies.ts`. Reusing those phases gives the original boss's numbers, whatever your config says.
-
-Caught: `registry.test.ts` (pattern, `BOSS_ORDER`, spiral params, summon type), `i18n.test.ts` (`short`). The golden test gains a `boss-N` duel; the sandbox gains a duel tile.
+Caught: typecheck (`bossConfig()` rejects a missing group, or a group none of the phases reads); at load, the registry throws if a boss lacks a group its phases need (`missingBossParams()`, for configs not built with `bossConfig()`); `registry.test.ts` (pattern, `BOSS_ORDER`, parameter groups, summon type), `i18n.test.ts` (`short`). The golden test gains a `boss-N` duel; the sandbox gains a duel tile.
 
 ### Waves and spawns
 
