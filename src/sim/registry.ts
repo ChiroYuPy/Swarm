@@ -5,7 +5,7 @@
 import { ALL_WEAPONS, BASE_WEAPONS, type WeaponDef, type WeaponLevel } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { ENEMIES, BOSS, BOSS_ORDER, ETOILE, HEXAGONE, OEIL, REINE, type BossPhase, type BossSummon, type EnemyBehavior } from '../data/enemies';
+import { ENEMIES, BOSS_ORDER, type BossConfig, type BossPhase, type BossSpiral, type BossSummon, type EnemyBehavior } from '../data/enemies';
 import { WAVES } from '../data/waves';
 import { DIFFICULTIES } from '../data/difficulty';
 import { TICK_RATE } from './constants';
@@ -146,11 +146,9 @@ export const HORDE_TYPES = WAVES.horde.types.map(enemyId);
 
 export const SWARM_TYPE = enemyId(WAVES.swarm.type);
 export const RING_TYPE = enemyId(WAVES.ring.type);
-export const BOSS_TYPE = enemyId('boss');
-export const HEXAGONE_TYPE = enemyId('hexagone');
-export const PROP_TYPE = enemyId('distributeur');
-export const WALL_TYPE = enemyId('mur');
-export const EGG_TYPE = enemyId('oeuf');
+export const PROP_TYPE = uniqueType('prop');
+export const WALL_TYPE = uniqueType('wall');
+export const EGG_TYPE = uniqueType('egg');
 /** Boss dans leur ordre d'arrivée. */
 export const BOSS_TYPES = BOSS_ORDER.map(enemyId);
 
@@ -158,15 +156,30 @@ export interface CompiledSummon extends BossSummon {
   typeId: number;
 }
 /** Phases et renforts de chaque boss, par type d'ennemi (vide pour les autres). */
-export const BOSS_PATTERNS: BossPhase[][] = ENEMIES.map(() => []);
-export const BOSS_SUMMONS: (CompiledSummon | null)[] = ENEMIES.map(() => null);
-for (const [id, cfg] of [
-  ['boss', BOSS],
-  ['hexagone', HEXAGONE],
-  ['etoile', ETOILE],
-  ['oeil', OEIL],
-  ['reine', REINE],
-] as [string, { pattern: BossPhase[]; summon?: BossSummon }][]) {
-  BOSS_PATTERNS[enemyId(id)] = cfg.pattern;
-  if (cfg.summon) BOSS_SUMMONS[enemyId(id)] = { ...cfg.summon, typeId: enemyId(cfg.summon.type) };
+export const BOSS_PATTERNS: BossPhase[][] = ENEMIES.map((e) => e.boss?.pattern ?? []);
+export const BOSS_SUMMONS: (CompiledSummon | null)[] = ENEMIES.map((e) => {
+  const sm = e.boss?.summon;
+  return sm ? { ...sm, typeId: enemyId(sm.type) } : null;
+});
+/** 'spiral' phase params per enemy type (null when its config has none). */
+export const BOSS_SPIRALS: (BossSpiral | null)[] = ENEMIES.map((e) => (e.boss && isSpiral(e.boss) ? e.boss : null));
+
+function isSpiral(cfg: BossConfig): cfg is BossConfig & BossSpiral {
+  return cfg.spiralEvery !== undefined && cfg.spiralArms !== undefined && cfg.spiralTurn !== undefined && cfg.bulletSpeed !== undefined && cfg.bulletDamage !== undefined;
 }
+
+/** The only enemy type with this behavior (props, walls, eggs are spawned by type, not by id). */
+function uniqueType(b: EnemyBehavior): number {
+  const types = ENEMIES.flatMap((e, i) => (e.behavior === b ? [i] : []));
+  if (types.length !== 1) throw new Error(`Expected exactly one '${b}' enemy, found ${types.length}`);
+  return types[0];
+}
+
+/**
+ * Content that engine code refers to by id (render variants, bot taste). Kept here so a renamed or
+ * removed id throws at load instead of silently matching nothing.
+ */
+export const SQUADRON_WEAPON = weaponId('escadrille');
+export const KAMIKAZE_DRONES_WEAPON = weaponId('kamikazes');
+export const BLACK_HOLE_WEAPON = weaponId('trounoir');
+export const BOT_FAVORITE_PASSIVES = ['soupe', 'biceps', 'blindage'].map(passiveId);

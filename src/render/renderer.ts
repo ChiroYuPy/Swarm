@@ -34,6 +34,9 @@ import {
   BOSS_PATTERNS,
   WALL_TYPE,
   EGG_TYPE,
+  SQUADRON_WEAPON,
+  KAMIKAZE_DRONES_WEAPON,
+  BLACK_HOLE_WEAPON,
   MAX_ENEMIES,
   TICK_RATE,
   weaponDef,
@@ -72,7 +75,7 @@ const ENEMY_LEADER = ENEMIES.findIndex((e) => e.behavior === 'leader');
 const BLINK_DEF = ENEMIES[ENEMY_BLINKER];
 const BLINK_FUSE = Math.round((BLINK_DEF?.fuse ?? 1) * TICK_RATE);
 const LEADER_DEF = ENEMIES[ENEMY_LEADER];
-const HEX_COLOR = ENEMIES.find((e) => e.id === 'hexagone')!.color;
+const WALL_COLOR = ENEMIES[WALL_TYPE].color;
 
 /** Résolution dynamique : plancher, pas, et seuils (ms par image, moyenne glissante). */
 const RES_MIN = 0.55;
@@ -439,7 +442,8 @@ export class Renderer {
     const r = e.r;
     const fx = e.vx || 1;
     const fy = e.vy || 0;
-    switch (ENEMIES[type].shape) {
+    const shape = ENEMIES[type].shape;
+    switch (shape) {
       case 'triangle': {
         const ax = fx * r * 1.25;
         const ay = fy * r * 1.25;
@@ -528,6 +532,18 @@ export class Renderer {
       case 'queen':
         queenPath(ctx, x, y, r);
         break;
+      case 'rock':
+      case 'sun':
+      case 'ring':
+      case 'dart':
+      case 'block':
+      case 'egg':
+        // only bosses are drawn as paths; these shapes exist as sprites only
+        break;
+      default: {
+        const unhandled: never = shape;
+        throw new Error(`Unhandled enemy shape ${unhandled}`);
+      }
     }
   }
 
@@ -742,7 +758,7 @@ export class Renderer {
     ctx.setLineDash([4, 4]);
     ctx.lineDashOffset = -time * 20;
     ctx.globalAlpha = 0.7;
-    ctx.strokeStyle = HEX_COLOR;
+    ctx.strokeStyle = WALL_COLOR;
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.setLineDash([]);
@@ -1068,7 +1084,7 @@ export class Renderer {
       const sp = Math.hypot(b.vx, b.vy);
       const ux = sp > 5 ? b.vx / sp : 1;
       const uy = sp > 5 ? b.vy / sp : 0;
-      const L = def.id === 'escadrille' ? 10 : 8;
+      const L = b.weapon === SQUADRON_WEAPON ? 10 : 8;
       ctx.beginPath();
       ctx.moveTo(x + ux * L, y + uy * L);
       ctx.lineTo(x - ux * L * 0.7 - uy * L * 0.7, y - uy * L * 0.7 + ux * L * 0.7);
@@ -1077,7 +1093,7 @@ export class Renderer {
       ctx.closePath();
       ctx.globalAlpha = Math.min(1, b.age / 20);
       ctx.fillStyle = def.color;
-      const dive = def.id === 'kamikazes';
+      const dive = b.weapon === KAMIKAZE_DRONES_WEAPON;
       ctx.globalAlpha *= dive && (b.age >> 2) & 1 ? 0.9 : 0.35;
       ctx.fill();
       ctx.globalAlpha = Math.min(1, b.age / 20);
@@ -1479,14 +1495,14 @@ export class Renderer {
           ctx.moveTo(ox + w.vS, oy);
           ctx.arc(ox, oy, w.vS, 0, Math.PI * 2);
         }
-        if (def.id === 'trounoir') {
+        if (w.def === BLACK_HOLE_WEAPON) {
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = '#000000';
           ctx.fill();
           ctx.globalCompositeOperation = 'lighter';
         }
-        this.glow(def.color, def.id === 'trounoir' ? 3 : 2.5);
-        if (def.id === 'trounoir') {
+        this.glow(def.color, w.def === BLACK_HOLE_WEAPON ? 3 : 2.5);
+        if (w.def === BLACK_HOLE_WEAPON) {
           ctx.beginPath();
           for (let k = 0; k < n; k++) {
             const a = ang + (k * Math.PI * 2) / n;

@@ -10,9 +10,8 @@ import { explode, hurtPlayer, nearestPlayer } from './combat';
 import {
   BEHAVIOR,
   BOSS_PATTERNS,
+  BOSS_SPIRALS,
   BOSS_SUMMONS,
-  BOSS_TYPE,
-  HEXAGONE_TYPE,
   EGG_TYPE,
   ENEMY_BEHAVIOR,
   LEADER_SPEED,
@@ -331,6 +330,10 @@ export function updateEnemies(s: GameState): void {
         }
         break;
       }
+      default: {
+        const unhandled: never = beh;
+        throw new Error(`Unhandled enemy behavior ${unhandled}`);
+      }
     }
 
     // Séparation douce entre ennemis voisins (grille construite en début de tick).
@@ -434,10 +437,10 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       }
       break;
     case 'spiral': {
-      const c = e.type === BOSS_TYPE ? BOSS : e.type === HEXAGONE_TYPE ? HEXAGONE : REINE;
+      const c = BOSS_SPIRALS[e.type]!;
       const every = Math.max(1, Math.round(c.spiralEvery * TICK_RATE));
       if (elapsed % every === 0) {
-        const arms = c.spiralArms + (e.type === BOSS_TYPE ? e.aux2 : 0);
+        const arms = c.spiralArms + (c.spiralArmsPerBoss ?? 0) * e.aux2;
         for (let k = 0; k < arms; k++) fireEnemyBullet(s, e.x, e.y, e.aux + (k * TWO_PI) / arms, c.bulletSpeed, c.bulletDamage * dm);
         e.aux += c.spiralTurn;
         if (elapsed % (every * 3) === 0) emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
@@ -498,9 +501,17 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
         VY = DY * e.speed;
       }
       break;
-    default:
-      // summon, build, aim, focus, lay : immobile (tout se passe à l'entrée de la phase)
+    case 'summon':
+    case 'build':
+    case 'aim':
+    case 'focus':
+    case 'lay':
+      // immobile (tout se passe à l'entrée de la phase)
       break;
+    default: {
+      const unhandled: never = ph.kind;
+      throw new Error(`Unhandled boss phase ${unhandled}`);
+    }
   }
   // Horloge : ses phases continuent, mais il se traîne.
   e.x += VX * DT * tf;
@@ -552,6 +563,19 @@ function enterPhase(s: GameState, e: Enemy, kind: BossPhaseKind, p: Player, dx: 
       }
       emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       break;
+    }
+    case 'chase':
+    case 'spiral':
+    case 'volley':
+    case 'dash':
+    case 'burst':
+    case 'watch':
+    case 'flee':
+      // nothing on entry
+      break;
+    default: {
+      const unhandled: never = kind;
+      throw new Error(`Unhandled boss phase ${unhandled}`);
     }
   }
 }

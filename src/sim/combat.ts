@@ -1,5 +1,5 @@
 /** Dégâts, morts, butin, explosions. */
-import { LOOT, PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS, type PickupKind } from '../data/loot';
 import { HERO } from '../data/hero';
 import { TICK_RATE } from './constants';
 import { PI, TWO_PI, datan2, dcos, dsin } from './dmath';
@@ -160,9 +160,11 @@ function split(s: GameState, x: number, y: number, fx: number, fy: number, type:
 }
 
 // Familles d'objets (codes PK_* = index dans PICKUPS).
-const BONUS_KINDS = PICKUPS.map((p, i) => (p.kind === 'instant' || p.kind === 'timed' || p.kind === 'relic' ? i : -1)).filter((i) => i >= 0);
+/** random-drop family of each pickup kind (null: never dropped at random) */
+const DROP_FAMILY: Record<PickupKind, 'bonus' | 'active' | null> = { instant: 'bonus', timed: 'bonus', relic: 'bonus', active: 'active', chest: null };
+const BONUS_KINDS = PICKUPS.map((p, i) => (DROP_FAMILY[p.kind] === 'bonus' ? i : -1)).filter((i) => i >= 0);
 const BONUS_W = BONUS_KINDS.map((i) => PICKUPS[i].weight);
-const ACTIVE_KINDS = PICKUPS.map((p, i) => (p.kind === 'active' ? i : -1)).filter((i) => i >= 0);
+const ACTIVE_KINDS = PICKUPS.map((p, i) => (DROP_FAMILY[p.kind] === 'active' ? i : -1)).filter((i) => i >= 0);
 const ACTIVE_W = ACTIVE_KINDS.map((i) => PICKUPS[i].weight);
 
 function pickFrom(kinds: number[], weights: number[], u: number): number {

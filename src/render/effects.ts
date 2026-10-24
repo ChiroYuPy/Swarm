@@ -3,9 +3,9 @@
  * Alimentés par les événements de la sim. Utilisent le flux COSMETIC : ils ne touchent jamais la sim.
  */
 import { ENEMIES, bossName } from '../data/enemies';
-import { ALL_WEAPONS } from '../data/weapons';
+import { ALL_WEAPONS, type Behavior } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
-import { LOOT, PICKUPS } from '../data/loot';
+import { LOOT, PICKUPS, type PickupDef, type PickupKind } from '../data/loot';
 import {
   Rng,
   STREAM,
@@ -108,17 +108,35 @@ const MAXL = 128;
 const MAXR = 48;
 
 /** Message au ramassage : bonus = effet immédiat, activable = rangé (Espace pour l'utiliser). */
-const PICKUP_TOASTS = PICKUPS.map((d) =>
-  d.kind === 'active'
-    ? `${d.name} en réserve · Espace`
-    : d.kind === 'timed'
-      ? `${d.name} · ${d.duration} s`
-      : d.kind === 'instant'
-        ? `${d.name} +30 % PV`
-        : d.kind === 'relic'
-          ? `${d.name} : il te ramènera une fois`
-          : '',
-);
+const PICKUP_TOAST: Record<PickupKind, (d: PickupDef) => string> = {
+  active: (d) => `${d.name} en réserve · Espace`,
+  timed: (d) => `${d.name} · ${d.duration} s`,
+  instant: (d) => `${d.name} +30 % PV`,
+  relic: (d) => `${d.name} : il te ramènera une fois`,
+  chest: () => '',
+};
+const PICKUP_TOASTS = PICKUPS.map((d) => PICKUP_TOAST[d.kind](d));
+
+/** firing sound of each weapon behavior */
+const SHOT_SFX: Record<Behavior, SfxName> = {
+  projectile: 'shoot',
+  spiral: 'shoot',
+  orbit: 'shoot',
+  aura: 'shoot',
+  beam: 'laser',
+  mine: 'mine',
+  boomerang: 'boomerang',
+  chain: 'zap',
+  pulse: 'shoot',
+  whip: 'boomerang',
+  scythe: 'boomerang',
+  flame: 'laser',
+  turret: 'mine',
+  drone: 'shoot',
+  ricochet: 'boomerang',
+  mortar: 'mine',
+  phoenix: 'boomerang',
+};
 
 const ENEMY_COL = ENEMIES.map((e) => fxColorIndex(e.color));
 const WEAPON_COL = ALL_WEAPONS.map((w) => fxColorIndex(w.color));
@@ -283,18 +301,7 @@ export class Effects {
           h.sfx('levelup');
           break;
         case EV_SHOOT: {
-          const b = weaponDef(e.k).behavior;
-          h.sfx(
-            b === 'beam' || b === 'flame'
-              ? 'laser'
-              : b === 'mine' || b === 'turret' || b === 'mortar'
-                ? 'mine'
-                : b === 'boomerang' || b === 'whip' || b === 'scythe' || b === 'ricochet' || b === 'phoenix'
-                  ? 'boomerang'
-                  : b === 'chain'
-                    ? 'zap'
-                    : 'shoot',
-          );
+          h.sfx(SHOT_SFX[weaponDef(e.k).behavior]);
           break;
         }
         case EV_EXPLOSION:

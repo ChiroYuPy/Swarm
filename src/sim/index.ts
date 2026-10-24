@@ -35,6 +35,10 @@ export {
   WAVE_TICKS,
   WALL_TYPE,
   EGG_TYPE,
+  SQUADRON_WEAPON,
+  KAMIKAZE_DRONES_WEAPON,
+  BLACK_HOLE_WEAPON,
+  BOT_FAVORITE_PASSIVES,
 } from './registry';
 export { hashString, Rng, STREAM, deriveSeed } from './rng';
 export { spawnRate, mixAt, waveInfo } from './spawner';

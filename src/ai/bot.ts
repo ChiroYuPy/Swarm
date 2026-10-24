@@ -18,6 +18,7 @@ import {
   PJ_EBULLET,
   PJ_FIRE,
   BOSS_PATTERNS,
+  BOT_FAVORITE_PASSIVES,
   circleHitsObstacle,
   choiceCode,
   encodeMove,
@@ -54,7 +55,7 @@ function offerScore(p: Player, o: Offer): number {
     const ownedIds = p.weapons.map((w) => BASE_WEAPONS[w.def]?.id);
     const helps = FUSIONS.some((f) => f.with === id && ownedIds.includes(f.weapon));
     const base = o.toLevel > 1 ? 40 : 38;
-    return base + (helps ? 12 : 0) + (id === 'soupe' || id === 'biceps' || id === 'blindage' ? 6 : 0);
+    return base + (helps ? 12 : 0) + (BOT_FAVORITE_PASSIVES.includes(o.id) ? 6 : 0);
   }
   return 1;
 }

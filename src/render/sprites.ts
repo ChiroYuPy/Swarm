@@ -198,6 +198,10 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
     case 'egg':
       ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2);
       break;
+    default: {
+      const unhandled: never = d.shape;
+      throw new Error(`Unhandled enemy shape ${unhandled}`);
+    }
   }
 }
 

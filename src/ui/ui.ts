@@ -6,9 +6,9 @@
 import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../data/weapons';
 import { PASSIVES, type PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
-import { BOSS_ORDER, ENEMIES } from '../data/enemies';
-import { PICKUPS } from '../data/loot';
-import { DIFFICULTIES } from '../data/difficulty';
+import { BOSS_ORDER, ENEMIES, type EnemyBehavior } from '../data/enemies';
+import { PICKUPS, type PickupKind } from '../data/loot';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { WAVES } from '../data/waves';
 import { SCORE } from '../data/hero';
 import { MIX_TICKS, UNLOCK_SLOT } from '../sim/registry';
@@ -286,11 +286,12 @@ interface CodexItem {
   group?: string;
 }
 
-const BEHAVIOR_LABEL: Record<string, string> = {
+const BEHAVIOR_LABEL: Record<EnemyBehavior, string> = {
   chaser: 'Poursuivant',
   shooter: 'À distance',
   kamikaze: 'Explosif',
   swarm: 'En groupe',
+  prop: 'Caisse',
   boss: 'Boss',
   leader: 'Soutien',
   blinker: 'Téléportation',
@@ -317,6 +318,16 @@ function enemyArrival(id: string): number[] {
   });
 }
 
+/** codex groups of the « objets » tab, in display order */
+const PICKUP_GROUPS = ['Bonus temporaires', 'Activables · Espace', 'Autres'] as const;
+const PICKUP_GROUP: Record<PickupKind, (typeof PICKUP_GROUPS)[number]> = {
+  timed: 'Bonus temporaires',
+  active: 'Activables · Espace',
+  instant: 'Autres',
+  relic: 'Autres',
+  chest: 'Autres',
+};
+
 function codexItems(tab: CodexTab): CodexItem[] {
   switch (tab) {
     case 'regles':
@@ -331,22 +342,16 @@ function codexItems(tab: CodexTab): CodexItem[] {
     case 'bonus':
       return PASSIVES.map((p) => ({ tab, id: p.id, name: p.name, color: p.color, icon: `passive:${p.id}` }));
     case 'objets': {
-      const groups: [string, string[]][] = [
-        ['Bonus temporaires', ['timed']],
-        ['Activables · Espace', ['active']],
-        ['Autres', ['instant', 'relic', 'chest']],
-      ];
       const out: CodexItem[] = [];
-      for (const [group, kinds] of groups)
-        for (const p of PICKUPS) if (kinds.includes(p.kind)) out.push({ tab, id: p.id, name: p.name, color: p.color, icon: `pickup:${p.id}`, group });
+      for (const group of PICKUP_GROUPS)
+        for (const p of PICKUPS) if (PICKUP_GROUP[p.kind] === group) out.push({ tab, id: p.id, name: p.name, color: p.color, icon: `pickup:${p.id}`, group });
       const prop = ENEMIES.find((e) => e.behavior === 'prop')!;
       out.push({ tab, id: prop.id, name: prop.name, color: prop.color, icon: `enemy:${prop.id}`, group: 'Autres' });
       return out;
     }
     case 'ennemis': {
-      const normal = DIFFICULTIES.findIndex((d) => d.id === 'normal');
       return ENEMIES.filter((e) => e.behavior !== 'prop' && !e.hidden)
-        .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 + BOSS_ORDER.indexOf(e.id) : enemyArrival(e.id)[Math.max(0, normal)] }))
+        .map((e) => ({ e, at: e.behavior === 'boss' ? 1e9 + BOSS_ORDER.indexOf(e.id) : enemyArrival(e.id)[DEFAULT_DIFFICULTY] }))
         .sort((a, b) => a.at - b.at)
         .map(({ e }) => ({ tab, id: e.id, name: e.name, color: e.color, icon: `enemy:${e.id}` }));
     }
@@ -478,26 +483,36 @@ function codexDetail(it: CodexItem): string {
         break;
       }
       desc = p.desc;
-      if (p.kind === 'timed') {
-        tag = `Bonus temporaire · ${p.duration} s`;
-        body = `<p class="hint">Lâché au hasard par les ennemis. En reprendre un identique prolonge la durée. Le temps restant s’affiche en bas de l’écran.</p>`;
-      } else if (p.kind === 'active') {
-        tag = 'Activable · Espace';
-        body = `<p class="hint">Rangé dans l’emplacement « Objet » et déclenché avec Espace (bouton A). Un seul en réserve : en ramasser un autre le remplace.</p>`;
-      } else if (p.kind === 'relic') {
-        tag = 'Relique · automatique';
-        body = `<p class="hint">Gardée à part (elle n’occupe pas l’emplacement « Objet ») et affichée au-dessus de ta barre. Une seule à la fois. Très rare : lâchée par les ennemis et les caisses bonus.</p>`;
-      } else if (p.kind === 'instant') {
-        tag = 'Effet immédiat';
-        body = `<p class="hint">Lâché au hasard par les ennemis, et proposé au level-up quand ton équipement est complet.</p>`;
-      } else {
-        tag = 'Coffre';
+      switch (p.kind) {
+        case 'timed':
+          tag = `Bonus temporaire · ${p.duration} s`;
+          body = `<p class="hint">Lâché au hasard par les ennemis. En reprendre un identique prolonge la durée. Le temps restant s’affiche en bas de l’écran.</p>`;
+          break;
+        case 'active':
+          tag = 'Activable · Espace';
+          body = `<p class="hint">Rangé dans l’emplacement « Objet » et déclenché avec Espace (bouton A). Un seul en réserve : en ramasser un autre le remplace.</p>`;
+          break;
+        case 'relic':
+          tag = 'Relique · automatique';
+          body = `<p class="hint">Gardée à part (elle n’occupe pas l’emplacement « Objet ») et affichée au-dessus de ta barre. Une seule à la fois. Très rare : lâchée par les ennemis et les caisses bonus.</p>`;
+          break;
+        case 'instant':
+          tag = 'Effet immédiat';
+          body = `<p class="hint">Lâché au hasard par les ennemis, et proposé au level-up quand ton équipement est complet.</p>`;
+          break;
+        case 'chest':
+          tag = 'Coffre';
+          break;
+        default: {
+          const unhandled: never = p.kind;
+          throw new Error(`Unhandled pickup kind ${unhandled}`);
+        }
       }
       break;
     }
     case 'ennemis': {
       const e = ENEMIES.find((x) => x.id === it.id)!;
-      tag = BEHAVIOR_LABEL[e.behavior] ?? '';
+      tag = BEHAVIOR_LABEL[e.behavior];
       desc = e.desc;
       const top: [string, string][] = [
         ['PV', num(e.hp)],

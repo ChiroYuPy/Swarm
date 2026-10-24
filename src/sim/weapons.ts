@@ -9,7 +9,7 @@ import { TWO_PI, dcos, datan2, dsin } from './dmath';
 import { spawnProjectile } from './entities';
 import { damageEnemy, healPlayer, pushEnemy } from './combat';
 import { clearShotsIn, clearShotsOnLine } from './shots';
-import { ENEMY_INDEX, weaponLevel } from './registry';
+import { BEHAVIOR, ENEMY_BEHAVIOR, weaponLevel } from './registry';
 import {
   EF_BOSS,
   EV_LINE,
@@ -781,7 +781,9 @@ export const DRONE_LIFE = 1 << 30;
  * Cible de drone, la plus proche de (x, y) dans cet ordre : un gênant libre, un ennemi libre, un gênant déjà pris,
  * un ennemi déjà pris. « Pris » = déjà visé par un autre de tes drones (ids dans `claimed[0..nClaimed)`).
  */
-const PRIORITY: number[] = ['pentagone', 'meneur', 'teleporteur', 'cercle'].map((id) => ENEMY_INDEX[id]).filter((t) => t !== undefined);
+// the « gênants », by behavior: shooters, leaders, blinkers, bombs
+const PRIORITY_BEHAVIORS: number[] = [BEHAVIOR.SHOOTER, BEHAVIOR.LEADER, BEHAVIOR.BLINKER, BEHAVIOR.KAMIKAZE];
+const PRIORITY: number[] = ENEMY_BEHAVIOR.flatMap((b, t) => (PRIORITY_BEHAVIORS.includes(b) ? [t] : []));
 export function huntTarget(
   s: GameState,
   x: number,
