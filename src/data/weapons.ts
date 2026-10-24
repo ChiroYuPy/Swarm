@@ -1,7 +1,7 @@
 /**
  * Armes de base et leurs évolutions (arme + passif).
  *
- * Chaque arme a un `behavior` (le code qui l'anime dans src/sim/weapons.ts) et une liste de niveaux.
+ * Chaque arme a un `behavior` (le code qui l'anime dans src/sim/weapons/) et une liste de niveaux.
  * Les niveaux sont CUMULATIFS : `prog(base, d2, d3, ...)` part de la base et applique chaque delta
  * par-dessus le précédent. Les durées sont en secondes, les distances en unités monde.
  */

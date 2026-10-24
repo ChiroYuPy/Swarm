@@ -7,8 +7,10 @@ const SIM_DIR = join(__dirname, '..', 'src', 'sim');
 const DATA_DIR = join(__dirname, '..', 'src', 'data');
 
 function sources(dir: string): { file: string; code: string }[] {
-  return readdirSync(dir)
+  // Recursive: subfolders (e.g. src/sim/weapons/) are checked too; `file` is relative to `dir`.
+  return (readdirSync(dir, { recursive: true }) as string[])
     .filter((f) => f.endsWith('.ts'))
+    .map((f) => f.replace(/\\/g, '/'))
     .map((f) => ({
       file: f,
       // On retire les commentaires pour ne pas déclencher sur la doc.
