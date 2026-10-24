@@ -601,5 +601,3 @@ export class App implements AppApi {
     requestAnimationFrame((t) => this.frame(t));
   }
 }
-
-new App();
