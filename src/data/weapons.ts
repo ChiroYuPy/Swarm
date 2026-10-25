@@ -63,8 +63,10 @@ export interface WeaponLevel {
   rotStep?: number;
   /** half-angle of a flame cone or of a blade sweep (radians); a blade with a half turn or more spins all around */
   arc?: number;
-  /** Scythe: outer share of the reach that deals double damage */
+  /** Scythe: outer share of the reach where hits deal `tipBonus` extra damage */
   tip?: number;
+  /** Scythe: extra damage share in the outer `tip` band (0.2 = +20%) */
+  tipBonus?: number;
   /** burn left on the enemies hit: damage per second and duration (s) */
   burn?: number;
   burnTime?: number;
@@ -152,11 +154,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'rail',
     color: '#ff3b3b',
     levels: prog(
-      { damage: 40, cooldown: 1.4, length: 900, width: 6, knockback: 100 },
-      { damage: 55, cooldown: 1.3 },
-      { damage: 70, cooldown: 1.2 },
-      { damage: 85, cooldown: 1.05 },
-      { damage: 100, cooldown: 0.9, width: 8, burn: 10, burnTime: 2.5 },
+      { damage: 70, cooldown: 1.4, length: 900, width: 6, knockback: 100 },
+      { damage: 100, cooldown: 1.3 },
+      { damage: 135, cooldown: 1.2 },
+      { damage: 175, cooldown: 1.05 },
+      { damage: 220, cooldown: 0.9, width: 8, burn: 20, burnTime: 2.5 },
     ),
   },
   {
@@ -308,7 +310,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'orbit',
     color: '#b98cff',
     fusion: true,
-    levels: [{ damage: 30, count: 6, radius: 118, rotSpeed: 2.4, size: 22, hitCd: 0.3, pull: 150, pullRadius: 120, knockback: 0 }],
+    levels: [{ damage: 30, count: 6, radius: 118, rotSpeed: 2.4, size: 22, hitCd: 0.3, pull: 110, pullRadius: 120, knockback: 0 }],
   },
   {
     id: 'vampire_field',
@@ -350,7 +352,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'blade',
     color: '#d9a8ff',
     fusion: true,
-    levels: [{ damage: 20, cooldown: 0.7, arc: deg(180), length: 150, knockback: 80, tip: 0.35 }],
+    levels: [{ damage: 20, cooldown: 0.56, arc: deg(180), length: 150, knockback: 80, tip: 0.27, tipBonus: 0.2 }],
   },
 ];
 

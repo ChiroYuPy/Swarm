@@ -65,8 +65,6 @@ export const en: LocaleShape = {
     sub: 'The waves are the same everywhere: only enemy strength, enemy numbers and items change.',
     meterTitle: '{hint}: ×{value}',
     meters: {
-      hp: { label: 'Toughness', hint: 'Enemy HP' },
-      dmg: { label: 'Damage', hint: 'Damage you take' },
       rate: { label: 'Numbers', hint: 'Amount of enemies' },
       loot: { label: 'Items', hint: 'Heals and items dropped by enemies' },
     },
@@ -262,7 +260,7 @@ export const en: LocaleShape = {
   victory: {
     title: 'Victory',
     sub: 'All 5 bosses are down',
-    endless: 'You can stop here, or go on in endless mode: the waves and the bosses come back, stronger and stronger, and your score keeps climbing.',
+    endless: 'You can stop here, or go on in endless mode: the waves and the bosses come back, denser and denser, and your score keeps climbing.',
     continue: 'Go on (endless)',
     finish: 'End the run',
   },
@@ -386,11 +384,11 @@ export const en: LocaleShape = {
       name: 'Railgun',
       desc: 'Like the Blaster, but each shot is an instant beam that crosses the whole screen and every enemy on its line.',
       levels: [
-        '1 beam every 1.4 s, 40 damage along the whole line.',
-        'Damage 55, every 1.3 s',
-        'Damage 70, every 1.2 s',
-        'Damage 85, every 1.05 s',
-        'Damage 100, every 0.9 s, wider, sets the enemies hit on fire',
+        '1 beam every 1.4 s, 70 damage along the whole line.',
+        'Damage 100, every 1.3 s',
+        'Damage 135, every 1.2 s',
+        'Damage 175, every 1.05 s',
+        'Damage 220, every 0.9 s, wider, sets the enemies hit on fire',
       ],
     },
     mortar: {
@@ -530,7 +528,7 @@ export const en: LocaleShape = {
     scythe: {
       name: 'Scythe',
       desc: 'Evolution of the Blade.',
-      levels: ['A big scythe goes all the way around on every swing, with more reach: 20 damage, doubled at the tip of the blade.'],
+      levels: ['Like the Blade, but the scythe goes all the way around on every swing, with more reach: 20 damage, +20% on the outer band of the blade.'],
     },
   },
   passives: {
@@ -559,7 +557,7 @@ export const en: LocaleShape = {
       name: 'Freeze',
       desc: 'Freezes the enemies around you for 5s. Frozen, they take +50% damage and shatter, hurting their neighbors: enough to break a whole group.',
     },
-    bomb: { name: 'Bomb', desc: 'Big explosion around you (300 damage).' },
+    bomb: { name: 'Bomb', desc: 'Big explosion around you (800 damage).' },
     clock: { name: 'Clock', desc: 'Slows down the rest of the world for 8s: enemies, bosses and shots move 3× slower. Not you.' },
     clone: { name: 'Clone', desc: 'A double of you appears for 10s: it stays put, fires your weapons and lures nearby enemies.' },
     eradicate: { name: 'Eradication', desc: 'Wipes out every enemy in play. The boss loses 20% of its HP.' },
@@ -607,8 +605,8 @@ export const en: LocaleShape = {
     egg: { name: 'Egg', desc: 'Laid by the Queen: hatches into Swarm.' },
   },
   difficulties: {
-    easy: { name: 'Easy', desc: 'Slower, fewer and softer enemies, more items: enough to see all 5 bosses.' },
+    easy: { name: 'Easy', desc: 'Fewer enemies, more items: enough to see all 5 bosses.' },
     normal: { name: 'Normal', desc: 'The intended experience: the pressure keeps building up to the 5th boss.' },
-    hard: { name: 'Hard', desc: 'More enemies, tougher, fewer heals and items. Where scores are compared.' },
+    hard: { name: 'Hard', desc: 'More enemies, fewer heals and items. Where scores are compared.' },
   },
 };

@@ -10,7 +10,7 @@ import { HERO } from '../data/hero';
 import { PASSIVES } from '../data/passives';
 import { LOOT, PICKUPS, type PickupIdOf } from '../data/loot';
 import { WAVES } from '../data/waves';
-import { DIFFICULTIES, type DifficultyDef } from '../data/difficulty';
+import type { DifficultyDef } from '../data/difficulty';
 import {
   MAX_PASSIVE_SLOTS,
   MAX_WEAPON_SLOTS,
@@ -113,21 +113,19 @@ const NOW_X = 28;
 const FADE_L = 26;
 const FADE_R = 60;
 
-/** A wave's color by difficulty (spawn rate × enemy toughness): from green to magenta. */
+/** A wave's color by difficulty (spawn rate): from green to magenta. */
 const WAVE_TIERS: [number, string][] = [
   [0, '#39ff7a'],
   [3, '#b8ff3d'],
-  [8, '#ffe14d'],
-  [18, '#ff8a1f'],
-  [40, '#ff3366'],
-  [90, '#ff3df5'],
+  [4.5, '#ffe14d'],
+  [6.5, '#ff8a1f'],
+  [9, '#ff3366'],
+  [12, '#ff3df5'],
 ];
 
 function waveColor(s: GameState, slot: number): string {
   const tick = slot * MIX_TICKS + WAVE_TICKS / 2;
-  const m = tick / TICK_RATE / 60;
-  const danger =
-    spawnRate(tick, s.difficulty).rate * (1 + m * WAVES.hpScalePerMinute + m * m * WAVES.hpScalePerMinute2) * DIFFICULTIES[s.difficulty].hp;
+  const danger = spawnRate(tick, s.difficulty).rate;
   let col = WAVE_TIERS[0][1];
   for (const [at, c] of WAVE_TIERS) if (danger >= at) col = c;
   return col;

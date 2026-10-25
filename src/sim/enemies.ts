@@ -22,7 +22,6 @@ import {
   WALL_RISE,
   WALL_TYPE,
 } from './registry';
-import { dmgMul, hpMul, spdMul } from './spawner';
 import { deriveSeed } from './rng';
 import {
   EF_BOSS,
@@ -346,7 +345,7 @@ function hop(s: GameState, e: Enemy, p: Player, dx: number, dy: number, dist: nu
         const R = d.blastRadius ?? 40;
         if (e.ai === HOP_AIR) {
           // the landing: the only moment it hurts
-          const dmg = (d.blastDamage ?? 10) * dmgMul(s);
+          const dmg = d.blastDamage ?? 10;
           for (const q of s.players) {
             if (!q.alive) continue;
             const qx = q.x - e.x;
@@ -545,7 +544,7 @@ export function updateEnemies(s: GameState): void {
           while (off < -PI) off += TWO_PI;
           if (dist < 560 && !stunned && Math.abs(off) < SHOOTER_CONE) {
             const a = e.aux;
-            fireEnemyBullet(s, e.x, e.y, a, d.bulletSpeed ?? 190, (d.bulletDamage ?? 8) * dmgMul(s), true);
+            fireEnemyBullet(s, e.x, e.y, a, d.bulletSpeed ?? 190, d.bulletDamage ?? 8, true);
             emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
             e.timer = Math.round((d.shootEvery ?? 2.6) * TICK_RATE);
           } else {
@@ -568,7 +567,7 @@ export function updateEnemies(s: GameState): void {
           if (e.timer <= 0) {
             e.alive = false;
             e.hp = 0;
-            explode(s, e.x, e.y, d.blastRadius ?? 85, (d.blastDamage ?? 20) * 1.5, ti, 200, (d.blastDamage ?? 20) * dmgMul(s));
+            explode(s, e.x, e.y, d.blastRadius ?? 85, (d.blastDamage ?? 20) * 1.5, ti, 200, d.blastDamage ?? 20);
             continue;
           }
         }
@@ -758,7 +757,6 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
   const total = Math.round(ph.duration * TICK_RATE);
   const elapsed = total - e.timer;
   const stunned = e.stunUntil > s.tick;
-  const dm = dmgMul(s);
   VX = 0;
   VY = 0;
   switch (ph.kind) {
@@ -774,7 +772,7 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       const every = Math.max(1, Math.round(c.every * TICK_RATE));
       if (elapsed % every === 0) {
         const arms = c.arms + (c.armsPerBoss ?? 0) * e.aux2;
-        for (let k = 0; k < arms; k++) fireEnemyBullet(s, e.x, e.y, e.aux + (k * TWO_PI) / arms, b.speed, b.damage * dm);
+        for (let k = 0; k < arms; k++) fireEnemyBullet(s, e.x, e.y, e.aux + (k * TWO_PI) / arms, b.speed, b.damage);
         e.aux += c.turn;
         if (elapsed % (every * 3) === 0) emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
@@ -798,21 +796,21 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
         const a = datan2(dy, dx);
         const n = v.count;
         for (let k = 0; k < n; k++) {
-          fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * v.spread, b.speed, b.damage * dm);
+          fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * v.spread, b.speed, b.damage);
         }
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
       break;
     }
     case 'dash':
-      dash(s, e, cfg, elapsed, dm);
+      dash(s, e, cfg, elapsed);
       break;
     case 'burst':
       if (elapsed === 1 || elapsed === total >> 1) {
         const b = cfg.bullets!;
         const n = cfg.burst!.arms;
         const off = elapsed === 1 ? 0 : PI / n;
-        for (let k = 0; k < n; k++) fireEnemyBullet(s, e.x, e.y, off + (k * TWO_PI) / n, b.speed, b.damage * dm);
+        for (let k = 0; k < n; k++) fireEnemyBullet(s, e.x, e.y, off + (k * TWO_PI) / n, b.speed, b.damage);
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       }
       break;
@@ -826,13 +824,13 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
       }
       const every = Math.round(w.shootEvery * TICK_RATE);
       if (elapsed % every === 0 && dist < 600) {
-        fireEnemyBullet(s, e.x, e.y, datan2(dy, dx), b.speed, b.damage * dm);
+        fireEnemyBullet(s, e.x, e.y, datan2(dy, dx), b.speed, b.damage);
         emit(s, EV_ENEMY_SHOT, e.x, e.y, 0, e.type);
       }
       break;
     }
     case 'sweep':
-      sweep(s, e, cfg, elapsed / total, dm);
+      sweep(s, e, cfg, elapsed / total);
       break;
     case 'flee':
       if (!stunned) {
@@ -904,7 +902,7 @@ function enterPhase(s: GameState, e: Enemy, cfg: BossConfig, kind: BossPhaseKind
       const a = datan2(dy, dx);
       const n = l.volleyCount;
       for (let k = 0; k < n; k++) {
-        fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * l.volleySpread, b.speed, b.damage * dmgMul(s));
+        fireEnemyBullet(s, e.x, e.y, a + (k - (n - 1) / 2) * l.volleySpread, b.speed, b.damage);
       }
       emit(s, EV_ENEMY_SHOT, e.x, e.y, 1, e.type);
       break;
@@ -926,7 +924,7 @@ function enterPhase(s: GameState, e: Enemy, cfg: BossConfig, kind: BossPhaseKind
 }
 
 /** Dash (Ricochet star): bounces off the edges of its box, drops flames. */
-function dash(s: GameState, e: Enemy, cfg: BossConfig, elapsed: number, dm: number): void {
+function dash(s: GameState, e: Enemy, cfg: BossConfig, elapsed: number): void {
   const d = cfg.dash!;
   const H = d.box;
   let ux = dcos(e.aux);
@@ -967,13 +965,13 @@ function dash(s: GameState, e: Enemy, cfg: BossConfig, elapsed: number, dm: numb
     b.y = b.py = e.y;
     b.vx = b.vy = 0;
     b.r = d.fireRadius;
-    b.a = d.fireDps * dm;
+    b.a = d.fireDps;
     b.life = Math.round(d.fireLife * TICK_RATE);
   }
 }
 
 /** Sweep (Laser eye): the beam turns from e.ax to e.ay; it hurts whoever is on it (once, thanks to invulnerability). */
-function sweep(s: GameState, e: Enemy, cfg: BossConfig, f: number, dm: number): void {
+function sweep(s: GameState, e: Enemy, cfg: BossConfig, f: number): void {
   const L = cfg.laser!;
   e.aux = e.ax + (e.ay - e.ax) * Math.min(1, f);
   const ux = dcos(e.aux);
@@ -984,7 +982,7 @@ function sweep(s: GameState, e: Enemy, cfg: BossConfig, f: number, dm: number): 
     const qy = q.y - e.y;
     const along = qx * ux + qy * uy;
     const perp = Math.abs(qy * ux - qx * uy);
-    if (along > 0 && along < L.length + q.r && perp < L.width / 2 + q.r) hurtPlayer(s, q, L.damage * dm);
+    if (along > 0 && along < L.length + q.r && perp < L.width / 2 + q.r) hurtPlayer(s, q, L.damage);
   }
 }
 
@@ -1000,7 +998,6 @@ function buildCage(s: GameState, e: Enemy, cfg: BossConfig, p: Player): void {
   const n = Math.max(1, Math.round(R / c.wallSpacing));
   const life = Math.round(c.wallLife * TICK_RATE);
   const solid = Math.round((c.wallLife - WALL_RISE) * TICK_RATE);
-  const hm = hpMul(s);
   // The exits change sides from one cage to the next.
   const gapSide = ((e.ax - 1) / c.every) % 3;
   const g0 = Math.floor((n - c.gapWalls) / 2) + 1;
@@ -1016,7 +1013,7 @@ function buildCage(s: GameState, e: Enemy, cfg: BossConfig, p: Player): void {
       const x = x0 + ((x1 - x0) * j) / n;
       const y = y0 + ((y1 - y0) * j) / n;
       if (circleHitsObstacle(s.map, x, y, 4)) continue;
-      const w = spawnEnemy(s, WALL_TYPE, x, y, hm, 1, 1, e.target);
+      const w = spawnEnemy(s, WALL_TYPE, x, y, 1, 1, 1, e.target);
       if (!w) return;
       w.timer = life;
       w.aux = solid;
@@ -1033,10 +1030,9 @@ function layEggs(s: GameState, e: Enemy, l: BossLay): void {
   // ay = layings already done (aux is used by the dart spiral)
   e.ay++;
   const n = Math.min(l.maxEggs - eggs, e.ay % l.bigEvery === 0 ? 3 : 1);
-  const hm = hpMul(s);
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / 3 + e.ay;
-    const egg = spawnEnemy(s, EGG_TYPE, e.x + (n > 1 ? dcos(a) * 34 : 0), e.y + (n > 1 ? dsin(a) * 34 : 0), hm, 1, 1, e.target);
+    const egg = spawnEnemy(s, EGG_TYPE, e.x + (n > 1 ? dcos(a) * 34 : 0), e.y + (n > 1 ? dsin(a) * 34 : 0), 1, 1, 1, e.target);
     if (!egg) return;
     egg.timer = Math.round(l.hatchAfter * TICK_RATE) + k * 12;
   }
@@ -1051,7 +1047,7 @@ function hatch(s: GameState, egg: Enemy): void {
   const n = into < 0 ? 0 : (d.hatchCount ?? 0);
   for (let k = 0; k < n; k++) {
     const a = (k * TWO_PI) / n;
-    spawnEnemy(s, into, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, hpMul(s) * (d.hatchHp ?? 1), dmgMul(s), spdMul(s), egg.target);
+    spawnEnemy(s, into, egg.x + dcos(a) * 12, egg.y + dsin(a) * 12, d.hatchHp ?? 1, 1, 1, egg.target);
   }
   emit(s, EV_HATCH, egg.x, egg.y, n);
 }
@@ -1077,7 +1073,7 @@ function summon(s: GameState, boss: Enemy, p: Player): void {
     const x = cx + dcos(a) * R;
     const y = cy + dsin(a) * R;
     if (circleHitsObstacle(s.map, x, y, r)) continue;
-    spawnEnemy(s, sm.typeId, x, y, hpMul(s) * (sm.hp ?? 1), dmgMul(s), spdMul(s), boss.target);
+    spawnEnemy(s, sm.typeId, x, y, sm.hp ?? 1, 1, 1, boss.target);
   }
   if (!self) emit(s, EV_RING_WAVE, p.x, p.y, n);
 }

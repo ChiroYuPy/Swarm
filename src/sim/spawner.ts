@@ -9,7 +9,7 @@
  * of waves is identical for all players with the same seed and the same difficulty.
  */
 import { WAVES } from '../data/waves';
-import { BOSS_HP_GROWTH, ENEMIES } from '../data/enemies';
+import { ENEMIES } from '../data/enemies';
 import { DIFFICULTIES } from '../data/difficulty';
 import { DT, TICK_RATE } from './constants';
 import { TWO_PI, dcos, dsin } from './dmath';
@@ -56,18 +56,6 @@ import {
   type Enemy,
   type GameState,
 } from './state';
-
-/** Enemy multipliers from the wave clock (time curves × difficulty). */
-export function hpMul(s: GameState): number {
-  const m = (s.clock * DT) / 60;
-  return (1 + m * WAVES.hpScalePerMinute + m * m * WAVES.hpScalePerMinute2) * DIFFICULTIES[s.difficulty].hp;
-}
-export function dmgMul(s: GameState): number {
-  return (1 + ((s.clock * DT) / 60) * WAVES.dmgScalePerMinute) * DIFFICULTIES[s.difficulty].dmg;
-}
-export function spdMul(s: GameState): number {
-  return Math.min(WAVES.speedScaleMax, 1 + ((s.clock * DT) / 60) * WAVES.speedScalePerMinute) * DIFFICULTIES[s.difficulty].speed;
-}
 
 export function spawnRate(tick: number, difficulty = 1): { rate: number } {
   const pts = RATES_BY_DIFFICULTY[difficulty];
@@ -143,7 +131,7 @@ function spawnAround(s: GameState, type: number, angle: number, radius: number, 
     const x = p.x + dcos(a) * radius;
     const y = p.y + dsin(a) * radius;
     if (!ignoreObstacles && circleHitsObstacle(s.map, x, y, r + 4)) continue;
-    return spawnEnemy(s, type, x, y, hpMul(s), dmgMul(s), spdMul(s), target);
+    return spawnEnemy(s, type, x, y, 1, 1, 1, target);
   }
   return null;
 }
@@ -152,7 +140,7 @@ function spawnAround(s: GameState, type: number, angle: number, radius: number, 
 function spawnAt(s: GameState, type: number, x: number, y: number, target: number): Enemy | null {
   if (s.enemyCount >= WAVES.enemyCap) return null;
   if (circleHitsObstacle(s.map, x, y, ENEMIES[type].radius)) return null;
-  return spawnEnemy(s, type, x, y, hpMul(s), dmgMul(s), spdMul(s), target);
+  return spawnEnemy(s, type, x, y, 1, 1, 1, target);
 }
 
 function countProps(s: GameState): number {
@@ -199,7 +187,7 @@ function updateMapItems(s: GameState): void {
 /**
  * The boss arrives: normal enemies flee, only it remains (and whatever it summons), and its arena closes
  * around the player: a ring neither of them can leave until it dies.
- * `k` = its rank in the game (0 = the first): it sets the boss, its strength and its name (Mk II…).
+ * `k` = its rank in the game (0 = the first): it sets the boss and its name (Mk II…). Its stats never change.
  */
 function spawnBoss(s: GameState, k = s.bossSpawned): void {
   const type = BOSS_TYPES[k % BOSS_TYPES.length];
@@ -219,10 +207,6 @@ function spawnBoss(s: GameState, k = s.bossSpawned): void {
   const e = spawnAround(s, type, a, WAVES.arena.bossDistance, target);
   s.bossSpawned++;
   if (!e) return;
-  const d = ENEMIES[type];
-  e.maxHp = e.hp = d.hp * (1 + BOSS_HP_GROWTH * k) * DIFFICULTIES[s.difficulty].hp;
-  e.dmg = d.damage * dmgMul(s);
-  e.speed = d.speed * (1 + 0.08 * k);
   e.aux2 = k;
   e.ai = 0;
   e.timer = Math.round(BOSS_PATTERNS[type][0].duration * TICK_RATE);

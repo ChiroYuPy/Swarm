@@ -8,7 +8,6 @@ import { circleHitsObstacle } from './map';
 import { clearShotsIn } from './shots';
 import { AFTER_BOSS_TICKS, BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO, VICTORY_BOSS } from './registry';
 import { DIFFICULTIES } from '../data/difficulty';
-import { dmgMul, hpMul, spdMul } from './spawner';
 import { ENEMIES } from '../data/enemies';
 import {
   EV_BOSS_DEAD,
@@ -206,7 +205,7 @@ function split(s: GameState, x: number, y: number, fx: number, fy: number, type:
       cx = x;
       cy = y;
     }
-    const f = spawnEnemy(s, into, cx, cy, hpMul(s), dmgMul(s), spdMul(s), target);
+    const f = spawnEnemy(s, into, cx, cy, 1, 1, 1, target);
     if (!f) return;
     f.kbx = ux * 320;
     f.kby = uy * 320;

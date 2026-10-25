@@ -1,7 +1,7 @@
 /**
  * Blade: a sword sweep around the player toward the densest group in reach (big enemies count double),
  * alternating left and right. With `arc` of a half turn or more (Scythe), every swing is a full turn, and
- * enemies under the outer `tip` share of the reach take double damage. The blade really sweeps: an enemy is
+ * enemies under the outer `tip` share of the reach take `tipBonus` extra damage. The blade really sweeps: an enemy is
  * hit when the blade passes over it, once per swing. No projectile; visuals read w.angles (0 = start,
  * 1 = signed sweep, 2 = current angle, 3 = tip share, 4 = reach), w.vN (sweep ticks), w.tickTimer (ticks
  * elapsed) and w.activeTicks (ticks left, sweep + fade).
@@ -76,7 +76,7 @@ function cut(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLeve
     e.immune[key] = s.tick + w.vN + 1;
     const d = Math.sqrt(dx * dx + dy * dy) || 1;
     const tip = w.angles[3] > 0 && d + e.r >= tipR;
-    damageEnemy(s, idx, tip ? dmg * 2 : dmg, p.index, (dx / d) * knock, (dy / d) * knock);
+    damageEnemy(s, idx, tip ? dmg * (1 + (L.tipBonus ?? 0)) : dmg, p.index, (dx / d) * knock, (dy / d) * knock);
   }
 }
 

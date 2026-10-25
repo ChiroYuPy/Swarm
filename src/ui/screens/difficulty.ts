@@ -7,19 +7,17 @@ import { difficultyDesc, difficultyName } from '../../i18n/content';
 import { SCREEN_COLOR, cascade, esc, heading, keys, num } from '../html';
 import type { UI } from '../ui';
 
-type Meter = 'hp' | 'dmg' | 'rate' | 'loot';
+type Meter = 'rate' | 'loot';
 
 // ---------- Difficulty picker ----------
 /**
- * One card per difficulty: threat level, description, compared meters (toughness, damage, numbers, items)
+ * One card per difficulty: threat level, description, compared meters (numbers, items)
  * and the record of the difficulty if there is one.
  */
 export function showDifficulty(ui: UI): void {
   const save = ui.app.save;
   // 5-step meters, relative to the hardest difficulty on each criterion.
   const crit: [Meter, (d: (typeof DIFFICULTIES)[number]) => number][] = [
-    ['hp', (d) => d.hp],
-    ['dmg', (d) => d.dmg],
     ['rate', (d) => d.rate],
     ['loot', (d) => d.loot],
   ];

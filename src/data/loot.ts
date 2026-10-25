@@ -54,7 +54,7 @@ export const LOOT = {
   swarmMul: 0.3,
   swarmGemChance: 0.6,
   healAmount: 0.3,
-  bombDamage: 300,
+  bombDamage: 800,
   bombRadius: 460,
   /** Freeze: radius, duration, damage taken ×fragile; a frozen enemy that dies shatters (base damage + share of its max HP) */
   freezeRadius: 420,

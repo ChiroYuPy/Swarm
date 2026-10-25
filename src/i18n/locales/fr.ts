@@ -77,8 +77,6 @@ export const fr = {
     sub: 'Les vagues sont les mêmes partout : seuls la force des ennemis, leur nombre et les objets changent.',
     meterTitle: '{hint} : ×{value}',
     meters: {
-      hp: { label: 'Résistance', hint: 'PV des ennemis' },
-      dmg: { label: 'Dégâts', hint: 'Dégâts que tu reçois' },
       rate: { label: 'Nombre', hint: 'Quantité d’ennemis' },
       loot: { label: 'Objets', hint: 'Soins et objets lâchés par les ennemis' },
     },
@@ -276,7 +274,7 @@ export const fr = {
   victory: {
     title: 'Victoire',
     sub: 'Les 5 boss sont tombés',
-    endless: 'Tu peux t’arrêter là, ou continuer en mode infini : les vagues et les boss reviennent, de plus en plus forts, et ton score continue de monter.',
+    endless: 'Tu peux t’arrêter là, ou continuer en mode infini : les vagues et les boss reviennent, de plus en plus denses, et ton score continue de monter.',
     continue: 'Continuer (infini)',
     finish: 'Terminer la partie',
   },
@@ -416,11 +414,11 @@ export const fr = {
       name: 'Railgun',
       desc: 'Comme le Blaster, mais chaque tir est un rayon instantané qui traverse tout l’écran et tous les ennemis sur sa ligne.',
       levels: [
-        '1 rayon toutes les 1,4 s, 40 dégâts sur toute la ligne.',
-        'Dégâts 55, toutes les 1,3 s',
-        'Dégâts 70, toutes les 1,2 s',
-        'Dégâts 85, toutes les 1,05 s',
-        'Dégâts 100, toutes les 0,9 s, plus large, met le feu aux ennemis touchés',
+        '1 rayon toutes les 1,4 s, 70 dégâts sur toute la ligne.',
+        'Dégâts 100, toutes les 1,3 s',
+        'Dégâts 135, toutes les 1,2 s',
+        'Dégâts 175, toutes les 1,05 s',
+        'Dégâts 220, toutes les 0,9 s, plus large, met le feu aux ennemis touchés',
       ],
     },
     mortar: {
@@ -572,7 +570,7 @@ export const fr = {
     scythe: {
       name: 'Faux',
       desc: 'Évolution de la Lame.',
-      levels: ['Une grande faux fait le tour complet à chaque coup, avec plus de portée : 20 dégâts, doublés au bout de la lame.'],
+      levels: ['Comme la Lame, mais la faux fait le tour complet à chaque coup, avec plus de portée : 20 dégâts, +20 % sur la bande extérieure de la lame.'],
     },
   },
   passives: {
@@ -595,7 +593,7 @@ export const fr = {
     totem: { name: 'Totem', desc: 'Très rare. La prochaine fois que tu tombes à 0 PV, tu reviens avec la moitié de tes PV et une onde repousse tout autour de toi.' },
     vacuum: { name: 'Aspirateur', desc: 'Attire toute l’XP et tous les objets au sol.' },
     freeze: { name: 'Gel', desc: 'Fige les ennemis autour de toi pendant 5 s. Gelés, ils prennent +50 % de dégâts et éclatent en blessant leurs voisins : de quoi briser un groupe entier.' },
-    bomb: { name: 'Bombe', desc: 'Grosse explosion autour de toi (300 dégâts).' },
+    bomb: { name: 'Bombe', desc: 'Grosse explosion autour de toi (800 dégâts).' },
     clock: { name: 'Horloge', desc: 'Ralentit tout le reste du monde pendant 8 s : ennemis, boss et tirs vont 3× moins vite. Toi, non.' },
     clone: { name: 'Clone', desc: 'Un double de toi apparaît 10 s : il reste sur place, tire avec tes armes et attire les ennemis proches.' },
     eradicate: { name: 'Éradication', desc: 'Détruit tous les ennemis présents. Le boss perd 20 % de ses PV.' },
@@ -623,8 +621,8 @@ export const fr = {
     egg: { name: 'Œuf', desc: 'Pondu par la Reine : éclot en Essaim.' },
   },
   difficulties: {
-    easy: { name: 'Facile', desc: 'Ennemis plus lents, moins nombreux et moins coriaces, plus d’objets : de quoi voir les 5 boss.' },
+    easy: { name: 'Facile', desc: 'Moins d’ennemis, plus d’objets : de quoi voir les 5 boss.' },
     normal: { name: 'Normal', desc: 'L’expérience prévue : la pression monte régulièrement jusqu’au 5e boss.' },
-    hard: { name: 'Difficile', desc: 'Plus d’ennemis, plus solides, moins de soins et d’objets. Là où les scores se comparent.' },
+    hard: { name: 'Difficile', desc: 'Plus d’ennemis, moins de soins et d’objets. Là où les scores se comparent.' },
   },
 } as const;

@@ -187,7 +187,7 @@ describe('weapons', () => {
     expect(projs(c, PJ_MINE).map((m) => Math.round(m.x - p.x)).sort()).toEqual([240, 400]);
   });
 
-  it('the Scythe goes all the way around, and its tip hits twice as hard', () => {
+  it('the Scythe goes all the way around, and its outer band hits tipBonus harder', () => {
     const s = empty('scythe', 1);
     const p = s.players[0];
     const L = weaponDef(p.weapons[0].def).levels[0];
@@ -199,7 +199,8 @@ describe('weapons', () => {
     const a = 100000 - inner.hp;
     const b = 100000 - tip.hp;
     expect(a).toBeGreaterThan(0);
-    expect(b).toBeCloseTo(a * 2, 5);
+    expect(b).toBeCloseTo(a * (1 + (L.tipBonus ?? 0)), 5);
+    expect(b).toBeGreaterThan(a);
   });
 
   it('the Boomerang flies out, stops, and comes back to the player as fast as it left', () => {

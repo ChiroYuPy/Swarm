@@ -13,6 +13,7 @@ Guide for anyone (human or AI agent) changing the game. Read [ARCHITECTURE.md](A
 - **`SIM_VERSION`** (`src/sim/constants.ts`): "bump it as soon as a change breaks replay compatibility", i.e. whenever the same seed and inputs no longer give the same game. That is any gameplay change, including new content. It is part of `hashState`, so a bump also needs `npm run golden:update`. Pure refactors, render, UI, audio and text changes do not bump it.
 - **Save format.** Changing the shape of `SaveData` (`src/storage/storage.ts`) needs `SAVE_VERSION` + 1, a new `if (version === N)` step in `migrate()`, and a case in `tests/storage.test.ts`. A new setting or sandbox field with a default needs no bump: missing fields read as the default.
 - **Text tracks numbers.** Many locale descriptions repeat data values ("300 damage", "8 s", "+6%"). When you retune a number in `src/data`, update the matching text in both locales; no test catches a stale number.
+- **Fixed enemy stats.** An enemy's HP, damage and speed are the numbers in `src/data/enemies.ts`, always: no scaling with time, difficulty or boss rank (Mk II). Difficulty and progression only change density (spawn rates, packs, caps, summons).
 - **Taste.** The maintainer balances by playing: do not loop on `npm run balance` benches unless asked. Audio and music changes are taste-driven: keep to the existing synthesized style and let the maintainer listen before committing. Waves stay readable: 2 or 3 enemy types at once.
 - **Git.** Work on `master`. Commit only when asked, never push unless asked: every push to `master` deploys to GitHub Pages.
 
@@ -138,14 +139,14 @@ Caught: typecheck (`bossConfig()` rejects a missing group, or a group none of th
 
 ### Waves and spawns
 
-- Numbers live in `WAVES` (`src/data/waves.ts`): spawn `rates` and `lateGrowth`, the rhythm (`waveLength`, `pause`, `wavesPerBoss`, `afterBoss`), the run wave by wave (`plan`, whole blocks of `wavesPerBoss` waves: the boss after the last block wins the run) and the endless mode's `mixes`, HP/damage/speed scaling, highlights (`swarm`, `horde`, `ring`, from `firstWave`), the boss `arena`, bonus crates (`props`), caps (`fluxCap`, `enemyCap`, `lostDistance`). Per-type caps and packs are on the enemies (`cap`, `pack`).
-- The registry compiles them (`RATES_BY_DIFFICULTY`, `PLAN_MIXES`, `ENDLESS_MIXES`, `UNLOCK_SLOT`, `VICTORY_BOSS`, `MIX_TICKS`, `BOSS_TICKS`); the logic is in `src/sim/spawner.ts` (`spawnRate`, `mixAt`, `waveInfo`). The waves are the same in every difficulty (it only changes strength, numbers and item drops). The wave clock (`s.clock`) stops during bosses; composition never depends on the player.
+- Numbers live in `WAVES` (`src/data/waves.ts`): spawn `rates` and `lateGrowth`, the rhythm (`waveLength`, `pause`, `wavesPerBoss`, `afterBoss`), the run wave by wave (`plan`, whole blocks of `wavesPerBoss` waves: the boss after the last block wins the run) and the endless mode's `mixes`, highlights (`swarm`, `horde`, `ring`, from `firstWave`), the boss `arena`, bonus crates (`props`), caps (`fluxCap`, `enemyCap`, `lostDistance`). Per-type caps and packs are on the enemies (`cap`, `pack`).
+- The registry compiles them (`RATES_BY_DIFFICULTY`, `PLAN_MIXES`, `ENDLESS_MIXES`, `UNLOCK_SLOT`, `VICTORY_BOSS`, `MIX_TICKS`, `BOSS_TICKS`); the logic is in `src/sim/spawner.ts` (`spawnRate`, `mixAt`, `waveInfo`). The waves are the same in every difficulty (it only changes enemy numbers and item drops). The wave clock (`s.clock`) stops during bosses; composition never depends on the player.
 - The codex rules and some HUD/sandbox strings read these numbers through placeholders; descriptions with literal numbers need a manual update.
 - Caught: `enemies.test.ts` (readable waves, caps), `bosses.test.ts` (wave / pause / boss rhythm), `content.test.ts` (arrival times per difficulty).
 
 ### A difficulty
 
-1. `src/data/difficulty.ts`: append to `DIFFICULTIES` (`hp`, `dmg`, `speed`, `rate`, `pace`, `color`). Its index is what scores, the save and `?difficulty=` store. `DEFAULT_DIFFICULTY` is an index.
+1. `src/data/difficulty.ts`: append to `DIFFICULTIES` (`rate`, `loot`, `color`). Its index is what scores, the save and `?difficulty=` store. `DEFAULT_DIFFICULTY` is an index.
 2. Locales: `difficulties.<id>` with `name`, `desc`.
 3. `src/styles/difficulty.css`: the picker grid is `repeat(3, ...)`; widen it.
 4. Spawn curves, arrivals, codex arrival table, records tabs and sandbox choice follow from the data. The golden test gains a `bot-N` run.

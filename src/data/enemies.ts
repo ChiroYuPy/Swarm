@@ -509,6 +509,3 @@ export const ENEMIES: EnemyDef[] = [
 
 /** Bosses always come in this order, then loop around as "Mk II", "Mk III"... (their names: bossName in src/i18n/content.ts). */
 export const BOSS_ORDER = ['trapezoid', 'builder_hexagon', 'ricochet_star', 'laser_eye', 'swarm_queen'];
-
-/** HP of the k-th boss × (1 + BOSS_HP_GROWTH × k) */
-export const BOSS_HP_GROWTH = 0.9;
