@@ -314,6 +314,11 @@ export class Player {
   moveY = 0;
   hurtTick = -1000;
   invulnUntil = 0;
+  /** dash: last tick of the dash, its unit direction, and the tick from which the next one is allowed */
+  dashUntil = -1;
+  dashX = 0;
+  dashY = 0;
+  dashReadyAt = 0;
   deathTick = -1;
   /** fixed damage multiplier (sandbox setting, 1 otherwise) */
   mightMul = 1;
@@ -383,6 +388,8 @@ export const EV_MAP_ITEM = 38;
 export const EV_VICTORY = 39;
 /** the boss arena closes (x, y = centre, v = radius) or opens again (v = 0) */
 export const EV_ARENA = 40;
+/** a player dashes: x, y = start, v, k = unit direction (x, y) */
+export const EV_DASH = 41;
 /**
  * Every event code. `emit()` only takes these, so a new EV_* constant must be listed here, and then
  * `Effects.consume` (render/effects.ts) fails to typecheck until it handles it (or lists it as ignored).
@@ -427,7 +434,8 @@ export type EventType =
   | typeof EV_CAGE
   | typeof EV_MAP_ITEM
   | typeof EV_VICTORY
-  | typeof EV_ARENA;
+  | typeof EV_ARENA
+  | typeof EV_DASH;
 
 /** Event emitted by the sim for rendering and audio. Purely informative: the sim never reads them back. */
 export class SimEvent {

@@ -18,7 +18,7 @@ import { drawProjectiles } from './draw-projectiles';
 import { drawWeaponFx } from './draw-weapon-fx';
 import { drawPlayer, drawDrop } from './draw-player';
 import { drawFx, drawTexts, drawIndicators } from './draw-fx';
-import { drawGameOver, drawSpeedLines } from './draw-screen';
+import { drawGameOver, drawSpeedLines, drawSpotlight } from './draw-screen';
 
 export interface RenderOptions extends HudOptions {
   quality: 'high' | 'low';
@@ -154,7 +154,7 @@ export class Renderer extends RenderView {
     drawEnemies(this, s, alpha, opt.time);
     if (!falling) drawWeaponFx(this, s, alpha, false);
     if (falling) drawDrop(this, s, opt.drop!, opt.zoom ?? 1, opt.time);
-    else drawPlayer(this, s, alpha, opt.time);
+    else drawPlayer(this, s, alpha, opt.time, opt.landed !== undefined ? 0.9 * Math.max(0, 1 - opt.landed / 0.45) : 0);
     drawFx(this, fx);
     ctx.globalCompositeOperation = 'source-over';
     drawTexts(this, fx);
@@ -164,6 +164,7 @@ export class Renderer extends RenderView {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const W = this.cw / this.dpr;
     const H = this.ch / this.dpr;
+    drawSpotlight(this, W, H, opt.drop, opt.landed);
     const hpRatio = p.hp / p.stats.maxHp;
     if (p.alive && (hpRatio < 0.3 || fx.hurtFlash > 0)) {
       const k = Math.max(fx.hurtFlash * 2.4, hpRatio < 0.3 ? (0.3 - hpRatio) * 2 * (0.75 + 0.25 * Math.sin(opt.time * 6)) : 0);

@@ -9,7 +9,7 @@ import { dcos, dsin } from '../dmath';
 import { damageEnemy, ignite } from '../combat';
 import { clearShotsOnLine } from '../shots';
 import { EV_SHOOT, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { AIM, RETRY_TICKS, aim, cdTicks, ticks } from './common';
+import { AIM, MUZZLE_X, MUZZLE_Y, RETRY_TICKS, aim, cdTicks, muzzle, ticks } from './common';
 
 export function rail(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   if (w.burstLeft > 0) {
@@ -42,17 +42,21 @@ function fireLine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void 
   const uy = dsin(w.angle);
   const dmg = L.damage * p.stats.might;
   const knock = L.knockback ?? 100;
-  clearShotsOnLine(s, p.x, p.y, ux, uy, len, width);
+  // The line leaves from just outside the hero's body.
+  muzzle(p, w.angle);
+  const ox = MUZZLE_X;
+  const oy = MUZZLE_Y;
+  clearShotsOnLine(s, ox, oy, ux, uy, len, width);
   const g = s.grid;
-  const m = g.query(s.enemies, p.x + (ux * len) / 2, p.y + (uy * len) / 2, len / 2 + width);
+  const m = g.query(s.enemies, ox + (ux * len) / 2, oy + (uy * len) / 2, len / 2 + width);
   // Copied: a kill can split an enemy (which does not touch the grid) but the burn must see the same list.
   let c = 0;
   for (let q = 0; q < m && c < LINE.length; q++) {
     const idx = g.out[q];
     const e = s.enemies[idx];
     if (!e.alive) continue;
-    const rx = e.x - p.x;
-    const ry = e.y - p.y;
+    const rx = e.x - ox;
+    const ry = e.y - oy;
     const t = rx * ux + ry * uy;
     if (t < -e.r || t > len + e.r) continue;
     if (Math.abs(rx * uy - ry * ux) > width + e.r) continue;
@@ -63,6 +67,6 @@ function fireLine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void 
     if (L.burn) ignite(s, idx, L.burn * p.stats.might, L.burnTime ?? 2.5, p.index);
     damageEnemy(s, idx, dmg, p.index, ux * knock, uy * knock);
   }
-  emit(s, EV_SHOOT, p.x, p.y, width, w.def, p.x + ux * len, p.y + uy * len, p.index);
+  emit(s, EV_SHOOT, ox, oy, width, w.def, ox + ux * len, oy + uy * len, p.index);
 }
 const LINE = new Int32Array(512);

@@ -8,7 +8,7 @@ import type { WeaponLevel } from '../../data/weapons';
 import { dcos, dsin } from '../dmath';
 import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_BOOMERANG, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { AIM, RETRY_TICKS, aim, cdTicks, ticks } from './common';
+import { AIM, MUZZLE_X, MUZZLE_Y, RETRY_TICKS, aim, cdTicks, muzzle, ticks } from './common';
 
 /** gap between the boomerangs of a throw (radians) */
 const FAN = 0.45;
@@ -32,8 +32,9 @@ export function boomerang(s: GameState, p: Player, w: WeaponInst, slot: number, 
     b.owner = p.index;
     b.slot = slot;
     b.weapon = w.def;
-    b.x = b.px = b.tx = p.x;
-    b.y = b.py = b.ty = p.y;
+    muzzle(p, a);
+    b.x = b.px = b.tx = MUZZLE_X;
+    b.y = b.py = b.ty = MUZZLE_Y;
     b.vx = dcos(a);
     b.vy = dsin(a);
     b.a = 0;

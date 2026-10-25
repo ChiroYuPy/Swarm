@@ -464,6 +464,11 @@ export class AudioEngine {
         this.tone('sawtooth', 1400, 180, 0.16, 0.04, 0, { filter: lp(2400) });
         this.noiseHit(0.1, 0.05, 'highpass', 3000);
         break;
+      case 'dash':
+        // Short airy whoosh
+        this.noiseHit(0.09, 0.045, 'bandpass', 1600);
+        this.tone('sine', 520, 260, 0.08, 0.02);
+        break;
       case 'wave':
         // Short gong: a wave is coming
         this.tone('triangle', 330, 330, 0.25, 0.06);

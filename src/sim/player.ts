@@ -10,6 +10,7 @@ import {
   EF_BOSS,
   EF_PROP,
   EV_ACTIVATE,
+  EV_DASH,
   EV_LEVELUP,
   PassiveInst,
   Player,
@@ -92,6 +93,35 @@ export function decodeMove(code: number, out: { x: number; y: number }): number 
 
 const MOVE = { x: 0, y: 0 };
 
+const DASH_TICKS = Math.max(1, Math.round(HERO.dash.seconds * TICK_RATE));
+const DASH_STEP = HERO.dash.distance / DASH_TICKS;
+const DASH_INVULN_TICKS = Math.round(HERO.dash.invuln * TICK_RATE);
+const DASH_COOLDOWN_TICKS = Math.round(HERO.dash.cooldown * TICK_RATE);
+
+/** Dash ("zero-time" step): toward the move direction, otherwise the manual aim, otherwise the facing. */
+export function startDash(s: GameState, p: Player): void {
+  if (!p.alive || p.master >= 0 || s.tick < p.dashReadyAt) return;
+  let dx = p.moveX;
+  let dy = p.moveY;
+  if (dx === 0 && dy === 0) {
+    if (p.aim >= 0) {
+      dx = DIR_X[p.aim];
+      dy = DIR_Y[p.aim];
+    } else {
+      dx = p.faceX;
+      dy = p.faceY;
+    }
+  }
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  p.dashX = dx / len;
+  p.dashY = dy / len;
+  // The dash covers the next DASH_TICKS steps.
+  p.dashUntil = s.tick + DASH_TICKS;
+  p.dashReadyAt = s.tick + DASH_COOLDOWN_TICKS;
+  p.invulnUntil = Math.max(p.invulnUntil, s.tick + 1 + DASH_INVULN_TICKS);
+  emit(s, EV_DASH, p.x, p.y, p.dashX, p.dashY, 0, 0, p.index);
+}
+
 export function updatePlayer(s: GameState, p: Player, code: number): void {
   p.px = p.x;
   p.py = p.y;
@@ -100,11 +130,17 @@ export function updatePlayer(s: GameState, p: Player, code: number): void {
   const mag = decodeMove(code, MOVE);
   p.moveX = MOVE.x * mag;
   p.moveY = MOVE.y * mag;
-  if (mag > 0) {
+  if (s.tick <= p.dashUntil) {
+    moveCircle(s.map, p, p.dashX * DASH_STEP, p.dashY * DASH_STEP, p.r);
+  } else if (mag > 0) {
     p.faceX = MOVE.x;
     p.faceY = MOVE.y;
     const speed = p.stats.speed;
     moveCircle(s.map, p, p.moveX * speed * DT, p.moveY * speed * DT, p.r);
+  }
+  if (mag > 0 && s.tick <= p.dashUntil) {
+    p.faceX = MOVE.x;
+    p.faceY = MOVE.y;
   }
   if (p.stats.regen > 0) healPlayer(s, p, p.stats.regen * DT, false);
 }

@@ -8,7 +8,7 @@ import { TICK_RATE } from '../constants';
 import { TWO_PI, dcos, dsin } from '../dmath';
 import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_SHURIKEN, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { AIM, RETRY_TICKS, aim, ticks } from './common';
+import { AIM, MUZZLE_X, MUZZLE_Y, RETRY_TICKS, aim, muzzle, ticks } from './common';
 
 /** half-size of the bounce box around the player (the screen at normal zoom is about 1400 x 860) */
 export const SHURIKEN_BOX_X = 640;
@@ -32,8 +32,9 @@ export function shuriken(s: GameState, p: Player, w: WeaponInst, slot: number, L
     b.owner = p.index;
     b.slot = slot;
     b.weapon = w.def;
-    b.x = b.px = p.x;
-    b.y = b.py = p.y;
+    muzzle(p, a);
+    b.x = b.px = MUZZLE_X;
+    b.y = b.py = MUZZLE_Y;
     b.vx = dcos(a) * speed;
     b.vy = dsin(a) * speed;
     b.r = (L.size ?? 15) * p.stats.area;

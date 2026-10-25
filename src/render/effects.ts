@@ -25,6 +25,7 @@ import {
   EV_LAND,
   EV_VICTORY,
   EV_ARENA,
+  EV_DASH,
   EV_MAP_ITEM,
   EV_FUSION,
   EV_GEM,
@@ -97,7 +98,8 @@ export type SfxName =
   | 'wave'
   | 'hatch'
   | 'bossLaser'
-  | 'cage';
+  | 'cage'
+  | 'dash';
 
 export interface FxHooks {
   sfx(name: SfxName, v?: number): void;
@@ -514,6 +516,12 @@ export class Effects {
           this.ring(e.x, e.y, 420, 11, 1.2);
           this.burst(e.x, e.y, 90, 11, 460, 1.2, 5);
           h.toast(t('toasts.victory'), '#ffd23a');
+          break;
+        case EV_DASH:
+          // a puff left behind, sparks thrown backwards
+          this.burst(e.x, e.y, 10, 1, 160, 0.3, 2);
+          this.burst(e.x - e.v * 10, e.y - e.k * 10, 6, 0, 240, 0.25, 2);
+          h.sfx('dash');
           break;
         case EV_CLONE_END:
           this.burst(e.x, e.y, 18, 17, 160, 0.5, 3);

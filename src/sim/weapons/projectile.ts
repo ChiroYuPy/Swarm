@@ -7,28 +7,20 @@ import { TICK_RATE } from '../constants';
 import { TWO_PI, dcos, dsin } from '../dmath';
 import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_BULLET, emit, type GameState, type Player, type Projectile, type WeaponInst } from '../state';
-import { AIM, RETRY_TICKS, aim, cdTicks, ticks } from './common';
+import { AIM, MUZZLE_X, MUZZLE_Y, RETRY_TICKS, aim, cdTicks, muzzle, ticks } from './common';
 
-/** Bullet of player `p`, starting from (ox, oy) (by default, from the player). */
-export function spawnBullet(
-  s: GameState,
-  p: Player,
-  slot: number,
-  def: number,
-  a: number,
-  L: WeaponLevel,
-  ox = p.x,
-  oy = p.y,
-): Projectile | null {
+/** Bullet of player `p` in direction `a`, leaving from just outside its body. */
+export function spawnBullet(s: GameState, p: Player, slot: number, def: number, a: number, L: WeaponLevel): Projectile | null {
   const b = spawnProjectile(s);
   if (!b) return null;
+  muzzle(p, a);
   const speed = L.speed ?? 450;
   b.kind = PJ_BULLET;
   b.owner = p.index;
   b.slot = slot;
   b.weapon = def;
-  b.x = b.px = ox;
-  b.y = b.py = oy;
+  b.x = b.px = MUZZLE_X;
+  b.y = b.py = MUZZLE_Y;
   b.vx = dcos(a) * speed;
   b.vy = dsin(a) * speed;
   b.life = Math.round((L.life ?? 1.2) * TICK_RATE);

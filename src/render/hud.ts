@@ -62,6 +62,21 @@ export interface HudOptions {
   difficulty: DifficultyDef;
   /** real time (animations) */
   time: number;
+  /** seconds since the hero landed at run start (the HUD comes in piece by piece), undefined afterwards */
+  landed?: number;
+}
+
+/** HUD cascade after the landing: piece `i` slides in from (dx, dy). Returns false while it is not shown yet. */
+function enter(ctx: Ctx, opt: HudOptions, i: number, dx: number, dy: number): boolean {
+  ctx.save();
+  if (opt.landed === undefined) return true;
+  const f = Math.min(1, Math.max(0, (opt.landed - 0.3 - i * 0.16) / 0.3));
+  if (f <= 0) return false;
+  // Back-out easing: overshoots a little before settling.
+  const e = 1 + 2.7 * Math.pow(f - 1, 3) + 1.7 * Math.pow(f - 1, 2);
+  ctx.globalAlpha = f;
+  ctx.translate(dx * (1 - e), dy * (1 - e));
+  return true;
 }
 
 // Icons converted to ImageBitmap: drawing a source canvas every frame forces a costly GPU copy.
@@ -462,25 +477,46 @@ function activeEffects(s: GameState, p: Player): { kind: number; left: number; t
 }
 
 export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOptions): void {
-  const p = s.players[0];
   const score = computeScore(s);
   const blink = Math.floor(opt.time * 3) % 2 === 0;
   ctx.textBaseline = 'middle';
 
   // ---------- Top center: band (wave strip or boss), timer below ----------
+  if (enter(ctx, opt, 0, 0, -40)) drawTopCenter(ctx, s, W, opt, blink, score.survivedSec);
+  ctx.restore();
+
+  // ---------- Top left: the score, and the mode ----------
+  if (enter(ctx, opt, 1, -60, 0)) drawTopLeft(ctx, opt, score.score);
+  ctx.restore();
+
+  // ---------- Bottom center: main bar (HP, XP, weapons, item, passives), timed bonuses above it ----------
+  if (enter(ctx, opt, 2, 0, 60)) drawBottom(ctx, s, W, H, opt, blink);
+  ctx.restore();
+
+  if (opt.showFps) {
+    ctx.textAlign = 'right';
+    ctx.font = '12px monospace';
+    ctx.fillStyle = opt.fps >= 55 ? '#39ff7a' : opt.fps >= 40 ? '#ffe14d' : '#ff3d6e';
+    const fps = { fps: opt.fps.toFixed(0), res: Math.round((opt.resolution ?? 1) * 100), enemies: s.enemyCount, proj: s.projCount, gems: s.gemCount };
+    ctx.fillText(t('hud.fps', fps), W - 16, H - 12);
+  }
+}
+
+function drawTopCenter(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink: boolean, survivedSec: number): void {
   const boss = findBoss(s);
   if (boss) drawBossBand(ctx, boss, W);
   else drawWaveStrip(ctx, s, W, opt, blink);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `700 28px ${FONT}`;
-  glowText(ctx, formatTime(score.survivedSec), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
+  glowText(ctx, formatTime(survivedSec), W / 2, BAND_Y + BAND_H + 24, COLORS.player);
+}
 
-  // ---------- Top left: the score, and the mode ----------
+function drawTopLeft(ctx: Ctx, opt: HudOptions, scoreValue: number): void {
   const lx = 18;
   ctx.font = `700 34px ${FONT}`;
   ctx.textAlign = 'left';
-  glowText(ctx, pad7(score.score), lx, 30, '#ffe14d');
+  glowText(ctx, pad7(scoreValue), lx, 30, '#ffe14d');
   ctx.font = `700 14px ${FONT}`;
   ctx.fillStyle = opt.difficulty.color;
   const mode = difficultyName(opt.difficulty.id);
@@ -489,8 +525,10 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
     ctx.fillStyle = COLORS.sandbox;
     ctx.fillText(t(opt.sandbox.invincible ? 'hud.sandboxInvincible' : 'hud.sandbox'), lx + ctx.measureText(mode).width + 8, 60);
   }
+}
 
-  // ---------- Bottom center: main bar (HP, XP, weapons, item, passives) ----------
+function drawBottom(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOptions, blink: boolean): void {
+  const p = s.players[0];
   const ws = 46; // weapon slot
   const ps = 40; // passive slot
   const as = 52; // active item
@@ -578,13 +616,5 @@ export function drawHud(ctx: Ctx, s: GameState, W: number, H: number, opt: HudOp
   if (opt.replay) {
     label(ctx, t('hud.replay', { speed: opt.replay.speed }), W / 2, top - 92, 'center', '#ffe14d');
     bar(ctx, W / 2 - 200, top - 80, 400, 4, opt.replay.progress, '#ffe14d', '');
-  }
-
-  if (opt.showFps) {
-    ctx.textAlign = 'right';
-    ctx.font = '12px monospace';
-    ctx.fillStyle = opt.fps >= 55 ? '#39ff7a' : opt.fps >= 40 ? '#ffe14d' : '#ff3d6e';
-    const fps = { fps: opt.fps.toFixed(0), res: Math.round((opt.resolution ?? 1) * 100), enemies: s.enemyCount, proj: s.projCount, gems: s.gemCount };
-    ctx.fillText(t('hud.fps', fps), W - 16, H - 12);
   }
 }

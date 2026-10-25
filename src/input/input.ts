@@ -1,15 +1,15 @@
 /**
  * Keyboard + gamepad input. Produces a sim input code (see sim/inputcodec.ts).
  * Uses `KeyboardEvent.code` (physical position): WASD on QWERTY = ZQSD on AZERTY.
- * Manual aim (optional): left mouse button held on the game, or the gamepad's right stick;
- * otherwise the weapons aim on their own.
+ * Manual aim (optional): a left click on the game turns it on, another one turns it off; or the gamepad's
+ * right stick. Otherwise the weapons aim on their own. Dash: Shift, right click on the game, gamepad RB.
  */
 import { aimDir, encodeMove } from '../sim';
 
 /** Cursor too close to the hero (px): the last aim direction is kept. */
 const AIM_DEADZONE = 14;
 
-export type UiAction = 'pause' | 'mute' | 'use' | 'confirm' | 'back' | 'left' | 'right' | 'up' | 'down' | 'choice1' | 'choice2' | 'choice3' | 'fps' | 'speed1' | 'speed2' | 'speed4';
+export type UiAction = 'pause' | 'mute' | 'use' | 'dash' | 'confirm' | 'back' | 'left' | 'right' | 'up' | 'down' | 'choice1' | 'choice2' | 'choice3' | 'fps' | 'speed1' | 'speed2' | 'speed4';
 
 const UP = ['KeyW', 'ArrowUp'];
 const DOWN = ['KeyS', 'ArrowDown'];
@@ -22,7 +22,7 @@ export class InputManager {
   private padY = 0;
   private padButtons: boolean[] = [];
   private padAim = -1;
-  /** left button held on the game: aimed surface and pointer position */
+  /** manual aim turned on by a left click on the game: aimed surface (null = off) and pointer position */
   private aimSurface: Element | null = null;
   private pointerX = 0;
   private pointerY = 0;
@@ -49,16 +49,24 @@ export class InputManager {
     target.addEventListener('pointerdown', (e) => {
       this.pointerX = e.clientX;
       this.pointerY = e.clientY;
-      if (e.button === 0 && e.target instanceof HTMLCanvasElement) this.aimSurface = e.target;
+      if (!(e.target instanceof HTMLCanvasElement)) return;
+      if (e.button === 0) this.setAim(this.aimSurface ? null : e.target);
+      else if (e.button === 2) this.fire('dash');
+    });
+    // Right click on the game is the dash, not the browser menu.
+    target.addEventListener('contextmenu', (e) => {
+      if (e.target instanceof HTMLCanvasElement) e.preventDefault();
     });
     target.addEventListener('pointermove', (e) => {
       this.pointerX = e.clientX;
       this.pointerY = e.clientY;
     });
-    target.addEventListener('pointerup', (e) => {
-      if (e.button === 0) this.aimSurface = null;
-    });
-    target.addEventListener('pointercancel', () => (this.aimSurface = null));
+  }
+
+  /** Manual aim on (aimed surface) or off; the body class lets the cursor show the dot while it is on. */
+  private setAim(surface: Element | null): void {
+    this.aimSurface = surface;
+    document.body.classList.toggle('aim-on', !!surface);
   }
 
   onAction(fn: (a: UiAction) => void): void {
@@ -107,6 +115,10 @@ export class InputManager {
       case 'Numpad4':
         this.fire('speed4');
         break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.fire('dash');
+        break;
       case 'F3':
         this.fire('fps');
         break;
@@ -144,6 +156,7 @@ export class InputManager {
     if (pressed(9)) this.fire('pause');
     if (pressed(0)) this.fire('confirm');
     if (pressed(2)) this.fire('use');
+    if (pressed(5)) this.fire('dash');
     if (pressed(1)) this.fire('back');
     if (pressed(14)) this.fire('left');
     if (pressed(15)) this.fire('right');
@@ -191,6 +204,6 @@ export class InputManager {
 
   clear(): void {
     this.keys.clear();
-    this.aimSurface = null;
+    this.setAim(null);
   }
 }

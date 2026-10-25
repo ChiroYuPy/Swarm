@@ -16,6 +16,7 @@ import {
   InputLog,
   ReplayCursor,
   INPUT_USE,
+  INPUT_DASH,
   type GameConfig,
   type GameState,
   type Offer,
@@ -55,12 +56,15 @@ export class App implements AppApi {
   private readonly menuDemo: MenuDemo;
   /** start of the hero's fall (performance.now), -1 outside the fall */
   private dropAt = -1;
+  /** when the hero landed (performance.now()), -1 if not in the arrival anymore */
+  private landedAt = -1;
   private readonly log = new InputLog();
   /** last finished run, replayable from the end screen (in memory only) */
   private lastRun: { config: GameConfig; codes: Uint8Array } | null = null;
   private replay: { cursor: ReplayCursor; speed: number } | null = null;
   /** the active item was requested (Space): applied on the next sim step */
   private usePending = false;
+  private dashPending = false;
   private acc = 0;
   private last = performance.now();
   private deathTimer = 0;
@@ -190,6 +194,7 @@ export class App implements AppApi {
     this.runFinished = false;
     this.victoryShown = false;
     this.usePending = false;
+    this.dashPending = false;
     this.log.clear();
     this.fx.reset(this.state.seed);
     this.acc = 0;
@@ -197,6 +202,7 @@ export class App implements AppApi {
     this.mode = 'playing';
     // Arrival: the hero is dropped from above and lands right on the music's impact.
     this.dropAt = this.botMode || this.stressMode ? -1 : performance.now();
+    this.landedAt = -1;
     this.ui.hide();
     this.input.clear();
     this.audio.unlock();
@@ -320,6 +326,7 @@ export class App implements AppApi {
         if (this.dropAt >= 0) break; // during the fall, the run has not started yet
         if (a === 'pause') this.pause();
         else if (a === 'use' || a === 'confirm') this.usePending = true;
+        else if (a === 'dash') this.dashPending = true;
         break;
       case 'levelup':
         if (a === 'pause') this.pause();
@@ -438,6 +445,16 @@ export class App implements AppApi {
         step(s, [c]);
       }
     }
+    // Dash: recorded only when it can happen (not on cooldown).
+    if (this.dashPending && !this.botMode) {
+      this.dashPending = false;
+      const p = s.players[0];
+      if (p.alive && s.tick >= p.dashReadyAt) {
+        this.log.push(INPUT_DASH);
+        step(s, [INPUT_DASH]);
+        this.fx.consume(s);
+      }
+    }
     const code = this.botMode ? botInput(s, 0) : this.input.sampleCode();
     this.log.push(code);
     step(s, [code]);
@@ -454,6 +471,7 @@ export class App implements AppApi {
       this.victoryShown = true;
       this.mode = 'victory';
       this.usePending = false;
+      this.dashPending = false;
       this.audio.setDuck(0.5);
       this.ui.showVictory(this.runInfo());
       return;
@@ -461,6 +479,7 @@ export class App implements AppApi {
     if (!this.botMode && isAwaitingChoice(s)) {
       this.mode = 'levelup';
       this.usePending = false;
+      this.dashPending = false;
       this.audio.setDuck(0.6);
       this.showLevelUp();
     }
@@ -509,7 +528,17 @@ export class App implements AppApi {
   /** End of the fall: shake, shockwaves and sparks around the hero. */
   private land(): void {
     this.dropAt = -1;
+    this.landedAt = performance.now();
     landingFx(this.fx, this.state.players[0]);
+  }
+
+  /** Seconds since the landing while the arrival still plays (reveal, HUD cascade), undefined afterwards. */
+  private landedSeconds(now: number): number | undefined {
+    if (this.landedAt < 0 || this.mode === 'menu') return undefined;
+    const t = (now - this.landedAt) / 1000;
+    if (t < 1.5) return t;
+    this.landedAt = -1;
+    return undefined;
   }
 
   /** Fall progress (0 → 1), or -1 outside the fall. */
@@ -567,7 +596,7 @@ export class App implements AppApi {
           }
           if (++n >= PLAY_CATCHUP) {
             // Machine too slow: do not catch up forever (otherwise each frame costs even more than the
-            // previous one and everything lags, cursor included). The game slows down a little instead.
+            // previous one and everything lags). The game slows down a little instead.
             this.acc = 0;
             break;
           }
@@ -620,6 +649,7 @@ export class App implements AppApi {
       hud: !this.demo && drop < 0 && this.mode !== 'paused' && this.mode !== 'victory',
       zoom,
       drop: drop >= 0 ? drop : undefined,
+      landed: this.landedSeconds(now),
       showFps: this.save.settings.showFps && !this.demo,
       fps: this.fps.fps,
       resolution: this.renderer.resolution,

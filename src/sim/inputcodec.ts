@@ -9,6 +9,7 @@
  *   131..194  aim in direction (code-131) × 360°/64 ("zero-time" step, recorded when the aim changes)
  *   200..202  pick offer 0, 1 or 2 at level-up ("zero-time" step, time does not advance)
  *   210       use the active item ("zero-time" step)
+ *   211       dash ("zero-time" step)
  *   220..224  at level-up, swap the weapon in slot (code-220); 229 cancel ("zero-time" step)
  *
  * Log: RLE (value byte + length as LEB128 varint), then base64, prefixed with the format version.

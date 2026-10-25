@@ -10,6 +10,12 @@ export const HERO = {
   radius: 14,
   /** invulnerability after a hit (seconds) */
   iframes: 0.2,
+  /** dash (Shift, right click, gamepad RB): distance (units) covered in `seconds`, invulnerable for `invuln` s, then `cooldown` s before the next one */
+  dash: { distance: 96, seconds: 0.15, invuln: 0.25, cooldown: 1.1 },
+  /** shots leave from this far in front of the hero's centre (just outside its body) */
+  muzzle: 18,
+  /** manual aim assist: the shot goes to the nearest enemy within this half-angle (degrees) of the aimed direction */
+  aimAssist: 20,
   startWeapon: 'blaster',
 };
 

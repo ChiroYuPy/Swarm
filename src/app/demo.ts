@@ -5,7 +5,7 @@ import { botInput } from '../ai/bot';
 /**
  * Demo behind the menu: the bot plays a sandbox game that is already under way (minute 6, more
  * enemies, hero equipped and invincible) so a real swarm is on screen right away.
- * Kept moderate: it runs behind the menus, which must stay smooth (the cursor depends on it).
+ * Kept moderate: it runs behind the menus, which must stay smooth.
  */
 const DEMO_SANDBOX: SandboxConfig = {
   invincible: true,

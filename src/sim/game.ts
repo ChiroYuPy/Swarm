@@ -9,13 +9,13 @@
  */
 import { HERO, SCORE, xpForLevel } from '../data/hero';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
-import { DT, GAME_VERSION, INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_SWAP_BASE, INPUT_SWAP_CANCEL, INPUT_USE, MAX_PLAYERS, SIM_VERSION } from './constants';
+import { DT, GAME_VERSION, INPUT_AIM_AUTO, INPUT_AIM_BASE, INPUT_CHOICE_BASE, INPUT_DIRS, INPUT_SWAP_BASE, INPUT_SWAP_CANCEL, INPUT_USE, INPUT_DASH, MAX_PLAYERS, SIM_VERSION } from './constants';
 import { WorldMap } from './map';
 import { Rng, STREAM, deriveSeed, hashString } from './rng';
 import { SpatialGrid } from './grid';
 import { NavField } from './navfield';
 import { Player, makePools, emit, EF_BOSS, EV_CLONE_END, type GameState } from './state';
-import { computeStats, updatePlayer, useActivable } from './player';
+import { computeStats, startDash, updatePlayer, useActivable } from './player';
 import { LOOT } from '../data/loot';
 import { addWeapon, applyChoice, handleSwapCode, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
@@ -126,7 +126,7 @@ export function isAwaitingChoice(s: GameState, player = 0): boolean {
  * Advances the simulation by one step. `inputs[i]` = input code of player i.
  * If a player must pick an upgrade, the world is frozen: the step only applies
  * a possible choice code (200..202) without advancing time.
- * Code 210 (use the active item) and the aim codes (130..194) are "zero-time" steps too.
+ * Codes 210 (use the active item), 211 (dash) and the aim codes (130..194) are "zero-time" steps too.
  */
 export function step(s: GameState, inputs: ArrayLike<number>): void {
   s.eventCount = 0;
@@ -153,6 +153,9 @@ export function step(s: GameState, inputs: ArrayLike<number>): void {
         processShatters(s);
         compactEnemies(s);
       }
+      consumed = true;
+    } else if (code === INPUT_DASH) {
+      if (p.alive && p.pendingLevels === 0) startDash(s, p);
       consumed = true;
     }
   }
