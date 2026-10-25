@@ -2,7 +2,7 @@ import { version } from '../../package.json';
 import { MAP_GEN } from '../data/map';
 
 /** Simulation version: bump it as soon as a change breaks replay compatibility. */
-export const SIM_VERSION = 19;
+export const SIM_VERSION = 21;
 /** Displayed game version, stored in scores. */
 export const GAME_VERSION: string = version;
 
@@ -13,7 +13,7 @@ export const DT = 1 / TICK_RATE;
 export const CHUNK = MAP_GEN.chunk;
 
 export const MAX_PLAYERS = 4;
-export const MAX_WEAPON_SLOTS = 5;
+export const MAX_WEAPON_SLOTS = 6;
 export const MAX_PASSIVE_SLOTS = 4;
 export const MAX_ITEM_LEVEL = 5;
 

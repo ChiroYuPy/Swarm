@@ -2,13 +2,14 @@
  * Sandbox screen: the free-play settings (definitions, left / right stepping, painting) and the
  * starting loadout tiles, foe and boss duel tiles. Values live in ui.app.save.sandbox.
  */
-import { ALL_WEAPONS, BASE_WEAPONS, FUSED_WEAPONS } from '../../data/weapons';
+import { ALL_WEAPONS, BASE_WEAPONS } from '../../data/weapons';
+import { FUSIONS } from '../../data/fusions';
 import { PASSIVES } from '../../data/passives';
 import { BOSS_ORDER, ENEMIES } from '../../data/enemies';
 import { PICKUPS } from '../../data/loot';
 import { DIFFICULTIES } from '../../data/difficulty';
 import { WAVES } from '../../data/waves';
-import { MAX_DUEL_MARK, MAX_PASSIVE_SLOTS, MAX_START_WAVE, MAX_WEAPON_SLOTS } from '../../sim';
+import { MAX_DUEL_MARK, MAX_ITEM_LEVEL, MAX_PASSIVE_SLOTS, MAX_START_WAVE, MAX_WEAPON_SLOTS } from '../../sim';
 import { defaultSandbox } from '../../storage/storage';
 import { t } from '../../i18n';
 import { difficultyName, enemyName, enemyShortName, passiveName, pickupName, weaponName } from '../../i18n/content';
@@ -151,8 +152,6 @@ export function showSandbox(ui: UI): void {
       <div class="panel loadout">
         <h3 class="rule">${t('common.weapons')} <small class="slots" data-slots="w"></small></h3>
         <div class="tiles">${BASE_WEAPONS.map((w) => kit('w', w.id, weaponName(w.id), w.color, `weapon:${w.id}`)).join('')}</div>
-        <h3 class="rule">${t('common.evolutions')}</h3>
-        <div class="tiles">${FUSED_WEAPONS.map((w) => kit('w', w.id, weaponName(w.id), w.color, `weapon:${w.id}`)).join('')}</div>
         <h3 class="rule">${t('common.passives')} <small class="slots" data-slots="p"></small></h3>
         <div class="tiles">${PASSIVES.map((x) => kit('p', x.id, passiveName(x.id), x.color, `passive:${x.id}`)).join('')}</div>
       </div>
@@ -221,14 +220,26 @@ function stepSandbox(ui: UI, row: HTMLElement, delta: number): void {
 }
 
 /** Gear tile: next (or previous) level, back to "not equipped" after the max level. */
+/** The evolution of a base weapon, or null. */
+const evolutionOf = (id: string) => FUSIONS.find((f) => f.weapon === id)?.result ?? null;
+
+/** The loadout entry of a tile: the weapon or passive, or (weapons) its evolution; and its level, the evolution being level 6. */
+function kitEntry(list: { id: string; level: number }[], kind: string, id: string): { cur: { id: string; level: number } | undefined; level: number } {
+  const evo = kind === 'w' ? evolutionOf(id) : null;
+  const cur = list.find((x) => x.id === id || (evo !== null && x.id === evo));
+  return { cur, level: !cur ? 0 : cur.id === evo ? MAX_ITEM_LEVEL + 1 : cur.level };
+}
+
+/** A loadout tile goes up (or down) one level, wrapping around; a weapon with an evolution has it after level 5. */
 function stepKit(ui: UI, tile: HTMLElement, delta: number): void {
   const r = ui.app.save.sandbox.rules;
   const [kind, id] = tile.dataset.kit!.split(':');
   const list = kind === 'w' ? r.weapons : r.passives;
-  const max = kind === 'w' ? ALL_WEAPONS.find((w) => w.id === id)!.levels.length : 5;
+  const evo = kind === 'w' ? evolutionOf(id) : null;
+  const max = MAX_ITEM_LEVEL + (evo ? 1 : 0);
   const cap = kind === 'w' ? MAX_WEAPON_SLOTS : MAX_PASSIVE_SLOTS;
-  const cur = list.find((x) => x.id === id);
-  const next = ((cur?.level ?? 0) + delta + max + 1) % (max + 1);
+  const { cur, level } = kitEntry(list, kind, id);
+  const next = (level + delta + max + 1) % (max + 1);
   if (!cur && next > 0 && list.length >= cap) {
     // Slots full: the counter blinks, nothing changes.
     const slots = ui.screenEl?.querySelector<HTMLElement>(`[data-slots="${kind}"]`);
@@ -237,9 +248,10 @@ function stepKit(ui: UI, tile: HTMLElement, delta: number): void {
     slots?.classList.add('full');
     return;
   }
+  const entry = evo && next > MAX_ITEM_LEVEL ? { id: evo, level: 1 } : { id, level: next };
   if (cur && next === 0) list.splice(list.indexOf(cur), 1);
-  else if (cur) cur.level = next;
-  else list.push({ id, level: next });
+  else if (cur) Object.assign(cur, entry);
+  else list.push(entry);
   paintSandbox(ui);
 }
 
@@ -300,10 +312,21 @@ function paintSandbox(ui: UI): void {
   });
   el.querySelectorAll<HTMLElement>('.kit').forEach((tile) => {
     const [kind, id] = tile.dataset.kit!.split(':');
-    const it = (kind === 'w' ? r.weapons : r.passives).find((x) => x.id === id);
-    const fusion = kind === 'w' && !!ALL_WEAPONS.find((w) => w.id === id)!.fusion;
-    tile.classList.toggle('on', !!it);
-    tile.querySelector('.lv')!.textContent = it ? (fusion ? t('sandbox.equipped') : t('common.lvlCap', { n: it.level })) : '—';
+    const { cur, level } = kitEntry(kind === 'w' ? r.weapons : r.passives, kind, id);
+    const evolved = level > MAX_ITEM_LEVEL;
+    tile.classList.toggle('on', !!cur);
+    tile.classList.toggle('evolved', evolved);
+    tile.querySelector('.lv')!.textContent = !cur ? '—' : evolved ? t('codex.evo') : t('common.lvlCap', { n: level });
+    // An evolved weapon shows its evolution (icon, name, colour).
+    const shown = evolved ? cur!.id : id;
+    const ico = tile.querySelector<HTMLElement>('.ico')!;
+    if (ico.dataset.icon !== `weapon:${shown}` && kind === 'w') {
+      ico.dataset.icon = `weapon:${shown}`;
+      ico.replaceChildren();
+      paintIcons(tile, 40);
+      tile.querySelector('.nm')!.textContent = weaponName(shown);
+      tile.style.setProperty('--c', ALL_WEAPONS.find((w) => w.id === shown)!.color);
+    }
   });
   el.querySelector('[data-slots="w"]')!.textContent = `${r.weapons.length}/${MAX_WEAPON_SLOTS}`;
   el.querySelector('[data-slots="p"]')!.textContent = `${r.passives.length}/${MAX_PASSIVE_SLOTS}`;

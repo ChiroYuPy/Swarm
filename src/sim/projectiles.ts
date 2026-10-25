@@ -16,8 +16,6 @@ import {
   BEE_RING,
   BEE_STUCK,
   RING_FADE,
-  SHURIKEN_BOX_X,
-  SHURIKEN_BOX_Y,
   beeTarget,
   ringAngle,
   spawnBlaze,
@@ -233,13 +231,15 @@ function shuriken(s: GameState, b: Projectile): boolean {
   if (!o || !o.alive) return true;
   b.x += b.vx * DT;
   b.y += b.vy * DT;
-  if (b.x > o.x + SHURIKEN_BOX_X || b.x < o.x - SHURIKEN_BOX_X) {
+  const bx = s.boxX;
+  const by = s.boxY;
+  if (b.x > o.x + bx || b.x < o.x - bx) {
     b.vx = b.x > o.x ? -Math.abs(b.vx) : Math.abs(b.vx);
-    b.x = b.x > o.x ? o.x + SHURIKEN_BOX_X : o.x - SHURIKEN_BOX_X;
+    b.x = b.x > o.x ? o.x + bx : o.x - bx;
   }
-  if (b.y > o.y + SHURIKEN_BOX_Y || b.y < o.y - SHURIKEN_BOX_Y) {
+  if (b.y > o.y + by || b.y < o.y - by) {
     b.vy = b.y > o.y ? -Math.abs(b.vy) : Math.abs(b.vy);
-    b.y = b.y > o.y ? o.y + SHURIKEN_BOX_Y : o.y - SHURIKEN_BOX_Y;
+    b.y = b.y > o.y ? o.y + by : o.y - by;
   }
   const w = ownerWeapon(o, b.weapon);
   const hitCd = Math.round((w ? (weaponLevel(b.weapon, w.level).hitCd ?? 0.3) : 0.3) * TICK_RATE);
@@ -408,16 +408,8 @@ function shell(s: GameState, b: Projectile): boolean {
   return true;
 }
 
-/** a mine caught in another one's blast goes off this many ticks later (the chain reaction is visible) */
-const CHAIN_TICKS = 6;
-
-/** Mine: armed after `a` ticks, goes off when an enemy enters its trigger radius, or when a blast sets it off. */
+/** Mine: armed after `a` ticks, goes off when an enemy enters its trigger radius (or at the end of its life). */
 function mine(s: GameState, b: Projectile): boolean {
-  if (b.d > 0) {
-    if (--b.d > 0) return false;
-    mineBlast(s, b);
-    return true;
-  }
   if (b.age < b.a) return false;
   const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, b.c);
@@ -438,22 +430,22 @@ function mine(s: GameState, b: Projectile): boolean {
   return true;
 }
 
-/** A mine explodes and sets off the same player's other mines inside its blast. */
 function mineBlast(s: GameState, b: Projectile): void {
   explode(s, b.x, b.y, b.b, b.damage, b.owner, b.knock);
-  for (let j = 0; j < s.projCount; j++) {
-    const o = s.projectiles[j];
-    if (o === b || o.kind !== PJ_MINE || o.owner !== b.owner || o.d > 0 || o.life <= 0) continue;
-    const dx = o.x - b.x;
-    const dy = o.y - b.y;
-    if (dx * dx + dy * dy <= b.b * b.b) o.d = CHAIN_TICKS;
-  }
+}
+
+/** Mine boomerang: a mini mine where the boomerang turns back (its farthest point). */
+function dropMine(s: GameState, b: Projectile, o: Player): void {
+  const L = weaponLevel(b.weapon, 1);
+  if (!L.mineDamage) return;
+  spawnMine(s, b.owner, b.weapon, b.x, b.y, L.mineDamage * o.stats.might, (L.mineRadius ?? 60) * o.stats.area, 26, 3 * TICK_RATE, 8, 120);
 }
 
 /**
  * Boomerang: out along (vx, vy) for `b` ticks, fast at the throw and slowing down to a stop at range `d`, then
  * back to where the player is now, mirroring the way out (slow start, back to full speed when it arrives).
- * (tx, ty) = start point, then the turning point. Each way hits an enemy once.
+ * (tx, ty) = start point, then the turning point. Each way hits an enemy once. The Mine boomerang drops a mine
+ * at the turning point.
  */
 function boomerang(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
@@ -465,6 +457,7 @@ function boomerang(s: GameState, b: Projectile): boolean {
       b.tx = b.x;
       b.ty = b.y;
       b.hitCount = 0;
+      dropMine(s, b, o);
     } else {
       const f = dsin((k * PI) / 2);
       b.x = b.tx + b.vx * b.d * f;
@@ -477,28 +470,6 @@ function boomerang(s: GameState, b: Projectile): boolean {
     const f = 1 - dcos((k * PI) / 2);
     b.x = b.tx + (o.x - b.tx) * f;
     b.y = b.ty + (o.y - b.ty) * f;
-  }
-
-  // Mine boomerang: drops mini mines along the way.
-  const L = weaponLevel(b.weapon, 1);
-  if (L.dropEvery) {
-    b.c -= 1;
-    if (b.c <= 0) {
-      b.c += Math.max(1, Math.round(L.dropEvery * TICK_RATE));
-      spawnMine(
-        s,
-        b.owner,
-        b.weapon,
-        b.x,
-        b.y,
-        (L.mineDamage ?? 25) * o.stats.might,
-        (L.mineRadius ?? 60) * o.stats.area,
-        26,
-        3 * TICK_RATE,
-        8,
-        120,
-      );
-    }
   }
 
   const mx = b.x - b.px;

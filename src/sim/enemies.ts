@@ -1,9 +1,13 @@
-/** Enemy and boss AI, separation, contact with players. */
-import { ENEMIES, type BossConfig, type BossLay, type BossPhaseKind } from '../data/enemies';
+/**
+ * Enemy and boss AI, steering, shape-aware collisions between enemies, the boss arena, contact with players.
+ * Movement: each behaviour says where it wants to go; the enemy accelerates toward that velocity (no
+ * instant change), turns its facing progressively, and slides along the enemies it brushes against.
+ */
+import { ENEMIES, type BossConfig, type BossLay, type BossPhaseKind, type EnemyShape } from '../data/enemies';
 import { LOOT } from '../data/loot';
 import { WAVES } from '../data/waves';
 import { DT, TICK_RATE } from './constants';
-import { PI, TWO_PI, dcos, datan2, dsin, turnToward } from './dmath';
+import { PI, TWO_PI, clamp, dcos, datan2, dsin, turnToward } from './dmath';
 import { AVOID, avoidance, circleHitsObstacle, moveCircle, segmentClear } from './map';
 import { spawnEnemy, spawnProjectile } from './entities';
 import { explode, hurtPlayer, nearestPlayer } from './combat';
@@ -15,19 +19,19 @@ import {
   EGG_TYPE,
   ENEMY_BEHAVIOR,
   HATCH_INTO,
-  RALLY_SPEED,
   WALL_RISE,
   WALL_TYPE,
 } from './registry';
 import { dmgMul, hpMul, spdMul } from './spawner';
+import { deriveSeed } from './rng';
 import {
   EF_BOSS,
   EF_PROP,
-  EV_BLINK,
   EV_CAGE,
   EV_ENEMY_SHOT,
   EV_FUSE,
   EV_HATCH,
+  EV_LAND,
   EV_LASER,
   EV_RING_WAVE,
   EV_WALL_HIT,
@@ -39,8 +43,15 @@ import {
   type Player,
 } from './state';
 
-const SEP_STRENGTH = 95;
 const KB_DECAY = 0.82;
+/** facing turn rate (radians/s) */
+const FACE_TURN = 7;
+/** collisions: share of the overlap resolved per tick, cap per neighbour and per tick (units) */
+const SEP_SHARE = 0.5;
+const SEP_PAIR_MAX = 4;
+const SEP_MAX = 6;
+/** orbiters veer away from what they brush against (radians/s) */
+const VEER = 3;
 
 /** Desired direction (output of the steering functions), without allocation. */
 let DX = 0;
@@ -83,6 +94,61 @@ function pathDir(s: GameState, e: Enemy, dx: number, dy: number, dist: number): 
   DY = uy;
 }
 
+/**
+ * Outline of each shape, for collisions: a regular polygon (sides, circumradius × radius, angle of a vertex
+ * in the facing frame) or a disc (sides 0). The diamond has its own formula.
+ */
+const OUTLINE: Record<EnemyShape, [number, number, number]> = {
+  triangle: [3, 1.15, 0],
+  dart: [3, 1.15, 0],
+  diamond: [0, 1, 0],
+  square: [4, 1.24, PI / 4],
+  pentagon: [5, 1, 0],
+  hexagon: [6, 1, PI / 6],
+  octagon: [8, 1, PI / 8],
+  circle: [0, 1, 0],
+  dot: [0, 1, 0],
+  bomb: [0, 1, 0],
+  box: [0, 1, 0],
+  trapezoid: [0, 1, 0],
+  star: [0, 1, 0],
+  eye: [0, 1, 0],
+  queen: [0, 1, 0],
+  block: [0, 1, 0],
+  egg: [0, 1, 0],
+};
+const OUT_SIDES = ENEMIES.map((d) => (d.shape === 'diamond' ? -1 : OUTLINE[d.shape][0]));
+const OUT_R = ENEMIES.map((d) => OUTLINE[d.shape][1] * d.radius);
+const OUT_A0 = ENEMIES.map((d) => OUTLINE[d.shape][2]);
+/** inradius / circumradius of a regular n-gon, for n = 0..8 */
+const IN_K = [1, 1, 1, 1, 1, 1, 1, 1, 1].map((v, n) => (n >= 3 ? dcos(PI / n) : v));
+/** widest outline over the radius (collision broad phase) */
+const OUT_MAX = 1.3;
+
+/** Distance from an enemy's centre to its outline in the world direction (nx, ny) (unit). */
+function extent(e: Enemy, nx: number, ny: number): number {
+  const sides = OUT_SIDES[e.type];
+  if (sides === 0) return e.r;
+  let fx = e.vx;
+  let fy = e.vy;
+  if (fx === 0 && fy === 0) fx = 1;
+  // the direction in the enemy's own frame (facing = +x)
+  const c = nx * fx + ny * fy;
+  const sn = ny * fx - nx * fy;
+  if (sides < 0) return 1 / (Math.abs(c) / (e.r * 1.25) + Math.abs(sn) / (e.r * 0.8));
+  const phi = datan2(sn, c);
+  const step = TWO_PI / sides;
+  const a0 = OUT_A0[e.type];
+  const k = Math.round((phi - a0 - step / 2) / step);
+  const face = a0 + step / 2 + k * step;
+  return (OUT_R[e.type] * IN_K[sides]) / Math.max(0.2, dcos(phi - face));
+}
+
+/** Deterministic value in [0, 1) for an enemy's own random choices (flight radius, hop side...). */
+function enemyRand(s: GameState, e: Enemy, salt: number): number {
+  return deriveSeed(s.seed, salt, e.id, s.tick) / 4294967296;
+}
+
 /** `breakable`: Shooter bullet, which the player's weapons can destroy (b.a = 1). */
 function fireEnemyBullet(s: GameState, x: number, y: number, angle: number, speed: number, damage: number, breakable = false): void {
   const b = spawnProjectile(s);
@@ -112,20 +178,250 @@ function keepAway(s: GameState, e: Enemy, dx: number, dy: number, dist: number, 
   }
 }
 
-/** Leader: rallies the enemies around it until the next tick (the effect dies with it). */
-function boostAround(s: GameState, e: Enemy, self: number, R: number): void {
-  const until = s.tick + 2;
-  const n = s.grid.query(s.enemies, e.x, e.y, R);
-  const out = s.grid.out;
-  for (let k = 0; k < n; k++) {
-    const j = out[k];
-    if (j === self) continue;
-    const o = s.enemies[j];
-    if (!o.alive || o.flags & (EF_PROP | EF_BOSS)) continue;
-    const ox = o.x - e.x;
-    const oy = o.y - e.y;
-    if (ox * ox + oy * oy < R * R) o.boostUntil = until;
+/** Shooter: keeps to its band, sliding sideways (`ax`: side, flipped every few seconds, `ay`: ticks before the flip). */
+function shooterMove(s: GameState, e: Enemy, dx: number, dy: number, dist: number, keepMin: number, keepMax: number): void {
+  if (dist > keepMax + 60) {
+    pathDir(s, e, dx, dy, dist);
+    return;
   }
+  if (e.ax === 0) {
+    e.ax = e.id & 1 ? 1 : -1;
+    e.ay = Math.round((2 + 2 * enemyRand(s, e, 0x73747266)) * TICK_RATE);
+  }
+  if (--e.ay <= 0) {
+    e.ax = -e.ax;
+    e.ay = Math.round((2 + 2 * enemyRand(s, e, 0x73747266)) * TICK_RATE);
+  }
+  const ux = dx / dist;
+  const uy = dy / dist;
+  const mid = (keepMin + keepMax) / 2;
+  const want = clamp((dist - mid) / ((keepMax - keepMin) / 2), -1, 1);
+  const side = 0.45 * e.ax;
+  DX = ux * want - uy * side;
+  DY = uy * want + ux * side;
+}
+
+/**
+ * Orbiter flight (data/enemies.ts EnemyFlight). ai: 0 new, 1 circling, 2 diving, 3 pulling out.
+ * aux = heading, aux2 = flight speed, ax = circle radius, ay = side (±1), timer = ticks before the dive
+ * (circling) or in the state (diving, pulling out). Sets the velocity directly.
+ */
+function fly(s: GameState, e: Enemy, p: Player, dx: number, dy: number, dist: number, speed: number, tf: number): void {
+  const f = ENEMIES[e.type].fly!;
+  if (e.ai === 0) {
+    e.ay = e.id & 1 ? 1 : -1;
+    e.aux = datan2(dy, dx) + e.ay * 1.2;
+    e.aux2 = e.speed * 0.7;
+    e.ax = f.orbit * (0.9 + 0.25 * enemyRand(s, e, 0x6f726231));
+    e.timer = Math.round((f.waitMin + (f.waitMax - f.waitMin) * enemyRand(s, e, 0x6f726232)) * TICK_RATE);
+    e.ai = 1;
+  }
+  // angle from the player to it
+  const phi = datan2(-dy, -dx);
+  let want = e.aux;
+  let wantV = e.speed;
+  let turn = f.turn;
+  if (e.ai === 1) {
+    e.timer -= tf;
+    e.ax = Math.max(f.orbit * 0.6, e.ax - f.tighten * DT * tf);
+    const err = clamp(((dist - e.ax) / e.ax) * 1.4, -0.9, 0.9);
+    want = phi + e.ay * (PI / 2 + err);
+    if (e.timer <= 0) {
+      e.ai = 2;
+      e.timer = 0;
+    }
+  } else if (e.ai === 2) {
+    // it lines up first (slowing down to turn), then dives straight: fast, but it cannot follow a dodge
+    want = datan2(dy, dx);
+    let off = want - e.aux;
+    while (off > PI) off -= TWO_PI;
+    while (off < -PI) off += TWO_PI;
+    wantV = Math.abs(off) < 0.35 ? f.dive : e.speed * 0.6;
+    turn = f.turn * 1.15;
+    e.timer += tf;
+    if (dist < e.r + p.r + 4 || e.timer > 2.6 * TICK_RATE) {
+      e.ai = 3;
+      e.timer = 0;
+    }
+  } else {
+    // carries on past the player and swings back out to the circle
+    want = phi + e.ay * 0.6;
+    wantV = f.dive * 0.75;
+    e.timer += tf;
+    if (dist > e.ax && e.timer > 0.5 * TICK_RATE) backToCircle(s, e);
+  }
+  if (speed <= 0) wantV = 0;
+  e.aux = turnToward(e.aux, want, turn * DT * tf);
+  e.aux2 += clamp(wantV - e.aux2, -f.accel * DT * tf, f.accel * DT * tf);
+  // slowed: it flies slower, by the same factor
+  const k = e.speed > 0 ? speed / e.speed : 0;
+  e.mvx = dcos(e.aux) * e.aux2 * k;
+  e.mvy = dsin(e.aux) * e.aux2 * k;
+}
+
+/** Orbiter: back to circling, at a new radius, for a new wait. */
+function backToCircle(s: GameState, e: Enemy): void {
+  const f = ENEMIES[e.type].fly!;
+  e.ai = 1;
+  e.ax = f.orbit * (0.9 + 0.25 * enemyRand(s, e, 0x6f726231));
+  e.timer = Math.round((f.waitMin + (f.waitMax - f.waitMin) * enemyRand(s, e, 0x6f726232)) * TICK_RATE);
+}
+
+/**
+ * Orbiter against something it cannot fly over (the arena ring), (nx, ny) pointing away from it:
+ * it glances off along it instead of pressing into it, and stops swinging out if that is where it was going.
+ */
+function flyerBlocked(s: GameState, e: Enemy, nx: number, ny: number): void {
+  const hx = dcos(e.aux);
+  const hy = dsin(e.aux);
+  const dot = hx * nx + hy * ny;
+  if (dot >= 0) return;
+  const tx = hx - dot * nx;
+  const ty = hy - dot * ny;
+  e.aux = tx * tx + ty * ty > 1e-6 ? datan2(ty, tx) : e.aux + PI / 2;
+  if (e.ai === 3) backToCircle(s, e);
+}
+
+/** Jumper states (ai). */
+const HOP_WALK = 0;
+const HOP_CROUCH = 1;
+const HOP_AIR = 2;
+const HOP_REST = 3;
+const HOP_CROUCH_BACK = 4;
+const HOP_AIR_BACK = 5;
+const HOP_REST_BACK = 6;
+
+/**
+ * Jumper (data/enemies.ts EnemyHop): `ax, ay` = landing spot, `aux, aux2` = take-off spot, timer = ticks
+ * left in the state (walking: before the next attack). Returns false while it walks (normal movement),
+ * true when it moves by itself (crouching, in the air, resting).
+ */
+function hop(s: GameState, e: Enemy, p: Player, dx: number, dy: number, dist: number, stunned: boolean, tf: number): boolean {
+  const d = ENEMIES[e.type];
+  const h = d.hop!;
+  const ticks = (sec: number) => Math.max(1, Math.round(sec * TICK_RATE));
+  switch (e.ai) {
+    case HOP_WALK: {
+      // keeps its distance, then jumps at the player's spot
+      if (dist > h.range * 0.8) pathDir(s, e, dx, dy, dist);
+      else if (dist < h.range * 0.62) {
+        DX = -dx / dist;
+        DY = -dy / dist;
+      }
+      e.timer -= tf;
+      if (e.timer <= 0 && dist < h.range && !stunned && !circleHitsObstacle(s.map, p.x, p.y, e.r)) {
+        e.ai = HOP_CROUCH;
+        e.ax = p.x;
+        e.ay = p.y;
+        e.timer = ticks(h.crouch);
+        emit(s, EV_FUSE, p.x, p.y, 2, e.type);
+      }
+      return false;
+    }
+    case HOP_CROUCH:
+    case HOP_CROUCH_BACK:
+      e.timer -= tf;
+      e.vx = e.ax - e.x;
+      e.vy = e.ay - e.y;
+      {
+        const l = Math.sqrt(e.vx * e.vx + e.vy * e.vy) || 1;
+        e.vx /= l;
+        e.vy /= l;
+      }
+      if (e.timer <= 0) {
+        e.ai = e.ai === HOP_CROUCH ? HOP_AIR : HOP_AIR_BACK;
+        e.aux = e.x;
+        e.aux2 = e.y;
+        e.timer = ticks(h.air);
+      }
+      return true;
+    case HOP_AIR:
+    case HOP_AIR_BACK: {
+      e.timer -= tf;
+      const air = ticks(h.air);
+      const k = Math.min(1, 1 - e.timer / air);
+      e.x = e.aux + (e.ax - e.aux) * k;
+      e.y = e.aux2 + (e.ay - e.aux2) * k;
+      if (e.timer <= 0) {
+        const R = d.blastRadius ?? 40;
+        if (e.ai === HOP_AIR) {
+          // the landing: the only moment it hurts
+          const dmg = (d.blastDamage ?? 10) * dmgMul(s);
+          for (const q of s.players) {
+            if (!q.alive) continue;
+            const qx = q.x - e.x;
+            const qy = q.y - e.y;
+            const rr = R + q.r;
+            if (qx * qx + qy * qy < rr * rr) hurtPlayer(s, q, dmg);
+          }
+        }
+        emit(s, EV_LAND, e.x, e.y, e.ai === HOP_AIR ? R : 0, e.type);
+        e.ai = e.ai === HOP_AIR ? HOP_REST : HOP_REST_BACK;
+        e.timer = ticks(h.rest);
+      }
+      return true;
+    }
+    case HOP_REST:
+      e.timer -= tf;
+      if (e.timer <= 0) {
+        // hops away, to one side or the other
+        const side = enemyRand(s, e, 0x686f7031) < 0.5 ? 1 : -1;
+        const a0 = datan2(-dy, -dx) + side * (0.9 + 0.5 * enemyRand(s, e, 0x686f7032));
+        let tx = e.x + dcos(a0) * h.away;
+        let ty = e.y + dsin(a0) * h.away;
+        if (circleHitsObstacle(s.map, tx, ty, e.r)) {
+          tx = e.x - (dx / dist) * h.away;
+          ty = e.y - (dy / dist) * h.away;
+          if (circleHitsObstacle(s.map, tx, ty, e.r)) {
+            tx = e.x;
+            ty = e.y;
+          }
+        }
+        e.ai = HOP_CROUCH_BACK;
+        e.ax = tx;
+        e.ay = ty;
+        e.timer = ticks(h.crouchBack);
+      }
+      return true;
+    default:
+      e.timer -= tf;
+      if (e.timer <= 0) {
+        e.ai = HOP_WALK;
+        e.timer = ticks(h.every);
+      }
+      return true;
+  }
+}
+
+/** Is this enemy in the air (a jumping Jumper): no collisions, no contact. */
+function airborne(e: Enemy): boolean {
+  return ENEMY_BEHAVIOR[e.type] === BEHAVIOR.JUMPER && (e.ai === HOP_AIR || e.ai === HOP_AIR_BACK);
+}
+
+/** Turns the facing (vx, vy) toward the unit vector (tx, ty), at most `step` radians. */
+function turnFacing(e: Enemy, tx: number, ty: number, step: number): void {
+  let fx = e.vx;
+  let fy = e.vy;
+  if (fx === 0 && fy === 0) {
+    e.vx = tx;
+    e.vy = ty;
+    return;
+  }
+  const dot = fx * tx + fy * ty;
+  if (dot >= dcos(step)) {
+    e.vx = tx;
+    e.vy = ty;
+    return;
+  }
+  const c = dcos(step);
+  const sn = (fx * ty - fy * tx > 0 ? 1 : -1) * dsin(step);
+  const nx = fx * c - fy * sn;
+  const ny = fx * sn + fy * c;
+  const l = Math.sqrt(nx * nx + ny * ny) || 1;
+  fx = nx / l;
+  fy = ny / l;
+  e.vx = fx;
+  e.vy = fy;
 }
 
 export function updateEnemies(s: GameState): void {
@@ -208,13 +504,15 @@ export function updateEnemies(s: GameState): void {
 
     const d = ENEMIES[e.type];
     let speed = e.speed;
-    if (e.boostUntil > tick) speed *= 1 + RALLY_SPEED;
     if (e.slowUntil > tick) speed *= 1 - e.slowFactor;
     const stunned = e.stunUntil > tick;
     if (stunned) speed = 0;
 
     DX = 0;
     DY = 0;
+    /** the behaviour sets the velocity itself (flight), or moves the enemy itself (a Jumper's hop) */
+    let direct = false;
+    let selfMoved = false;
     switch (beh) {
       case BEHAVIOR.CHASER:
         pathDir(s, e, dx, dy, dist);
@@ -232,7 +530,7 @@ export function updateEnemies(s: GameState): void {
         break;
       }
       case BEHAVIOR.SHOOTER: {
-        keepAway(s, e, dx, dy, dist, d.keepMin ?? 240, d.keepMax ?? 340);
+        shooterMove(s, e, dx, dy, dist, d.keepMin ?? 240, d.keepMax ?? 340);
         // It turns toward you little by little (aux = its heading) and only shoots straight ahead.
         if (e.ai === 0) {
           e.aux = datan2(dy, dx);
@@ -276,74 +574,62 @@ export function updateEnemies(s: GameState): void {
         }
         break;
       }
-      case BEHAVIOR.LEADER:
-        keepAway(s, e, dx, dy, dist, d.keepMin ?? 200, d.keepMax ?? 300);
-        boostAround(s, e, i, d.auraRadius ?? 170);
+      case BEHAVIOR.ORBITER:
+        fly(s, e, p, dx, dy, dist, speed, tf);
+        direct = true;
         break;
-      case BEHAVIOR.ORBITER: {
-        // Tightening spiral: mostly sideways, a little inward; when very close, it dives in.
-        if (dist > 420 || dist < 70) pathDir(s, e, dx, dy, dist);
-        else {
-          const side = e.id & 1 ? 1 : -1;
-          const ux = dx / dist;
-          const uy = dy / dist;
-          DX = -uy * side * 0.92 + ux * 0.39;
-          DY = ux * side * 0.92 + uy * 0.39;
-        }
+      case BEHAVIOR.JUMPER:
+        selfMoved = hop(s, e, p, dx, dy, dist, stunned, tf);
         break;
-      }
-      case BEHAVIOR.BLINKER: {
-        // ai 0: moves slowly. ai 1: the ground is marked at (aux, aux2), it appears there after `fuse`.
-        if (e.ai === 0) {
-          pathDir(s, e, dx, dy, dist);
-          e.timer -= tf;
-          if (e.timer <= 0) {
-            if (dist > 120 && dist < 620 && !stunned && !circleHitsObstacle(s.map, p.x, p.y, e.r)) {
-              e.ai = 1;
-              e.aux = p.x;
-              e.aux2 = p.y;
-              e.timer = Math.round((d.fuse ?? 1) * TICK_RATE);
-              emit(s, EV_FUSE, p.x, p.y, 1, e.type);
-            } else {
-              e.timer = 20;
-            }
-          }
-        } else {
-          speed = 0;
-          e.timer -= tf;
-          if (e.timer <= 0) {
-            e.x = e.px = e.aux;
-            e.y = e.py = e.aux2;
-            e.kbx = e.kby = 0;
-            e.ai = 0;
-            e.timer = Math.round((d.blinkEvery ?? 3.5) * TICK_RATE) + (e.id % 23);
-            const R = d.blastRadius ?? 52;
-            const dmg = (d.blastDamage ?? 10) * dmgMul(s);
-            for (const q of s.players) {
-              if (!q.alive) continue;
-              const qx = q.x - e.x;
-              const qy = q.y - e.y;
-              const rr = R + q.r;
-              if (qx * qx + qy * qy < rr * rr) hurtPlayer(s, q, dmg);
-            }
-            emit(s, EV_BLINK, e.x, e.y, R, e.type);
-          }
-        }
-        break;
-      }
       default: {
         const unhandled: never = beh;
         throw new Error(`Unhandled enemy behavior ${unhandled}`);
       }
     }
 
-    // Soft separation between neighbouring enemies (grid built at the start of the tick).
+    if (selfMoved) {
+      // crouching, in the air or resting: it does not walk (knockback still pushes it on the ground)
+      e.mvx = 0;
+      e.mvy = 0;
+      if (!airborne(e) && (e.kbx !== 0 || e.kby !== 0)) {
+        moveCircle(s.map, e, e.kbx * tf * DT, e.kby * tf * DT, e.r);
+      }
+      e.kbx *= KB_DECAY;
+      e.kby *= KB_DECAY;
+      keepInArena(s, e, e);
+      continue;
+    }
+
+    // Steering: accelerate toward the wanted velocity, with limited acceleration (stunned: stops dead).
+    if (!direct) {
+      if (stunned) {
+        e.mvx = 0;
+        e.mvy = 0;
+      } else {
+        const acc = (d.accel ?? Math.max(170, e.speed * 3)) * DT;
+        let ax = DX * speed - e.mvx;
+        let ay = DY * speed - e.mvy;
+        const al = Math.sqrt(ax * ax + ay * ay);
+        if (al > acc) {
+          ax *= acc / al;
+          ay *= acc / al;
+        }
+        e.mvx += ax;
+        e.mvy += ay;
+      }
+    }
+
+    // Collisions with neighbouring enemies (grid built at the start of the tick), along their real outlines:
+    // overlaps are pushed apart (the lighter one moves more), the speed that drives into the other one is
+    // dropped and the sideways one kept, so they graze and slide instead of stopping dead.
     let sx = 0;
     let sy = 0;
-    // solid walls: get fully pushed out of them (no soft separation)
+    // solid walls: get fully pushed out of them
     let hx = 0;
     let hy = 0;
     let checks = 0;
+    const flyer = beh === BEHAVIOR.ORBITER;
+    const me = e.r * e.r;
     const ccx = Math.min(cols - 1, Math.max(0, Math.floor((e.x - grid.ox) / 64)));
     const ccy = Math.min(rows - 1, Math.max(0, Math.floor((e.y - grid.oy) / 64)));
     for (let oy = -1; oy <= 1 && checks < 14; oy++) {
@@ -362,43 +648,86 @@ export function updateEnemies(s: GameState): void {
           if (!o.alive) continue;
           const ddx = e.x - o.x;
           const ddy = e.y - o.y;
-          const rr = e.r + o.r;
           const dd = ddx * ddx + ddy * ddy;
-          if (dd >= rr * rr) continue;
           if (o.type === WALL_TYPE) {
-            if (o.ai === 1 && dd > 0.0001) {
+            // (flyers go over the boss walls, as over the obstacles)
+            const rr = e.r + o.r;
+            if (!flyer && o.ai === 1 && dd < rr * rr && dd > 0.0001) {
               const dl = Math.sqrt(dd);
               hx += (ddx / dl) * (rr - dl);
               hy += (ddy / dl) * (rr - dl);
             }
             continue;
           }
+          const rr = (e.r + o.r) * OUT_MAX;
+          if (dd >= rr * rr || airborne(o) || o.flags & EF_PROP) continue;
           checks++;
           if (dd < 0.0001) {
             sx += e.id < o.id ? 1 : -1;
-          } else {
-            const dl = Math.sqrt(dd);
-            const push = (rr - dl) / rr;
-            sx += (ddx / dl) * push;
-            sy += (ddy / dl) * push;
+            continue;
+          }
+          const dl = Math.sqrt(dd);
+          // n: from the other one toward this one
+          const nx = ddx / dl;
+          const ny = ddy / dl;
+          const over = extent(e, -nx, -ny) + extent(o, nx, ny) - dl;
+          if (over <= 0) continue;
+          const mo = o.r * o.r;
+          const w = o.kbResist >= 0.95 ? 1 : mo / (me + mo);
+          const push = Math.min(SEP_PAIR_MAX, over * SEP_SHARE) * w;
+          sx += nx * push;
+          sy += ny * push;
+          const into = -(e.mvx * nx + e.mvy * ny);
+          if (into > 0) {
+            const k2 = Math.min(1, 2 * w);
+            e.mvx += nx * into * k2;
+            e.mvy += ny * into * k2;
+          }
+          if (flyer && -(dcos(e.aux) * nx + dsin(e.aux) * ny) > 0) {
+            // heading toward it: veer off to the side it is not on
+            e.aux += (dcos(e.aux) * ny - dsin(e.aux) * nx > 0 ? 1 : -1) * VEER * DT * tf;
           }
           if (checks >= 14) break;
         }
       }
     }
+    const sl = Math.sqrt(sx * sx + sy * sy);
+    if (sl > SEP_MAX) {
+      sx *= SEP_MAX / sl;
+      sy *= SEP_MAX / sl;
+    }
 
-    const vx = (DX * speed + sx * SEP_STRENGTH + e.kbx) * tf;
-    const vy = (DY * speed + sy * SEP_STRENGTH + e.kby) * tf;
-    moveCircle(s.map, e, vx * DT + hx, vy * DT + hy, e.r);
+    const vx = (e.mvx + e.kbx) * tf;
+    const vy = (e.mvy + e.kby) * tf;
+    if (flyer) {
+      // it flies over the obstacles and the boss walls, not over the arena ring: it glances off it
+      e.x += vx * DT + sx;
+      e.y += vy * DT + sy;
+      const bx = e.x;
+      const by = e.y;
+      keepInArena(s, e, e);
+      if (e.x !== bx || e.y !== by) {
+        const ax = s.arenaX - e.x;
+        const ay = s.arenaY - e.y;
+        const al = Math.sqrt(ax * ax + ay * ay) || 1;
+        flyerBlocked(s, e, ax / al, ay / al);
+      }
+    } else {
+      moveCircle(s.map, e, vx * DT + sx + hx, vy * DT + sy + hy, e.r);
+      keepInArena(s, e, e);
+    }
     e.kbx *= KB_DECAY;
     e.kby *= KB_DECAY;
     if (beh === BEHAVIOR.SHOOTER) {
       // The Shooter faces where it aims, not where it walks.
       e.vx = dcos(e.aux);
       e.vy = dsin(e.aux);
-    } else if (DX !== 0 || DY !== 0) {
-      e.vx = DX;
-      e.vy = DY;
+    } else {
+      const v2 = e.mvx * e.mvx + e.mvy * e.mvy;
+      if (v2 > 36) {
+        const vl = Math.sqrt(v2);
+        turnFacing(e, e.mvx / vl, e.mvy / vl, (flyer ? FACE_TURN * 2 : FACE_TURN) * DT * tf);
+      }
     }
   }
 }
@@ -528,6 +857,7 @@ function updateBoss(s: GameState, e: Enemy, p: Player, dx: number, dy: number, d
   // Clock: its phases go on, but it crawls.
   e.x += VX * DT * tf;
   e.y += VY * DT * tf;
+  keepInArena(s, e);
   if (VX !== 0 || VY !== 0) {
     const l = Math.sqrt(VX * VX + VY * VY);
     e.vx = VX / l;
@@ -610,6 +940,21 @@ function dash(s: GameState, e: Enemy, cfg: BossConfig, elapsed: number, dm: numb
     e.aux = -e.aux;
     uy = -uy;
     emit(s, EV_WALL_HIT, e.x, e.y, 2, e.type);
+  }
+  // the arena wall bounces it too
+  if (s.arenaR > 0) {
+    const ox = e.x - s.arenaX;
+    const oy = e.y - s.arenaY;
+    const od = Math.sqrt(ox * ox + oy * oy);
+    if (od > s.arenaR - e.r - 2 && od > 0.001 && ux * ox + uy * oy > 0) {
+      const nx = ox / od;
+      const ny = oy / od;
+      const dot = ux * nx + uy * ny;
+      ux -= 2 * dot * nx;
+      uy -= 2 * dot * ny;
+      e.aux = datan2(uy, ux);
+      emit(s, EV_WALL_HIT, e.x, e.y, 2, e.type);
+    }
   }
   VX = ux * d.speed;
   VY = uy * d.speed;
@@ -746,6 +1091,37 @@ function bossContactMul(e: Enemy): number {
   }
   if (kind === 'dash') return BOSS_CONFIGS[e.type]!.dash!.damage;
   return 1;
+}
+
+/**
+ * Boss arena: keeps a player or an enemy inside the ring (sliding along it). Nothing while it is open.
+ * Outward speed is dropped so nothing presses into the wall.
+ */
+export function keepInArena(s: GameState, o: { x: number; y: number; r: number; alive: boolean }, v?: Enemy): void {
+  const R = s.arenaR;
+  if (R <= 0 || !o.alive) return;
+  const dx = o.x - s.arenaX;
+  const dy = o.y - s.arenaY;
+  const lim = R - o.r;
+  const d2 = dx * dx + dy * dy;
+  if (d2 <= lim * lim) return;
+  const d = Math.sqrt(d2);
+  const nx = dx / d;
+  const ny = dy / d;
+  o.x = s.arenaX + nx * lim;
+  o.y = s.arenaY + ny * lim;
+  if (v) {
+    const out = v.mvx * nx + v.mvy * ny;
+    if (out > 0) {
+      v.mvx -= nx * out;
+      v.mvy -= ny * out;
+    }
+    const kb = v.kbx * nx + v.kby * ny;
+    if (kb > 0) {
+      v.kbx -= nx * kb;
+      v.kby -= ny * kb;
+    }
+  }
 }
 
 /** The Builder hexagon's walls block players (sliding along, as against an obstacle). */

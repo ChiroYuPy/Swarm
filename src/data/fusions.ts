@@ -12,12 +12,13 @@ export interface FusionDef {
 
 export const FUSIONS: FusionDef[] = [
   { result: 'spiral', weapon: 'blaster' },
+  { result: 'mine_boomerang', weapon: 'boomerang' },
+  { result: 'meteors', weapon: 'mortar' },
   { result: 'black_holes', weapon: 'saws' },
   { result: 'vampire_field', weapon: 'force_field' },
-  { result: 'electric_storm', weapon: 'electric_arc' },
-  { result: 'mine_boomerang', weapon: 'boomerang' },
   { result: 'earthquake', weapon: 'shockwave' },
   { result: 'fire_tornado', weapon: 'flamethrower' },
+  { result: 'electric_storm', weapon: 'electric_arc' },
   { result: 'hornets', weapon: 'swarm' },
-  { result: 'meteors', weapon: 'mortar' },
+  { result: 'scythe', weapon: 'blade' },
 ];

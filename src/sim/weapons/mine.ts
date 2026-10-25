@@ -1,13 +1,12 @@
 /**
- * Mine: drops one PJ_MINE trap under the player every cooldown when enemies are near, at most `count` on the
- * ground (a = arm ticks, b = blast radius, c = trigger radius, d = chain fuse; see projectiles.ts). A blast
- * sets off the other mines inside it: they go off in a chain.
+ * Mine: drops one PJ_MINE trap under the player every cooldown; it stays `life` s (a = arm ticks, b = blast
+ * radius, c = trigger radius; see projectiles.ts). Each mine goes off on its own: no chain reaction.
  */
 import type { WeaponLevel } from '../../data/weapons';
 import { TICK_RATE } from '../constants';
 import { spawnProjectile } from '../entities';
 import { EV_SHOOT, PJ_MINE, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { RETRY_TICKS, cdTicks, target } from './common';
+import { cdTicks } from './common';
 
 /** a mine is armed (can be triggered by enemies) this long after being dropped (ticks) */
 const ARM_TICKS = Math.round(0.35 * TICK_RATE);
@@ -36,7 +35,6 @@ export function spawnMine(
   m.b = radius;
   m.c = trigger;
   m.a = arm;
-  m.d = 0;
   m.life = life;
   m.r = 9;
   m.knock = knock;
@@ -45,16 +43,6 @@ export function spawnMine(
 export function mine(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
-  // Mines are traps: drop them as soon as enemies come close, not into the void; and not too many at once.
-  let laid = 0;
-  for (let i = 0; i < s.projCount; i++) {
-    const b = s.projectiles[i];
-    if (b.kind === PJ_MINE && b.owner === p.index && b.weapon === w.def && b.life > 0) laid++;
-  }
-  if (laid >= (L.count ?? 5) || target(s, p.x, p.y, 400) < 0) {
-    w.timer = RETRY_TICKS;
-    return;
-  }
   spawnMine(
     s,
     p.index,

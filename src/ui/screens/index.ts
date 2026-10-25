@@ -9,3 +9,4 @@ export { codexNav, showCodex } from './codex';
 export { confirmCard, focusCard, moveCard, showLevelUp } from './levelup';
 export { showPause } from './pause';
 export { showDeath } from './death';
+export { showVictory } from './victory';

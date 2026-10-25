@@ -52,8 +52,8 @@ export const FX_COLORS = [
   '#b8ff3d', // 19 fever
   '#3dffb4', // 20 orbiter
   '#c8ff3d', // 21 splitter
-  '#3d9bff', // 22 guardian
-  '#8f5bff', // 23 teleporter
+  '#ff5a3d', // 22 hunter
+  '#9dff3d', // 23 jumper
   '#3dffe0', // 24 builder hexagon
   '#ff4d6d', // 25 laser eye
 ];

@@ -26,6 +26,8 @@ export function spawnEnemy(
   e.y = e.py = y;
   e.vx = 0;
   e.vy = 0;
+  e.mvx = 0;
+  e.mvy = 0;
   e.maxHp = e.hp = d.hp * hpMul;
   e.r = d.radius;
   e.speed = d.speed * spdMul;
@@ -42,7 +44,6 @@ export function spawnEnemy(
   e.burnDps = 0;
   e.burnNext = 0;
   e.burnOwner = -1;
-  e.boostUntil = 0;
   e.hitTick = -1000;
   e.attackReady = 0;
   e.ai = 0;

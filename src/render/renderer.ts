@@ -12,7 +12,7 @@ import { COLORS } from './palette';
 import type { Effects } from './effects';
 import { drawHud, type HudOptions } from './hud';
 import { RenderView, lerp } from './view';
-import { drawMap, drawGems, drawPickups } from './draw-world';
+import { drawArena, drawMap, drawGems, drawPickups } from './draw-world';
 import { drawEnemies } from './draw-enemies';
 import { drawProjectiles } from './draw-projectiles';
 import { drawWeaponFx } from './draw-weapon-fx';
@@ -51,7 +51,11 @@ export class Renderer extends RenderView {
   /** smooth time required before raising the resolution again (doubled on each relapse) */
   private raiseAfterMs = 4000;
 
-  constructor(canvas: HTMLCanvasElement) {
+  /** `fit`: CSS size the canvas fills (the window by default; the codex preview passes its own box). */
+  constructor(
+    canvas: HTMLCanvasElement,
+    private readonly fit: () => [number, number] = () => [window.innerWidth, window.innerHeight],
+  ) {
     super(canvas);
     this.resize();
   }
@@ -102,8 +106,9 @@ export class Renderer extends RenderView {
   resize(): void {
     const maxDpr = this.quality === 'low' ? 1 : 2;
     this.dpr = Math.min(maxDpr, window.devicePixelRatio || 1) * this.resScale;
-    const w = Math.max(1, window.innerWidth);
-    const h = Math.max(1, window.innerHeight);
+    const [fw, fh] = this.fit();
+    const w = Math.max(1, fw);
+    const h = Math.max(1, fh);
     this.cw = Math.floor(w * this.dpr);
     this.ch = Math.floor(h * this.dpr);
     this.canvas.width = this.cw;
@@ -139,6 +144,7 @@ export class Renderer extends RenderView {
     ctx.lineJoin = 'round';
 
     drawMap(this, s);
+    drawArena(this, s, opt.time);
     ctx.globalCompositeOperation = 'lighter';
     drawPickups(this, s, opt.time);
     drawGems(this, s, alpha);

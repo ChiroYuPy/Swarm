@@ -24,7 +24,6 @@ import { swarm } from './swarm';
 export { ticks } from './common';
 export { spawnMine } from './mine';
 export { RING_FADE } from './pulse';
-export { RAIL_FX_TICKS } from './rail';
 export { lockedTarget } from './arc';
 export { BLADE_FADE_TICKS } from './blade';
 export { BEE_DEAD, BEE_GO, BEE_HOME, BEE_IDLE, BEE_LIFE, BEE_RING, BEE_STUCK, beeTarget, ringAngle } from './swarm';

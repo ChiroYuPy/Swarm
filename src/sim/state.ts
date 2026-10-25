@@ -29,9 +29,12 @@ export class Enemy {
   y = 0;
   px = 0;
   py = 0;
-  /** movement direction (for orientation when rendering) */
+  /** facing (unit vector, for orientation when rendering): turns progressively toward where it goes */
   vx = 0;
   vy = 0;
+  /** current velocity (units/s, knockback excluded): it steers toward the one it wants, with limited acceleration */
+  mvx = 0;
+  mvy = 0;
   hp = 0;
   maxHp = 0;
   r = 10;
@@ -51,8 +54,6 @@ export class Enemy {
   burnDps = 0;
   burnNext = 0;
   burnOwner = -1;
-  /** rallied by a Leader until this tick (faster) */
-  boostUntil = 0;
   hitTick = -1000;
   attackReady = 0;
   /** AI state (phase), timer and auxiliary variables */
@@ -364,8 +365,8 @@ export const EV_SHATTER = 29;
 export const EV_REVIVE = 30;
 /** the clone disappears */
 export const EV_CLONE_END = 31;
-/** Teleporter: x, y = arrival, v = impact radius */
-export const EV_BLINK = 32;
+/** Jumper landing: x, y = where, v = impact radius, k = type */
+export const EV_LAND = 32;
 /** enemy driven off by a boss arrival: x, y, v = radius, k = type */
 export const EV_FLEE = 33;
 /** wave start: v = number (1 = the first) */
@@ -378,6 +379,10 @@ export const EV_LASER = 36;
 export const EV_CAGE = 37;
 /** an item appears on its own in the arena: x, y, k = PK_* code */
 export const EV_MAP_ITEM = 38;
+/** the last boss of the run is down: the game is won (it can go on, endless) */
+export const EV_VICTORY = 39;
+/** the boss arena closes (x, y = centre, v = radius) or opens again (v = 0) */
+export const EV_ARENA = 40;
 /**
  * Every event code. `emit()` only takes these, so a new EV_* constant must be listed here, and then
  * `Effects.consume` (render/effects.ts) fails to typecheck until it handles it (or lists it as ignored).
@@ -414,13 +419,15 @@ export type EventType =
   | typeof EV_SHATTER
   | typeof EV_REVIVE
   | typeof EV_CLONE_END
-  | typeof EV_BLINK
+  | typeof EV_LAND
   | typeof EV_FLEE
   | typeof EV_WAVE
   | typeof EV_HATCH
   | typeof EV_LASER
   | typeof EV_CAGE
-  | typeof EV_MAP_ITEM;
+  | typeof EV_MAP_ITEM
+  | typeof EV_VICTORY
+  | typeof EV_ARENA;
 
 /** Event emitted by the sim for rendering and audio. Purely informative: the sim never reads them back. */
 export class SimEvent {
@@ -482,6 +489,15 @@ export interface GameState {
   clock: number;
   /** calm after a boss until this tick (no wave, no clock) */
   calmUntil: number;
+  /** boss arena (players and enemies kept inside): centre and radius, 0 = open */
+  arenaX: number;
+  arenaY: number;
+  arenaR: number;
+  /** the run is won (last boss of the plan down); it can go on, endless */
+  won: boolean;
+  /** half-size of the box around a player that shurikens bounce in: the screen at normal zoom (the codex preview sets its own view) */
+  boxX: number;
+  boxY: number;
   chestCount: number;
   totalKills: number;
   /** world slowed down (Clock) until this tick */

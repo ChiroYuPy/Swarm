@@ -1,9 +1,9 @@
 /**
  * Weapon effects around the player: force field / vampire field bubble, saws and black holes, blade sweep,
- * flame jets, railgun charge and shot, electric arc lock; plus the shockwave shape drawn for its projectiles.
+ * flame jets, electric arc lock; plus the shockwave shape drawn for its projectiles.
  */
 import { DT, BLACK_HOLE_WEAPON, VAMPIRE_FIELD_WEAPON, weaponDef, weaponLevel, type GameState, type Player, type WeaponInst } from '../sim';
-import { BLADE_FADE_TICKS, RAIL_FX_TICKS } from '../sim/weapons';
+import { BLADE_FADE_TICKS } from '../sim/weapons';
 import { sawPath } from './icons';
 import { hash01, lerp, type RenderView } from './view';
 
@@ -45,13 +45,41 @@ function drawFlameJet(view: RenderView, x: number, y: number, a: number, len: nu
 /**
  * Shockwave: a sharp front with a short gradient behind it (clear centre). Once its damage is done it keeps
  * growing while it fades. `f` = progress over its damage time (0..1, then beyond while fading). `quake`
- * (Earthquake, which slows hard): the ground cracks in a star under the wave.
+ * (Earthquake: big, slowing waves in a row): only a thin front over a faint tint, and a few cracks in the
+ * ground, so the enemies stay readable under it. `seed` must stay the same for the whole life of the wave.
  */
 export function drawShockwave(view: RenderView, x: number, y: number, maxR: number, f: number, color: string, quake: boolean, seed: number): void {
   const ctx = view.ctx;
-  const R = Math.max(2, f <= 1 ? maxR * f : maxR * (1 + 0.85 * (f - 1)));
-  const fade = f <= 1 ? 1 : Math.max(0, 1 - (R - maxR) / (maxR * 0.6));
+  const R = Math.max(2, f <= 1 ? maxR * f : maxR * (1 + (quake ? 0.25 : 0.85) * (f - 1)));
+  const fade = f <= 1 ? 1 : Math.max(0, 1 - (R - maxR) / (maxR * (quake ? 0.12 : 0.6)));
   if (fade <= 0) return;
+  if (quake) {
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, TAU);
+    ctx.fillStyle = rgba(color, 0.05 * fade);
+    ctx.fill();
+    ctx.globalAlpha = 0.75 * fade;
+    view.glow(color, 1.6);
+    // A few zigzag cracks behind the front, the same for the whole wave.
+    ctx.beginPath();
+    for (let c = 0; c < 5; c++) {
+      let a = ((c + hash01(seed * 13 + c)) / 5) * TAU;
+      let px = x + Math.cos(a) * R * 0.15;
+      let py = y + Math.sin(a) * R * 0.15;
+      ctx.moveTo(px, py);
+      for (let k = 2; k <= 5; k++) {
+        a += (hash01(seed * 17 + c * 5 + k) - 0.5) * 0.5;
+        const r = (R * 0.9 * k) / 5;
+        px = x + Math.cos(a) * r;
+        py = y + Math.sin(a) * r;
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.globalAlpha = 0.35 * fade;
+    view.glow(color, 1);
+    ctx.globalAlpha = 1;
+    return;
+  }
   const inner = R * 0.72;
   const g = ctx.createRadialGradient(x, y, inner, x, y, R);
   g.addColorStop(0, rgba(color, 0));
@@ -62,26 +90,6 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
   ctx.fill();
   ctx.globalAlpha = fade;
   view.glow(color, 2.2);
-  if (quake) {
-    // Zigzag cracks, from the center to the front.
-    ctx.beginPath();
-    for (let c = 0; c < 7; c++) {
-      let a = ((c + hash01(seed * 13 + c)) / 7) * TAU;
-      let px = x;
-      let py = y;
-      ctx.moveTo(px, py);
-      const steps = 5;
-      for (let k = 1; k <= steps; k++) {
-        a += (hash01(seed * 17 + c * 5 + k) - 0.5) * 0.7;
-        const r = (R * k) / steps;
-        px = x + Math.cos(a) * r;
-        py = y + Math.sin(a) * r;
-        ctx.lineTo(px, py);
-      }
-    }
-    ctx.globalAlpha = 0.85 * fade;
-    view.glow(color, 2);
-  }
   ctx.globalAlpha = 1;
 }
 
@@ -157,7 +165,10 @@ function drawDrops(view: RenderView, s: GameState, w: WeaponInst, x: number, y: 
   ctx.globalAlpha = 1;
 }
 
-/** Blade: the sword and the fading wedge it leaves behind. */
+/**
+ * Blade: the sword and the fading wedge it leaves behind. Scythe (w.angles[3] = tip share): a long handle
+ * with a curved blade at its end, and a brighter band in the trail where the tip hits twice as hard.
+ */
 function drawBlade(view: RenderView, w: WeaponInst, x: number, y: number, color: string, alpha: number): void {
   const ctx = view.ctx;
   const from = w.angles[0];
@@ -171,6 +182,7 @@ function drawBlade(view: RenderView, w: WeaponInst, x: number, y: number, color:
   const now = sweeping ? w.tickTimer + alpha : w.vN;
   const fade = sweeping ? 1 : Math.max(0, (w.activeTicks - alpha) / BLADE_FADE_TICKS);
   const dir = sweep >= 0;
+  const tip = w.angles[3];
   // Trail: the angles of the last ticks, fading with age.
   const TRAIL = 10;
   ctx.fillStyle = color;
@@ -182,14 +194,26 @@ function drawBlade(view: RenderView, w: WeaponInst, x: number, y: number, color:
     ctx.arc(x, y, R, a0, a1, !dir);
     ctx.arc(x, y, R * 0.35, a1, a0, dir);
     ctx.closePath();
-    ctx.globalAlpha = 0.35 * (1 - j / TRAIL) * fade;
+    ctx.globalAlpha = (tip > 0 ? 0.06 : 0.35) * (1 - j / TRAIL) * fade;
     ctx.fill();
+    if (tip > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, R, a0, a1, !dir);
+      ctx.arc(x, y, R * (1 - tip), a1, a0, dir);
+      ctx.closePath();
+      ctx.globalAlpha = 0.3 * (1 - j / TRAIL) * fade;
+      ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
   if (!sweeping) return;
   const a = at(now);
   const ux = Math.cos(a);
   const uy = Math.sin(a);
+  if (tip > 0) {
+    drawScythe(view, x, y, a, R, dir ? 1 : -1, color);
+    return;
+  }
   ctx.beginPath();
   ctx.moveTo(x + ux * 18, y + uy * 18);
   ctx.lineTo(x + ux * R, y + uy * R);
@@ -200,56 +224,28 @@ function drawBlade(view: RenderView, w: WeaponInst, x: number, y: number, color:
   view.glow(color, 5);
 }
 
-/** Railgun: dashed aim line(s) and a closing circle while it charges, then the shot itself (beam + shock rings). */
-function drawRail(view: RenderView, w: WeaponInst, x: number, y: number, color: string, alpha: number): void {
+/** Scythe at angle `a`: handle out to `R`, blade curving back from its end on the side it sweeps toward (f = ±1). */
+function drawScythe(view: RenderView, x: number, y: number, a: number, R: number, f: number, color: string): void {
   const ctx = view.ctx;
-  if (w.burstLeft > 0) {
-    const k = Math.max(0, Math.min(1, 1 - (w.burstTimer - alpha) / Math.max(1, w.vS)));
-    ctx.beginPath();
-    for (let b = 0; b < w.vN; b++) {
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(w.angles[b]) * w.vLen, y + Math.sin(w.angles[b]) * w.vLen);
-    }
-    ctx.setLineDash([8, 12]);
-    ctx.globalAlpha = 0.25 + k * 0.4;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(x, y, 34 - k * 20, 0, TAU);
-    ctx.globalAlpha = k;
-    view.glow(color, 2);
-    ctx.globalAlpha = 1;
-  }
-  if (w.activeTicks > 0) {
-    const k = Math.max(0, (w.activeTicks - alpha) / RAIL_FX_TICKS);
-    for (let b = 0; b < w.vN; b++) {
-      const a = w.angles[b];
-      const ux = Math.cos(a);
-      const uy = Math.sin(a);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + ux * w.vLen, y + uy * w.vLen);
-      ctx.globalAlpha = k;
-      view.glow(color, w.vW * k + 1.5);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.5 * k + 0.8;
-      ctx.stroke();
-      // Shock rings along the shot, widening as they fade.
-      for (let d = 60; d < w.vLen; d += 120) {
-        ctx.save();
-        ctx.translate(x + ux * d, y + uy * d);
-        ctx.rotate(a);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 4 + (1 - k) * 4, 9 + (1 - k) * 18, 0, 0, TAU);
-        ctx.globalAlpha = k * 0.8;
-        view.glow(color, 1.5);
-        ctx.restore();
-      }
-    }
-    ctx.globalAlpha = 1;
-  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(a);
+  ctx.beginPath();
+  ctx.moveTo(14, 0);
+  ctx.lineTo(R, 0);
+  view.glow(color, 1.8);
+  // Crescent: the sharp inner edge faces the way it sweeps.
+  ctx.beginPath();
+  ctx.moveTo(R + 4, 0);
+  ctx.quadraticCurveTo(R * 1.02, f * R * 0.34, R * 0.66, f * R * 0.46);
+  ctx.quadraticCurveTo(R * 0.9, f * R * 0.22, R - 6, 0);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.45;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  view.glow('#ffffff', 2.5);
+  ctx.restore();
 }
 
 /** Electric arc: a crackling bolt from the player to the locked target, and a ring around it. */
@@ -319,7 +315,7 @@ function drawPlayerWeaponFx(view: RenderView, s: GameState, p: Player, alpha: nu
             continue;
           }
           ctx.beginPath();
-          sawPath(ctx, ox, oy, w.vS * 0.62, w.vS, 7, time * 9);
+          sawPath(ctx, ox, oy, w.vS * 0.62, w.vS, 7, -time * 9);
           ctx.fillStyle = def.color;
           ctx.globalAlpha = 0.28;
           ctx.fill();
@@ -338,9 +334,6 @@ function drawPlayerWeaponFx(view: RenderView, s: GameState, p: Player, alpha: nu
         break;
       case 'flame':
         if (w.activeTicks > 0) for (let b = 0; b < w.vN; b++) drawFlameJet(view, x, y, w.angles[b], w.vLen, w.vW, def.color, s.tick + alpha, b);
-        break;
-      case 'rail':
-        drawRail(view, w, x, y, def.color, alpha);
         break;
       case 'arc':
         drawArcLock(view, s, w, x, y, def.color);

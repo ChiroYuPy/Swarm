@@ -1,6 +1,7 @@
-/** World layer: background dots, neon obstacles of the visible chunks, XP gems and pickups. */
+/** World layer: background dots, neon obstacles of the visible chunks, the boss arena, XP gems and pickups. */
 import { PICKUPS } from '../data/loot';
-import { CHUNK, OB_CIRCLE, OB_HEX, PK_CHEST, type GameState, type Obstacle } from '../sim';
+import { ENEMIES } from '../data/enemies';
+import { CHUNK, EF_BOSS, OB_CIRCLE, OB_HEX, PK_CHEST, type GameState, type Obstacle } from '../sim';
 import { COLORS, OBSTACLE_TINTS } from './palette';
 import { lerp, type RenderView } from './view';
 
@@ -104,4 +105,45 @@ export function drawPickups(view: RenderView, s: GameState, time: number): void 
     ctx.globalAlpha = 1;
     view.spriteAt(sp[it.kind], it.x, y, chest ? 1 + Math.sin(time * 5) * 0.06 : 1);
   }
+}
+
+/**
+ * Boss arena: the outside is dimmed and a neon wall in the boss's colour rings the fight (dashes that
+ * crawl along it), until the boss dies.
+ */
+export function drawArena(view: RenderView, s: GameState, time: number): void {
+  const R = s.arenaR;
+  if (R <= 0) return;
+  const ctx = view.ctx;
+  let color = '#ff3df5';
+  for (let i = 0; i < s.enemyCount; i++) {
+    const e = s.enemies[i];
+    if (e.alive && e.flags & EF_BOSS) {
+      color = ENEMIES[e.type].color;
+      break;
+    }
+  }
+  const x = s.arenaX;
+  const y = s.arenaY;
+  ctx.beginPath();
+  ctx.rect(view.viewX0, view.viewY0, view.viewX1 - view.viewX0, view.viewY1 - view.viewY0);
+  ctx.moveTo(x + R, y);
+  ctx.arc(x, y, R, 0, Math.PI * 2, true);
+  ctx.fillStyle = 'rgba(4, 0, 14, 0.55)';
+  ctx.fill('evenodd');
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI * 2);
+  ctx.globalAlpha = 0.9;
+  view.glow(color, 3);
+  ctx.beginPath();
+  ctx.arc(x, y, R + 9, 0, Math.PI * 2);
+  ctx.setLineDash([18, 22]);
+  ctx.lineDashOffset = -time * 40;
+  ctx.globalAlpha = 0.45 + 0.15 * Math.sin(time * 3);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+  ctx.globalAlpha = 1;
 }

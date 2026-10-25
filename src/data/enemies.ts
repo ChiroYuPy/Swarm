@@ -1,6 +1,6 @@
 /** Enemies. HP / damage / speeds are multiplied by the difficulty curves of waves.ts. */
 
-export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'leader' | 'blinker' | 'orbiter' | 'wall' | 'egg';
+export type EnemyBehavior = 'chaser' | 'shooter' | 'kamikaze' | 'swarm' | 'prop' | 'boss' | 'orbiter' | 'jumper' | 'wall' | 'egg';
 export type EnemyShape =
   | 'triangle'
   | 'diamond'
@@ -10,10 +10,9 @@ export type EnemyShape =
   | 'dot'
   | 'box'
   | 'trapezoid'
-  | 'rock'
-  | 'sun'
-  | 'ring'
   | 'dart'
+  | 'bomb'
+  | 'octagon'
   | 'hexagon'
   | 'star'
   | 'eye'
@@ -39,25 +38,26 @@ interface EnemyBase {
   kbResist: number;
   /** absent from the codex and the sandbox (only appears through another enemy) */
   hidden?: boolean;
-  /** on death, splits into `splitCount` `splitInto` enemies */
+  /** on death, bursts into `splitCount` `splitInto` enemies (and shows cracks as it loses HP) */
   splitInto?: string;
   splitCount?: number;
-  /** max number alive: `capStart` on arrival, + `capPerMinute` per minute afterwards, at most `capMax` */
-  capStart?: number;
-  capPerMinute?: number;
-  capMax?: number;
-  // leader: other enemies within `auraRadius` go `auraSpeed` faster
-  auraRadius?: number;
-  auraSpeed?: number;
-  // teleporter: marks the ground under the player, teleports there after `fuse` s (area damage), every `blinkEvery` s
-  blinkEvery?: number;
+  /** the wave stream spawns it in packs of this many, close together (counted as that many spawns) */
+  pack?: number;
+  /** most of this type alive at once from the wave stream (boss reinforcements ignore it) */
+  cap?: number;
+  /** how fast it reaches the speed it wants (units/s²); default: 3 × its speed, at least 170 */
+  accel?: number;
+  /** orbiter: physical flight around the player, then a dive */
+  fly?: EnemyFlight;
+  /** jumper: hops onto the player's spot, hurting only on landing (`blastRadius`, `blastDamage`) */
+  hop?: EnemyHop;
   // shooter
   keepMin?: number;
   keepMax?: number;
   shootEvery?: number;
   bulletSpeed?: number;
   bulletDamage?: number;
-  // kamikaze
+  // kamikaze (`blastRadius` and `blastDamage` are also the jumper's landing)
   fuse?: number;
   triggerRange?: number;
   blastRadius?: number;
@@ -68,6 +68,47 @@ interface EnemyBase {
   hatchInto?: string;
   hatchCount?: number;
   hatchHp?: number;
+}
+
+/**
+ * Orbiter flight: a heading that turns at a limited rate and a speed that accelerates. It circles the
+ * player, tightening, until its own timer runs out, then dives (it cannot turn sharply: dodgeable), hits or
+ * misses, carries on past and swings back out to the circle.
+ */
+export interface EnemyFlight {
+  /** circle radius around the player (each one varies it a little) */
+  orbit: number;
+  /** how fast the circle tightens (units/s), down to 60% of `orbit` */
+  tighten: number;
+  /** time circling before a dive (s), drawn between these two */
+  waitMin: number;
+  waitMax: number;
+  /** turn rate (radians/s) */
+  turn: number;
+  /** speed change rate (units/s²) */
+  accel: number;
+  /** dive speed */
+  dive: number;
+}
+
+/**
+ * Jumper: keeps its distance, crouches (the landing circle fills), jumps onto where the player was, lands
+ * (the only moment it hurts), rests, then hops away to a side and starts again.
+ */
+export interface EnemyHop {
+  /** crouch before the jump at the player, and before the hop away (s) */
+  crouch: number;
+  crouchBack: number;
+  /** flight time (s) */
+  air: number;
+  /** rest after landing (s) */
+  rest: number;
+  /** time before the next attack (s) */
+  every: number;
+  /** it jumps at the player from this distance */
+  range: number;
+  /** length of the hop away */
+  away: number;
 }
 
 export type BossPhaseKind =
@@ -282,7 +323,7 @@ export const TRAPEZOID_BOSS = bossConfig({
   bullets: { speed: 175, damage: 10 },
   spiral: { every: 0.1, arms: 4, armsPerBoss: 1, turn: 0.23 },
   charge: { telegraph: 0.9, speed: 700, length: 560, damage: 1.8 },
-  summon: { type: 'hunter', count: 10, perBoss: 2, around: 'self', radius: 90, maxAlive: 20 },
+  summon: { type: 'marble', count: 12, perBoss: 2, around: 'self', radius: 90, maxAlive: 24 },
 });
 
 /** Builder hexagon: cage of breakable walls around the player, then shots through it. */
@@ -299,7 +340,7 @@ export const BUILDER_HEXAGON_BOSS = bossConfig({
   bullets: { speed: 185, damage: 10 },
   spiral: { every: 0.2, arms: 5, turn: 0.1 },
   volley: { every: 0.5, count: 5, spread: 0.14 },
-  summon: { type: 'block', count: 5, perBoss: 1, around: 'player', radius: 420, maxAlive: 12 },
+  summon: { type: 'block', count: 5, perBoss: 1, around: 'player', radius: 400, maxAlive: 12 },
 });
 
 /** Ricochet star: aims (line), dashes bouncing inside a box around the player, leaves fire behind. */
@@ -334,7 +375,7 @@ export const LASER_EYE_BOSS = bossConfig({
   watch: { keepMin: 240, keepMax: 330, shootEvery: 0.45 },
   bullets: { speed: 210, damage: 9 },
   laser: { length: 520, width: 16, arc: 1.6, damage: 28 },
-  summon: { type: 'orbiter', count: 8, perBoss: 2, around: 'player', radius: 520, maxAlive: 14 },
+  summon: { type: 'orbiter', count: 6, perBoss: 2, around: 'player', radius: 480, maxAlive: 12 },
 });
 
 /** Swarm queen: flees (slower than you) and lays eggs that hatch into Swarm. */
@@ -359,9 +400,10 @@ export const SWARM_QUEEN_BOSS = bossConfig({
 
 export const ENEMIES: EnemyDef[] = [
   {
-    id: 'hunter',
-    behavior: 'chaser', shape: 'triangle', color: '#ff3366',
-    hp: 9, speed: 72, damage: 6, radius: 12, xp: 1, kbResist: 0,
+    id: 'marble',
+    behavior: 'chaser', shape: 'circle', color: '#ff3366',
+    hp: 9, speed: 58, damage: 4, radius: 9, xp: 1, kbResist: 0,
+    pack: 6,
   },
   {
     id: 'rusher',
@@ -369,60 +411,56 @@ export const ENEMIES: EnemyDef[] = [
     hp: 6, speed: 112, damage: 4, radius: 10, xp: 1, kbResist: 0,
   },
   {
+    id: 'hunter',
+    behavior: 'chaser', shape: 'triangle', color: '#ff5a3d',
+    hp: 9, speed: 64, damage: 5, radius: 12, xp: 1, kbResist: 0,
+  },
+  {
     id: 'block',
     behavior: 'chaser', shape: 'square', color: '#ff8a1f',
     hp: 55, speed: 46, damage: 12, radius: 21, xp: 4, kbResist: 0.75,
+    cap: 4,
   },
   {
     id: 'shooter',
     behavior: 'shooter', shape: 'pentagon', color: '#c46bff',
     hp: 20, speed: 62, damage: 6, radius: 14, xp: 3, kbResist: 0.2,
-    keepMin: 240, keepMax: 340, shootEvery: 2.6, bulletSpeed: 190, bulletDamage: 7,
-  },
-  {
-    id: 'orbiter',
-    behavior: 'orbiter', shape: 'dart', color: '#3dffb4',
-    hp: 12, speed: 128, damage: 5, radius: 11, xp: 2, kbResist: 0,
-  },
-  {
-    id: 'golem',
-    behavior: 'chaser', shape: 'rock', color: '#c8ff3d',
-    hp: 110, speed: 30, damage: 12, radius: 30, xp: 6, kbResist: 0.95,
-    splitInto: 'golem_medium', splitCount: 2, capStart: 1, capPerMinute: 1, capMax: 10,
-  },
-  {
-    id: 'golem_medium',
-    behavior: 'chaser', shape: 'rock', color: '#c8ff3d', hidden: true,
-    hp: 36, speed: 44, damage: 8, radius: 20, xp: 3, kbResist: 0.7,
-    splitInto: 'golem_small', splitCount: 2,
-  },
-  {
-    id: 'golem_small',
-    behavior: 'chaser', shape: 'rock', color: '#c8ff3d', hidden: true,
-    hp: 12, speed: 62, damage: 5, radius: 12, xp: 1, kbResist: 0.3,
-  },
-  {
-    id: 'leader',
-    behavior: 'leader', shape: 'sun', color: '#3d9bff',
-    hp: 30, speed: 58, damage: 5, radius: 15, xp: 5, kbResist: 0.4,
-    keepMin: 200, keepMax: 300, auraRadius: 170, auraSpeed: 0.3,
-  },
-  {
-    id: 'teleporter',
-    behavior: 'blinker', shape: 'ring', color: '#8f5bff',
-    hp: 24, speed: 50, damage: 6, radius: 14, xp: 3, kbResist: 0.2,
-    blinkEvery: 3.5, fuse: 1.0, blastRadius: 52, blastDamage: 11,
-  },
-  {
-    id: 'bomber',
-    behavior: 'kamikaze', shape: 'circle', color: '#ff2b2b',
-    hp: 12, speed: 94, damage: 0, radius: 13, xp: 2, kbResist: 0.1,
-    fuse: 0.8, triggerRange: 56, blastRadius: 75, blastDamage: 14,
+    cap: 5, keepMin: 240, keepMax: 340, shootEvery: 2.6, bulletSpeed: 190, bulletDamage: 7,
   },
   {
     id: 'swarm',
     behavior: 'swarm', shape: 'dot', color: '#ff9ecf',
     hp: 3, speed: 106, damage: 3, radius: 6, xp: 1, kbResist: 0,
+  },
+  {
+    id: 'orbiter',
+    behavior: 'orbiter', shape: 'dart', color: '#3dffb4',
+    hp: 18, speed: 100, damage: 8, radius: 11, xp: 2, kbResist: 0,
+    cap: 8, fly: { orbit: 170, tighten: 6, waitMin: 4, waitMax: 7.5, turn: 1.7, accel: 200, dive: 360 },
+  },
+  {
+    id: 'bomber',
+    behavior: 'kamikaze', shape: 'bomb', color: '#ff2b2b',
+    hp: 12, speed: 90, damage: 0, radius: 13, xp: 2, kbResist: 0.1,
+    cap: 4, fuse: 0.8, triggerRange: 56, blastRadius: 75, blastDamage: 14,
+  },
+  {
+    id: 'hexagon',
+    behavior: 'chaser', shape: 'hexagon', color: '#c8ff3d',
+    hp: 100, speed: 30, damage: 10, radius: 24, xp: 6, kbResist: 0.9,
+    cap: 2, splitInto: 'shard', splitCount: 6,
+  },
+  {
+    id: 'shard',
+    behavior: 'chaser', shape: 'triangle', color: '#c8ff3d', hidden: true,
+    hp: 10, speed: 92, damage: 4, radius: 9, xp: 1, kbResist: 0,
+  },
+  {
+    id: 'jumper',
+    behavior: 'jumper', shape: 'octagon', color: '#9dff3d',
+    hp: 30, speed: 50, damage: 0, radius: 14, xp: 3, kbResist: 0.3,
+    cap: 3, blastRadius: 40, blastDamage: 12,
+    hop: { crouch: 1.0, crouchBack: 0.5, air: 0.75, rest: 0.6, every: 2.4, range: 240, away: 150 },
   },
   {
     id: 'bonus_crate',

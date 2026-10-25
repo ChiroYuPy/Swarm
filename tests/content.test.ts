@@ -40,7 +40,7 @@ describe('content', () => {
     }
   });
 
-  it('enemy types arrive gradually, earlier on hard', () => {
+  it('enemy types arrive gradually, at the same waves in every difficulty', () => {
     const firstSeen = (difficulty: number, seconds: number) => {
       const s = createGame({ seed: 'ARRIVEES', difficulty });
       s.players[0].base.maxHp = 1e9;
@@ -67,11 +67,14 @@ describe('content', () => {
       return seen;
     };
     const normal = firstSeen(1, 380);
-    const hard = firstSeen(2, 200);
-    // At first, only Hunters; the other types are announced later.
+    const hard = firstSeen(2, 380);
+    // At first, only Marbles; the other types are announced later, at the same waves on hard.
+    expect(normal.get('marble')).toBeLessThan(2);
     expect(normal.get('rusher')).toBeGreaterThan(60);
     expect(normal.has('block')).toBe(true);
-    expect(hard.get('rusher')!).toBeLessThan(normal.get('rusher')!);
+    expect(hard.get('rusher')).toBe(normal.get('rusher'));
+    expect(hard.get('block')).toBe(normal.get('block'));
+    // more enemies on hard
     expect(spawnRate(30 * TICK_RATE, 0).rate).toBeLessThan(spawnRate(30 * TICK_RATE, 2).rate);
   });
 

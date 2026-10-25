@@ -99,10 +99,9 @@ function enemyPath(view: RenderView, e: Enemy, type: number, x: number, y: numbe
     case 'queen':
       queenPath(ctx, x, y, r);
       break;
-    case 'rock':
-    case 'sun':
-    case 'ring':
     case 'dart':
+    case 'bomb':
+    case 'octagon':
     case 'block':
     case 'egg':
       // only bosses are drawn as paths; these shapes exist as sprites only

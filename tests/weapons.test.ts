@@ -6,6 +6,7 @@ import {
   FUSION_TABLE,
   DMG_FIRE,
   EV_HIT,
+  EV_SHOOT,
   PJ_BEE,
   PJ_BLAZE,
   PJ_BOOMERANG,
@@ -112,22 +113,22 @@ describe('weapons', () => {
     expect(alive(s).some((e) => e.kbx !== 0 || e.kby !== 0)).toBe(true);
   });
 
-  it('the Railgun aims at the enemy with the most max HP, even a wounded one', () => {
+  it('the Railgun fires at once: one beam hits everything on its line, near and far, the same tick', () => {
     const s = empty('railgun', 1);
     const p = s.players[0];
-    // Near on the right: a small one at full HP. Farther on the left: a big one already badly hurt.
-    spawnEnemy(s, enemyId('hunter'), p.x + 120, p.y, 1, 0.01, 0.001, 0);
-    const big = spawnEnemy(s, enemyId('block'), p.x - 300, p.y, 1, 0.01, 0.001, 0)!;
-    big.maxHp = 5000;
-    big.hp = 50;
-    s.enemies[0].hp = s.enemies[0].maxHp = 400;
-    const w = p.weapons[0];
-    let aimed: number | null = null;
-    run(s, 1, () => {
-      if (aimed === null && w.burstLeft > 0) aimed = w.angle;
+    const near = spawnEnemy(s, enemyId('block'), p.x + 120, p.y, 1, 0.01, 0.001, 0)!;
+    const far = spawnEnemy(s, enemyId('block'), p.x + 700, p.y, 1, 0.01, 0.001, 0)!;
+    const aside = spawnEnemy(s, enemyId('block'), p.x, p.y + 300, 1, 0.01, 0.001, 0)!;
+    for (const e of [near, far, aside]) e.hp = e.maxHp = 5000;
+    let beams = 0;
+    let both = false;
+    run(s, 0.5, (st) => {
+      for (let i = 0; i < st.eventCount; i++) if (st.events[i].type === EV_SHOOT) beams++;
+      if (beams === 1 && near.hp < 5000) both = far.hp < 5000;
     });
-    expect(aimed).not.toBeNull();
-    expect(Math.abs(Math.abs(aimed!) - Math.PI)).toBeLessThan(0.05);
+    expect(beams).toBe(1);
+    expect(both).toBe(true);
+    expect(aside.hp).toBe(5000);
   });
 
   it('the Electric arc locks on the biggest by max HP, holds it in place and shocks its neighbours', () => {
@@ -167,11 +168,13 @@ describe('weapons', () => {
     expect(on / (6 * TICK_RATE)).toBeLessThan(((L.duration ?? 0) / ((L.duration ?? 0) + (L.cooldown ?? 0))) * 1.5);
   });
 
-  it('Mines: at most 5 on the ground, and a blast sets off the mines inside it', () => {
-    const s = arena('mines', 1, 100000);
-    let most = 0;
-    run(s, 10, (st) => (most = Math.max(most, projs(st, PJ_MINE).length)));
-    expect(most).toBeLessThanOrEqual(5);
+  it('Mines: one every cooldown, even with no enemy around, and a blast does not set off the others', () => {
+    const s = empty('mines', 1);
+    run(s, 5);
+    const L = weaponDef(s.players[0].weapons[0].def).levels[0];
+    const n = projs(s, PJ_MINE).length;
+    expect(n).toBeGreaterThanOrEqual(Math.floor(5 / (L.cooldown ?? 1)));
+    expect(n).toBeLessThanOrEqual(Math.floor(5 / (L.cooldown ?? 1)) + 1);
     const c = empty('mines', 1);
     const p = c.players[0];
     p.weapons.length = 0;
@@ -180,8 +183,23 @@ describe('weapons', () => {
     spawnMine(c, 0, weaponId('mines'), p.x + 400, p.y, 10, 60, 20, 600, 0, 0);
     spawnEnemy(c, enemyId('hunter'), p.x + 200, p.y, 1, 0.01, 0.001, 0);
     run(c, 0.5);
-    // The two close ones went off, the far one is still there.
-    expect(projs(c, PJ_MINE).map((m) => Math.round(m.x - p.x))).toEqual([400]);
+    // Only the one under the enemy went off.
+    expect(projs(c, PJ_MINE).map((m) => Math.round(m.x - p.x)).sort()).toEqual([240, 400]);
+  });
+
+  it('the Scythe goes all the way around, and its tip hits twice as hard', () => {
+    const s = empty('scythe', 1);
+    const p = s.players[0];
+    const L = weaponDef(p.weapons[0].def).levels[0];
+    const reach = L.length ?? 0;
+    const inner = spawnEnemy(s, enemyId('block'), p.x + 50, p.y, 1, 0.01, 0.001, 0)!;
+    const tip = spawnEnemy(s, enemyId('block'), p.x - reach + 20, p.y, 1, 0.01, 0.001, 0)!;
+    for (const e of [inner, tip]) e.hp = e.maxHp = 100000;
+    run(s, 1.1); // one swing (the first comes after one cooldown)
+    const a = 100000 - inner.hp;
+    const b = 100000 - tip.hp;
+    expect(a).toBeGreaterThan(0);
+    expect(b).toBeCloseTo(a * 2, 5);
   });
 
   it('the Boomerang flies out, stops, and comes back to the player as fast as it left', () => {

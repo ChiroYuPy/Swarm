@@ -89,14 +89,14 @@ Caught: typecheck (effect, activation visuals, HUD buff field, icon), `registry.
 
 ### An enemy with an existing behaviour
 
-1. `src/data/enemies.ts`: append to `ENEMIES` (`id`, `behavior`, `shape`, `color`, `hp`, `speed`, `damage`, `radius`, `xp`, `kbResist`, plus the fields its behaviour reads, see `EnemyBase`). `hidden: true` keeps it out of the codex and the sandbox (for enemies that only come from another one, like `golem_medium`).
+1. `src/data/enemies.ts`: append to `ENEMIES` (`id`, `behavior`, `shape`, `color`, `hp`, `speed`, `damage`, `radius`, `xp`, `kbResist`, plus the fields its behaviour reads, see `EnemyBase`). `hidden: true` keeps it out of the codex and the sandbox (for enemies that only come from another one, like `shard`). Optional: `cap` (most alive at once from the waves), `pack` (spawned in packs), `accel` (steering).
 2. Locales: `enemies.<id>` with `name`, `desc`.
-3. To put it in the waves: `src/data/waves.ts`, an arrival time in `unlocks` and at least one entry in `mixes` that features it (the first mix containing it is its debut). Keep 2 or 3 types per mix, the new type a minority.
-4. The sprite, codex entry, sandbox tile and "new enemy" toast come from the data.
+3. To put it in the waves: `src/data/waves.ts`, a wave of `plan` that features it (the first planned wave containing it is its arrival, announced, in every difficulty) and, for the endless mode, an entry in `mixes`. Keep 2 or 3 types per wave, the new type a minority.
+4. The sprite, codex entry (and its live preview), sandbox tile and "new enemy" toast come from the data.
 
-Caught: `i18n.test.ts`; `enemies.test.ts` (at most 3 types at once, caps).
+Caught: `i18n.test.ts`; `enemies.test.ts` (at most 3 types at once, every enemy arrives in the plan, caps).
 
-Several types may share a behaviour: the sim, the telegraphs (`src/render/draw-enemies.ts`: fuse flash, blast zones, landing marks, leader zones) and the bot check `ENEMY_BEHAVIOR[e.type] === BEHAVIOR.X` and read that type's own fields (`blastRadius`, `fuse`, `auraRadius`...). One exception: a rallied enemy does not store which leader rallied it, so the rally bonus is the strongest `auraSpeed` among leader types (`RALLY_SPEED` / `RALLY_TYPE` in `registry.ts`, also the color of the speed trails); a per-leader bonus would need a new `Enemy` field (gameplay change). `prop`, `wall` and `egg` stay unique by design (`uniqueType()` throws): they are spawned and matched by type. The wall's `rise` and the egg's `hatchInto` / `hatchCount` / `hatchHp` live on those types, not on the boss.
+Several types may share a behaviour: the sim, the telegraphs (`src/render/draw-enemies.ts`: fuse flash, blast zones, Jumper landing marks, splitter cracks) and the bot check `ENEMY_BEHAVIOR[e.type] === BEHAVIOR.X` and read that type's own fields (`blastRadius`, `fuse`, `fly`, `hop`...). Movement is shared too: a behaviour only sets the direction it wants (`DX`, `DY` in `updateEnemies`); the enemy accelerates toward it, turns its facing progressively and collides with its neighbours along its shape's outline (`OUTLINE` in `src/sim/enemies.ts`, one entry per `EnemyShape`). `prop`, `wall` and `egg` stay unique by design (`uniqueType()` throws): they are spawned and matched by type. The wall's `rise` and the egg's `hatchInto` / `hatchCount` / `hatchHp` live on those types, not on the boss.
 
 ### A new enemy behaviour
 
@@ -105,7 +105,7 @@ Several types may share a behaviour: the sim, the telegraphs (`src/render/draw-e
 3. `src/sim/enemies.ts`: a `case` in the `switch (beh)` of `updateEnemies()` (exhaustive: typecheck fails until you do). Use `dmath`, `pathDir()` / `keepAway()`, `emit()` for anything render or audio must show.
 4. Locales: `codex.behaviors.<behavior>` (the codex tag; typecheck fails until it exists in `fr.ts`).
 5. Optional: telegraphs in `src/render/draw-enemies.ts`, ability rows in the enemy sheet in `src/ui/codex-data.ts`, dodging in `src/ai/bot.ts`.
-6. A new **shape**: add it to `EnemyShape`, draw it in the exhaustive switches of `src/render/sprites.ts` and `src/render/draw-bosses.ts`.
+6. A new **shape**: add it to `EnemyShape`, draw it in the exhaustive switches of `src/render/sprites.ts` and `src/render/draw-bosses.ts`, and give it a collision outline in `OUTLINE` (`src/sim/enemies.ts`).
 7. Then the enemy itself (previous recipe), and a test in `tests/enemies.test.ts`.
 
 ### A boss
@@ -138,8 +138,8 @@ Caught: typecheck (`bossConfig()` rejects a missing group, or a group none of th
 
 ### Waves and spawns
 
-- Numbers live in `WAVES` (`src/data/waves.ts`): spawn `rates` and `lateGrowth`, `unlocks`, the rhythm (`waveLength`, `pause`, `wavesPerBoss`, `afterBoss`), `mixes`, HP/damage/speed scaling, highlights (`swarm`, `horde`, `ring`), bonus crates (`props`), caps (`fluxCap`, `enemyCap`, `lostDistance`).
-- The registry compiles them (`RATES_BY_DIFFICULTY`, `UNLOCK_SLOT`, `MIXES`, `MIX_TICKS`, `BOSS_TICKS`); the logic is in `src/sim/spawner.ts` (`spawnRate`, `mixAt`, `waveInfo`). The wave clock (`s.clock`) stops during bosses; composition never depends on the player.
+- Numbers live in `WAVES` (`src/data/waves.ts`): spawn `rates` and `lateGrowth`, the rhythm (`waveLength`, `pause`, `wavesPerBoss`, `afterBoss`), the run wave by wave (`plan`, whole blocks of `wavesPerBoss` waves: the boss after the last block wins the run) and the endless mode's `mixes`, HP/damage/speed scaling, highlights (`swarm`, `horde`, `ring`, from `firstWave`), the boss `arena`, bonus crates (`props`), caps (`fluxCap`, `enemyCap`, `lostDistance`). Per-type caps and packs are on the enemies (`cap`, `pack`).
+- The registry compiles them (`RATES_BY_DIFFICULTY`, `PLAN_MIXES`, `ENDLESS_MIXES`, `UNLOCK_SLOT`, `VICTORY_BOSS`, `MIX_TICKS`, `BOSS_TICKS`); the logic is in `src/sim/spawner.ts` (`spawnRate`, `mixAt`, `waveInfo`). The waves are the same in every difficulty (it only changes strength, numbers and item drops). The wave clock (`s.clock`) stops during bosses; composition never depends on the player.
 - The codex rules and some HUD/sandbox strings read these numbers through placeholders; descriptions with literal numbers need a manual update.
 - Caught: `enemies.test.ts` (readable waves, caps), `bosses.test.ts` (wave / pause / boss rhythm), `content.test.ts` (arrival times per difficulty).
 
@@ -192,7 +192,7 @@ Caught: typecheck (unknown key, `en.ts` mismatch), `i18n.test.ts` (empty strings
 
 Menu → **Sandbox**. Everything in the data arrays shows up there automatically:
 
-- Loadout tiles for every base weapon, evolution and passive: click to add or raise a level, right click to lower it.
+- Loadout tiles for every base weapon and passive: click to add or raise a level, right click to lower it. A weapon with an evolution gets it one click after level 5.
 - Game: difficulty, start wave (1 to 40), and a boss duel tile per `BOSS_ORDER` entry (the boss arrives at once, alone).
 - Hero: invincible, starting level, damage and XP multipliers, stored item (active items only).
 - Enemies: count multiplier, and "custom types" with a tile per enemy (bosses, the bonus crate and hidden types excluded).
@@ -201,7 +201,7 @@ Menu → **Sandbox**. Everything in the data arrays shows up there automatically
 Sandbox runs are deterministic and replayable, never ranked. The last setup is saved. From the browser console you can start one directly:
 
 ```js
-__swarm.playSandbox({ difficulty: 1, rules: { ...__swarm.save.sandbox.rules, weapons: [{ id: 'blade', level: 5 }], enemies: ['golem'] } })
+__swarm.playSandbox({ difficulty: 1, rules: { ...__swarm.save.sandbox.rules, weapons: [{ id: 'blade', level: 5 }], enemies: ['hexagon'] } })
 ```
 
 ## Dev tools

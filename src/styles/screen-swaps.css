@@ -15,6 +15,6 @@
 .screen.same .records {
   animation: fade-in 0.2s ease-out backwards;
 }
-.detail.swap {
+.detail .swap {
   animation: fade-in 0.18s ease-out backwards;
 }

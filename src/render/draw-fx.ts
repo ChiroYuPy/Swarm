@@ -1,8 +1,9 @@
 /** Cosmetic effects (lightning, rings, particles), damage numbers and off-screen arrows. */
 import { PICKUPS } from '../data/loot';
-import { DMG_PHYS, EF_BOSS, PK_CHEST, PK_VACUUM, type GameState } from '../sim';
+import { DMG_PHYS, EF_BOSS, PK_CHEST, PK_VACUUM, weaponDef, type GameState } from '../sim';
 import { COLORS, DAMAGE_COLORS, FX_COLORS } from './palette';
-import type { Effects } from './effects';
+import { BEAM_LIFE, BEAM_TRAVEL, type Effects } from './effects';
+import { rgba } from './draw-weapon-fx';
 import type { RenderView } from './view';
 
 export function drawFx(view: RenderView, fx: Effects): void {
@@ -33,6 +34,52 @@ export function drawFx(view: RenderView, fx: Effects): void {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;
     ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  // Railgun beams: a slug leaves the muzzle and crosses the line in a few frames, leaving a trail that is
+  // brightest behind it; once it is gone the trail thins and fades.
+  for (let i = 0; i < fx.bCount; i++) {
+    const age = BEAM_LIFE - fx.blife[i];
+    const x1 = fx.bx1[i];
+    const y1 = fx.by1[i];
+    const dx = fx.bx2[i] - x1;
+    const dy = fx.by2[i] - y1;
+    const head = Math.min(1, age / BEAM_TRAVEL);
+    const hx = x1 + dx * head;
+    const hy = y1 + dy * head;
+    const k = head < 1 ? 1 : Math.max(0, fx.blife[i] / (BEAM_LIFE - BEAM_TRAVEL));
+    const col = weaponDef(fx.bdef[i]).color;
+    const w = fx.bw[i] * 0.7 * k + 1.5;
+    const g = ctx.createLinearGradient(x1, y1, hx, hy);
+    g.addColorStop(0, rgba(col, head < 1 ? 0.15 : 0.6 * k));
+    g.addColorStop(1, rgba(col, k));
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(hx, hy);
+    ctx.strokeStyle = g;
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = w * 3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = w;
+    ctx.stroke();
+    ctx.strokeStyle = '#ffd6d6';
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 1.2 * k + 0.3;
+    ctx.stroke();
+    if (head < 1) {
+      // the slug, and the muzzle flash while it leaves
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(hx, hy, fx.bw[i] * 0.6 + 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = col;
+      ctx.globalAlpha = 1 - head;
+      ctx.beginPath();
+      ctx.arc(x1, y1, 6 + fx.bw[i] * (1 - head), 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalAlpha = 1;
   }
   // Rings

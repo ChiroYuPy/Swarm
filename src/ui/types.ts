@@ -24,6 +24,8 @@ export interface AppApi {
   cancelSwap(): void;
   resume(): void;
   quit(): void;
+  /** victory screen: the run goes on, endless */
+  continueEndless(): void;
   toMenu(screen?: 'menu' | 'sandbox'): void;
   watchLastRun(): void;
   applySettings(s: Settings): void;
@@ -64,6 +66,8 @@ export interface DeathInfo {
   /** sandbox run (unranked); `survived`: ended without dying */
   sandbox: boolean;
   survived: boolean;
+  /** the last boss of the run fell (victory), whatever happened after */
+  won: boolean;
 }
 
 export type NavDir = 'left' | 'right' | 'up' | 'down';

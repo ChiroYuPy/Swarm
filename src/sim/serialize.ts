@@ -6,6 +6,7 @@
  */
 import { createGame } from './game';
 import { Enemy, Gem, Pickup, Player, Projectile, PassiveInst, WeaponInst, type GameState, type OfferKind, type SandboxRules } from './state';
+import { SHURIKEN_BOX_X, SHURIKEN_BOX_Y } from './weapons';
 
 const ENEMY_KEYS = Object.keys(new Enemy()).filter((k) => k !== 'immune');
 const PROJ_KEYS = Object.keys(new Projectile()).filter((k) => k !== 'hitIds');
@@ -55,6 +56,12 @@ export function hashState(s: GameState): string {
   h.int(s.bossId);
   h.int(s.clock);
   h.int(s.calmUntil);
+  h.num(s.arenaX);
+  h.num(s.arenaY);
+  h.num(s.arenaR);
+  h.int(s.won ? 1 : 0);
+  h.num(s.boxX);
+  h.num(s.boxY);
   h.int(s.totalKills);
   h.int(s.nextEnemyId);
   for (const p of s.players) {
@@ -146,6 +153,12 @@ export function serializeState(s: GameState): string {
       bossId: s.bossId,
       clock: s.clock,
       calmUntil: s.calmUntil,
+      arenaX: s.arenaX,
+      arenaY: s.arenaY,
+      arenaR: s.arenaR,
+      won: s.won,
+      boxX: s.boxX,
+      boxY: s.boxY,
       chestCount: s.chestCount,
       totalKills: s.totalKills,
       clockUntil: s.clockUntil,
@@ -186,6 +199,12 @@ export function deserializeState(json: string): GameState {
   s.bossId = c.bossId as number;
   s.clock = c.clock as number;
   s.calmUntil = c.calmUntil as number;
+  s.arenaX = (c.arenaX as number) ?? 0;
+  s.arenaY = (c.arenaY as number) ?? 0;
+  s.arenaR = (c.arenaR as number) ?? 0;
+  s.won = (c.won as boolean) ?? false;
+  s.boxX = (c.boxX as number) ?? SHURIKEN_BOX_X;
+  s.boxY = (c.boxY as number) ?? SHURIKEN_BOX_Y;
   s.chestCount = c.chestCount as number;
   s.totalKills = c.totalKills as number;
   s.clockUntil = c.clockUntil as number;

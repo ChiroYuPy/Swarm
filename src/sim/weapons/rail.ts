@@ -1,72 +1,47 @@
 /**
- * Railgun: charges for `duration` while aiming at the biggest enemy in `range` (by max HP), then fires an
- * instant line of `length` x `width` that pierces everything (`count` 2: a second line straight behind).
- * Optional `burn` on everything the line hits. No projectile; visuals read w.angles / w.vLen / w.vW / w.vN,
- * w.burstLeft (charging), w.burstTimer / w.vS (charge left / total) and w.activeTicks (shot flash).
+ * Railgun: like the Blaster, `count` shots (default 1) `delay` apart at the nearest enemy, but each shot is an
+ * instant line of `length` x `width` (it travels at the speed of light) that pierces everything. Optional
+ * `burn` on everything the line hits. No projectile: each shot emits EV_SHOOT with the line's ends, and the
+ * renderer draws a fading beam fixed where it was fired.
  */
 import type { WeaponLevel } from '../../data/weapons';
-import { INPUT_DIRS, TICK_RATE } from '../constants';
-import { PI, TWO_PI, datan2, dcos, dsin } from '../dmath';
+import { dcos, dsin } from '../dmath';
 import { damageEnemy, ignite } from '../combat';
 import { clearShotsOnLine } from '../shots';
 import { EV_SHOOT, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { RETRY_TICKS, biggest, cdTicks, ticks } from './common';
-
-/** duration of the shot flash (ticks) */
-export const RAIL_FX_TICKS = 21;
-/** the aim stops following the target this long before the shot (ticks): it can be dodged */
-const RAIL_LOCK = Math.round(0.25 * TICK_RATE);
-
-/** Direction of the rail: the manual aim, otherwise the biggest enemy in range. False if nobody. */
-function railAim(s: GameState, p: Player, range: number, w: WeaponInst): boolean {
-  if (p.aim >= 0) {
-    w.angle = (p.aim * TWO_PI) / INPUT_DIRS;
-    return true;
-  }
-  const t = biggest(s, p.x, p.y, range);
-  if (t < 0) return false;
-  const e = s.enemies[t];
-  w.angle = datan2(e.y - p.y, e.x - p.x);
-  return true;
-}
+import { AIM, RETRY_TICKS, aim, cdTicks, ticks } from './common';
 
 export function rail(s: GameState, p: Player, w: WeaponInst, _slot: number, L: WeaponLevel): void {
-  const len = L.length ?? 900;
-  const width = (L.width ?? 8) * p.stats.area;
-  const n = Math.min(2, L.count ?? 1);
-  w.vLen = len;
-  w.vW = width;
-  w.vN = n;
-  if (w.activeTicks > 0) w.activeTicks--;
   if (w.burstLeft > 0) {
-    // Charging: the aim follows its target until just before the shot.
     w.burstTimer -= 1;
-    if (w.burstTimer > RAIL_LOCK) railAim(s, p, L.range ?? 480, w);
-    for (let b = 0; b < n; b++) w.angles[b] = w.angle + b * PI;
-    if (w.burstTimer > 0) return;
-    w.burstLeft = 0;
-    for (let b = 0; b < n; b++) fireLine(s, p, w.angles[b], len, width, L);
-    w.activeTicks = RAIL_FX_TICKS;
-    w.timer = cdTicks(L, p);
-    emit(s, EV_SHOOT, p.x, p.y, 0, w.def, 0, 0, p.index);
-    return;
+    if (w.burstTimer <= 0) {
+      // Keeps the last direction when nobody is left in range.
+      if (aim(s, p, 640)) w.angle = AIM;
+      fireLine(s, p, w, L);
+      w.burstLeft--;
+      w.burstTimer = ticks(L.delay, 0.12);
+    }
   }
   w.timer -= 1;
   if (w.timer > 0) return;
-  if (!railAim(s, p, L.range ?? 480, w)) {
+  if (!aim(s, p, 640)) {
     w.timer = RETRY_TICKS;
     return;
   }
-  for (let b = 0; b < n; b++) w.angles[b] = w.angle + b * PI;
-  w.burstLeft = 1;
-  w.burstTimer = w.vS = Math.max(1, Math.round(ticks(L.duration, 1.2) * p.stats.cooldownMul));
+  w.angle = AIM;
+  fireLine(s, p, w, L);
+  w.burstLeft = (L.count ?? 1) - 1;
+  w.burstTimer = ticks(L.delay, 0.12);
+  w.timer += cdTicks(L, p);
 }
 
-function fireLine(s: GameState, p: Player, a: number, len: number, width: number, L: WeaponLevel): void {
-  const ux = dcos(a);
-  const uy = dsin(a);
+function fireLine(s: GameState, p: Player, w: WeaponInst, L: WeaponLevel): void {
+  const len = L.length ?? 900;
+  const width = (L.width ?? 6) * p.stats.area;
+  const ux = dcos(w.angle);
+  const uy = dsin(w.angle);
   const dmg = L.damage * p.stats.might;
-  const knock = L.knockback ?? 140;
+  const knock = L.knockback ?? 100;
   clearShotsOnLine(s, p.x, p.y, ux, uy, len, width);
   const g = s.grid;
   const m = g.query(s.enemies, p.x + (ux * len) / 2, p.y + (uy * len) / 2, len / 2 + width);
@@ -88,5 +63,6 @@ function fireLine(s: GameState, p: Player, a: number, len: number, width: number
     if (L.burn) ignite(s, idx, L.burn * p.stats.might, L.burnTime ?? 2.5, p.index);
     damageEnemy(s, idx, dmg, p.index, ux * knock, uy * knock);
   }
+  emit(s, EV_SHOOT, p.x, p.y, width, w.def, p.x + ux * len, p.y + uy * len, p.index);
 }
 const LINE = new Int32Array(512);

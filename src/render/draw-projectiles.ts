@@ -65,7 +65,7 @@ function drawBoomerangs(view: RenderView, s: GameState, alpha: number): void {
   view.worldTransform(); // view.sprite() leaves its own transform behind
 }
 
-/** Mines: their blast zone (mines inside it go off together), the mine, its light once armed; white when set off by another. */
+/** Mines: their blast zone, the mine, its blinking light once armed. */
 function drawMines(view: RenderView, s: GameState): void {
   const sp = view.sprites;
   const ctx = view.ctx;
@@ -78,7 +78,7 @@ function drawMines(view: RenderView, s: GameState): void {
       ctx.arc(b.x, b.y, b.b, 0, Math.PI * 2);
       ctx.strokeStyle = ALL_WEAPONS[b.weapon].color;
       ctx.lineWidth = 1.5;
-      ctx.globalAlpha = b.d > 0 ? 0.6 : 0.16;
+      ctx.globalAlpha = 0.16;
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -86,7 +86,7 @@ function drawMines(view: RenderView, s: GameState): void {
   }
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_MINE || (b.d === 0 && (b.age < b.a || (b.age >> 3) & 1)) || !view.visible(b.x, b.y, 20)) continue;
+    if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !view.visible(b.x, b.y, 20)) continue;
     view.spriteAt(sp.mineLight, b.x, b.y);
   }
 }
@@ -259,7 +259,7 @@ function drawShurikens(view: RenderView, s: GameState, alpha: number): void {
     const x = lerp(b.px, b.x, alpha);
     const y = lerp(b.py, b.y, alpha);
     if (!view.visible(x, y, b.r + 6)) continue;
-    const rot = (b.age + alpha) * 0.27;
+    const rot = (b.age + alpha) * 0.5;
     const R = b.r;
     ctx.save();
     ctx.translate(x, y);
@@ -309,7 +309,8 @@ function drawRings(view: RenderView, s: GameState, alpha: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
     if (b.kind !== PJ_RING || !view.visible(b.x, b.y, b.a * 1.6)) continue;
-    drawShockwave(view, b.x, b.y, b.a, (b.age + alpha) / b.b, ALL_WEAPONS[b.weapon].color, b.d >= 0.5, i);
+    // seeded by its birth tick (the pool index moves when other projectiles go)
+    drawShockwave(view, b.x, b.y, b.a, (b.age + alpha) / b.b, ALL_WEAPONS[b.weapon].color, b.d >= 0.5, s.tick - b.age);
   }
 }
 

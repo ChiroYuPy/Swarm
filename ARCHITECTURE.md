@@ -16,7 +16,7 @@ Entry point: `index.html` loads `src/main.ts`, which imports the fonts and `src/
 | `src/render` | Canvas 2D: `renderer.ts` and the `draw-*.ts` layers, sprites, icons, HUD, cosmetic effects fed by sim events (`effects.ts`). | `sim`, `data`, `i18n` |
 | `src/audio` | Synthesized WebAudio sound effects and music loops (`audio.ts`). | `render` (the `SfxName` type) |
 | `src/input` | Keyboard, mouse and gamepad (`input.ts`): UI actions and per-step sim input codes. | `sim` |
-| `src/ui` | DOM screens (`ui.ts` core class, `screens/` one file per screen, `codex-data.ts`, `describe.ts`, `html.ts`). Styles in `src/styles/`. | `sim`, `data`, `i18n`, `render`, `storage`, `audio` |
+| `src/ui` | DOM screens (`ui.ts` core class, `screens/` one file per screen, `codex-data.ts`, `codex-preview.ts` (live mini-game of the codex, driven by the bot), `describe.ts`, `html.ts`). Styles in `src/styles/`. | `sim`, `data`, `i18n`, `render`, `storage`, `audio`, `ai` |
 | `src/app` | `App` (wires everything, main loop, URL params), menu demo, run info for the UI, drop-in intro, loop constants. | everything |
 
 ```
@@ -57,9 +57,9 @@ The sim is a pure function of `(GameConfig, input codes)`. That gives replays, t
 `src/data` refers to content by string id. `src/sim/registry.ts` compiles it once, at module load, into numeric tables so the hot loop never looks up a string:
 
 - `WEAPON_INDEX`, `PASSIVE_INDEX`, `ENEMY_INDEX` and `weaponId()` / `passiveId()` / `enemyId()` (throw on an unknown id).
-- `FUSION_TABLE`, `ENEMY_BEHAVIOR` (via the `BEHAVIOR` code table), `SPLIT_INTO`, `HATCH_INTO`, `RATES_BY_DIFFICULTY`, `UNLOCK_SLOT`, `MIXES`, `DEBUT_MIX`, `HORDE_TYPES`, `BOSS_TYPES`, `BOSS_CONFIGS`, `BOSS_PATTERNS`, `BOSS_SUMMONS`.
+- `FUSION_TABLE`, `ENEMY_BEHAVIOR` (via the `BEHAVIOR` code table), `SPLIT_INTO`, `HATCH_INTO`, `RATES_BY_DIFFICULTY`, `PLAN_MIXES`, `ENDLESS_MIXES`, `UNLOCK_SLOT`, `VICTORY_BOSS`, `PACK`, `CAP`, `HORDE_TYPES`, `BOSS_TYPES`, `BOSS_CONFIGS`, `BOSS_PATTERNS`, `BOSS_SUMMONS`.
 - Per-type tables are indexed by `e.type`, so code checks an enemy's behaviour (`ENEMY_BEHAVIOR[e.type] === BEHAVIOR.X`) and reads that type's own data; several types may share a behaviour. Boss phases read the parameter groups of the running boss (`BOSS_CONFIGS[e.type]`), and the registry throws at load if a boss lacks a group one of its phases needs (`PHASE_PARAMS` in `src/data/enemies.ts`).
-- Single-instance types found by behaviour (`PROP_TYPE`, `WALL_TYPE`, `EGG_TYPE`; exactly one each, or it throws), and the swarm / ring highlight types named in `WAVES` (`SWARM_TYPE`, `RING_TYPE`). `RALLY_SPEED` is the strongest leader aura: a rallied enemy does not store which leader rallied it.
+- Single-instance types found by behaviour (`PROP_TYPE`, `WALL_TYPE`, `EGG_TYPE`; exactly one each, or it throws), and the swarm / ring highlight types named in `WAVES` (`SWARM_TYPE`, `RING_TYPE`).
 - Ids the engine needs by name (`SQUADRON_WEAPON`, `KAMIKAZE_DRONES_WEAPON`, `BLACK_HOLE_WEAPON`, `BOT_FAVORITE_PASSIVES`), so a renamed id fails at load.
 
 Behaviour dispatch is by table, typed so a missing entry is a compile error:
@@ -115,7 +115,7 @@ All in `tests/`, run with `npm test` (Vitest, Node environment). `npm run typech
 | `fusion.test.ts` | Evolution recipes are consistent and applied correctly, boss chest grants them. |
 | `levelup.test.ts` | Offer order depends only on (seed, level), choices apply, world frozen during choice, fusions first. |
 | `swap.test.ts` | Weapon swap at level-up, arena items, gem merging. |
-| `enemies.test.ts` | Golem split, Leader, Teleporter, Orbiter, readable waves (at most 3 types), caps, despawn. |
+| `enemies.test.ts` | Hexagon split, Jumper, Orbiter, steering and collisions, boss arena, victory, readable waves (at most 3 types), caps and packs, despawn. |
 | `bosses.test.ts` | Wave/boss rhythm and each boss's signature attack. |
 | `items.test.ts` | Breakable bullets, Freeze, Clock, Totem, Clone, Fever. |
 | `sandbox.test.ts` | Sandbox loadout, invincibility, enemy selection, boss duel, reinforcements toggle. |

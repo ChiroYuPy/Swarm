@@ -1,6 +1,6 @@
 /**
- * Difficulty levels. They affect enemy strength AND the arrival pace of
- * new types (pace: multiplier of the wave phases' appearance times).
+ * Difficulty levels. The waves are the same in every difficulty (data/waves.ts plan): only enemy
+ * strength, enemy numbers and the item drops change.
  */
 export interface DifficultyDef {
   /** Name and description live in src/i18n/locales, keyed by this id. */
@@ -13,8 +13,8 @@ export interface DifficultyDef {
   speed: number;
   /** spawn rate multiplier */
   rate: number;
-  /** multiplier of the arrival times of new enemy types (> 1 = slower) */
-  pace: number;
+  /** chance multiplier of the items (heals, bonuses, active items) dropped by enemies */
+  loot: number;
 }
 
 export const DIFFICULTIES: DifficultyDef[] = [
@@ -25,7 +25,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     dmg: 0.45,
     speed: 0.85,
     rate: 0.8,
-    pace: 1.6,
+    loot: 1.25,
   },
   {
     id: 'normal',
@@ -34,7 +34,7 @@ export const DIFFICULTIES: DifficultyDef[] = [
     dmg: 0.82,
     speed: 0.92,
     rate: 0.95,
-    pace: 1.15,
+    loot: 1,
   },
   {
     id: 'hard',
@@ -42,8 +42,8 @@ export const DIFFICULTIES: DifficultyDef[] = [
     hp: 1.42,
     dmg: 1.42,
     speed: 1,
-    rate: 1.3,
-    pace: 0.7,
+    rate: 1.35,
+    loot: 0.6,
   },
 ];
 

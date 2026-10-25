@@ -1,4 +1,4 @@
-/* Codex screen: category tabs, item tile grid, detail sheet, rows, evolution recipes, chips and rules page. */
+/* Codex screen: tabs, item tile grid, detail sheet (header and level picker, live preview, details), rows. */
 
 /* ---------- Codex: tabs, grid | sheet ---------- */
 .screen-codex {
@@ -14,30 +14,97 @@
 }
 .codex {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 430px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
   gap: 0;
   width: 100%;
-  height: min(58vh, 560px);
-}
-.codex.solo {
-  grid-template-columns: minmax(0, 820px);
-  justify-content: center;
+  height: min(64vh, 640px);
 }
 .codex .panel {
   width: 100%;
   overflow-y: auto;
+  /* the scrollbar never changes the width (the preview is sized from it) */
+  scrollbar-gutter: stable;
 }
 .list {
   padding-right: 18px;
 }
-/* The sheet: separated from the grid by a simple rule. */
-.detail {
+/* The sheet: separated from the grid by a simple rule. Header, levels and preview stay put; only the details scroll. */
+.codex .panel.detail {
+  display: flex;
+  flex-direction: column;
   padding: 2px 6px 0 26px;
   border-left: 1px solid var(--line);
+  overflow: hidden;
 }
-.codex.solo .detail {
-  padding: 0 6px 0 0;
-  border-left: none;
+.detail .top,
+.detail .pv {
+  flex: none;
+}
+.detail .sheet {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+/* Live preview: a small real game, framed like a screen. */
+.detail .pv {
+  position: relative;
+  margin-top: 12px;
+}
+.detail canvas.preview {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #07020f;
+}
+/* Level picker: 1..5, then the evolution's icon in its own colour. */
+.lvls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.lvl {
+  --c: var(--accent, #38f6ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+}
+.lvl.evo {
+  margin-left: 6px;
+  opacity: 0.75;
+}
+.lvl.evo.on {
+  opacity: 1;
+}
+:where(body:not(.kbd)) .lvl:hover {
+  border-color: color-mix(in srgb, var(--c) 50%, transparent);
+  color: var(--text);
+}
+.lvl.on {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  color: var(--text);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 25%, transparent);
+}
+.detail p.line {
+  margin-top: 12px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
 }
 .list h3 {
   margin: 4px 0 8px;
@@ -166,61 +233,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-/* Evolution recipe: weapon + passive → evolution, large. */
-.recipe {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-/* the result on its own line: "A + B", then "→ C" */
-.recipe .res {
-  display: flex;
-  flex-basis: 100%;
-  align-items: center;
-  gap: 8px;
-}
-.recipe .op {
-  font-size: var(--fs-xl);
-  font-weight: 700;
-  color: var(--muted);
-}
-.chip {
-  --c: #fff;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px 4px 5px;
-  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--c) 6%, transparent);
-  font-size: var(--fs-m);
-  font-weight: 600;
-  color: var(--text);
-  transition:
-    border-color 0.12s,
-    background 0.12s;
-}
-.chip small {
-  font-size: var(--fs-s);
-  color: var(--c);
-}
-:where(body:not(.kbd)) .chip:hover,
-.chip:focus {
-  border-color: var(--c);
-  background: color-mix(in srgb, var(--c) 14%, transparent);
-}
-.rules {
-  display: grid;
-  gap: 18px;
-}
-.rules p {
-  font-size: var(--fs-l);
-  line-height: 1.5;
-  color: #d9d0f2;
-  margin-bottom: 6px;
-}
 @media (max-width: 1100px) {
   .codex {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -234,10 +246,11 @@
     grid-template-columns: 1fr;
     height: auto;
   }
-  .detail {
+  .codex .panel.detail {
     padding: 14px 0 0;
     border-left: none;
     border-top: 1px solid var(--line);
+    overflow: visible;
   }
   .codex .panel {
     max-height: 46vh;

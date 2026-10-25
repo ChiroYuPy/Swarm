@@ -127,6 +127,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       break;
     case 'circle':
     case 'dot':
+    case 'bomb':
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       break;
     case 'box':
@@ -139,31 +140,8 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
       ctx.lineTo(-r * 0.6, -r * 0.8);
       ctx.closePath();
       break;
-    case 'rock': {
-      // Irregular stone block.
-      const k = [1, 0.84, 0.96, 0.8, 1, 0.86, 0.94, 0.82];
-      for (let i = 0; i < 8; i++) {
-        const a = (i * Math.PI) / 4 + Math.PI / 8;
-        if (i === 0) ctx.moveTo(Math.cos(a) * r * k[i], Math.sin(a) * r * k[i]);
-        else ctx.lineTo(Math.cos(a) * r * k[i], Math.sin(a) * r * k[i]);
-      }
-      ctx.closePath();
-      break;
-    }
-    case 'sun':
-      // Sun: a disc and rays (it radiates onto its neighbors).
-      ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
-      for (let i = 0; i < 8; i++) {
-        const a = (i * Math.PI) / 4;
-        ctx.moveTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95);
-        ctx.lineTo(Math.cos(a) * r * 1.3, Math.sin(a) * r * 1.3);
-      }
-      break;
-    case 'ring':
-      // Portal: two rings.
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.moveTo(r * 0.55, 0);
-      ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+    case 'octagon':
+      polygon(ctx, 8, r, Math.PI / 8);
       break;
     case 'dart':
       ctx.moveTo(r * 1.3, 0);
@@ -176,7 +154,7 @@ function enemyShape(ctx: CanvasRenderingContext2D, d: EnemyDef): void {
     case 'block':
       // Hexagon (the boss: a second, smaller one in the center; the wall: flat, to tile as a honeycomb).
       polygon(ctx, 6, r, d.shape === 'block' ? 0 : Math.PI / 6);
-      if (d.shape === 'hexagon') polygon(ctx, 6, r * 0.5, 0);
+      if (d.shape === 'hexagon' && d.behavior === 'boss') polygon(ctx, 6, r * 0.5, 0);
       break;
     case 'star':
       for (let k = 0; k < 10; k++) {
@@ -249,6 +227,14 @@ export function paintEnemy(ctx: CanvasRenderingContext2D, d: EnemyDef, color: st
   {
     enemyShape(ctx, d);
     neon(ctx, color, lw, d.shape === 'dot' ? 0.45 : 0.14, halo);
+    if (d.shape === 'bomb') {
+      // Bomb: a cap and a fuse at the back (the spark is animated in draw-enemies.ts)
+      ctx.beginPath();
+      ctx.rect(-r * 1.22, -r * 0.28, r * 0.26, r * 0.56);
+      ctx.moveTo(-r * 1.22, 0);
+      ctx.quadraticCurveTo(-r * 1.6, r * 0.5, -r * 1.85, r * 0.2);
+      neon(ctx, color === '#ffffff' ? color : '#ffd9a0', 1.6, 0, halo);
+    }
     if (d.behavior === 'prop') {
       // Bonus crate: arcade-block style question mark
       ctx.beginPath();

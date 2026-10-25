@@ -23,7 +23,6 @@ import {
   PK_TURBO,
   TICK_RATE,
   BOSS_TYPES,
-  MIXES,
   MIX_TICKS,
   WAVE_TICKS,
   mixAt,
@@ -197,7 +196,7 @@ function drawWaveStrip(ctx: Ctx, s: GameState, W: number, opt: HudOptions, blink
     if (a > bw) break;
     const b = X(ws + waveSec);
     if (b > 0) {
-      const mix = pool ? null : MIXES[mixAt(s.seed, s.difficulty, j)];
+      const mix = pool ? null : mixAt(s.seed, j);
       const col = waveColor(s, j);
       const current = j === w.slot && w.inWave;
       g.beginPath();

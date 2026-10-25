@@ -9,7 +9,7 @@ export interface PassiveDef {
     cooldown?: number;
     /** speed bonus (0.06 = +6%) */
     speed?: number;
-    /** pickup radius bonus (0.25 = +25%) */
+    /** pickup radius bonus (1 = +100%) */
     magnet?: number;
     /** damage bonus */
     might?: number;
@@ -41,7 +41,7 @@ export const PASSIVES: PassiveDef[] = [
   {
     id: 'amplifier',
     color: '#d0d0ff',
-    perLevel: { area: 0.08 },
+    perLevel: { area: 0.06 },
   },
   {
     id: 'thrusters',
@@ -51,17 +51,17 @@ export const PASSIVES: PassiveDef[] = [
   {
     id: 'magnet',
     color: '#ff5a5a',
-    perLevel: { magnet: 0.25 },
+    perLevel: { magnet: 1 },
   },
   {
     id: 'vitality',
     color: '#8dff8d',
-    perLevel: { maxHp: 15, regen: 0.15 },
+    perLevel: { maxHp: 20, regen: 0.15 },
   },
   {
     id: 'armor',
     color: '#a0b4ff',
-    perLevel: { armor: 0.05 },
+    perLevel: { armor: 0.1 },
   },
   {
     id: 'luck',

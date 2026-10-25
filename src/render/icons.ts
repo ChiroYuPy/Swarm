@@ -263,21 +263,16 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
       neon(ctx, '#ff3b5c', lw * 0.6, 0.7);
     }),
   railgun: ({ ctx, r, c, lw }) => {
-    // The Blaster capsule on the diagonal, its trails replaced by shock rings
-    lw *= 1.15;
+    // A straight beam across the icon, with a bright core
     ctx.save();
     ctx.rotate(-Math.PI / 4);
-    capsule(ctx, -r * 0.05, r * 0.55, r * 0.18);
-    neon(ctx, c, lw * 0.9, 0.5);
-    for (const [x, k] of [
-      [-r * 0.35, 0.34],
-      [-r * 0.7, 0.26],
-      [-r * 1.0, 0.18],
-    ]) {
-      ctx.beginPath();
-      ctx.ellipse(x, 0, r * 0.07, r * k, 0, 0, TAU);
-      neon(ctx, c, lw * 0.5);
-    }
+    ctx.moveTo(-r * 1.05, 0);
+    ctx.lineTo(r * 1.05, 0);
+    neon(ctx, c, lw * 1.6);
+    ctx.beginPath();
+    ctx.moveTo(-r * 1.05, 0);
+    ctx.lineTo(r * 1.05, 0);
+    neon(ctx, '#ffffff', lw * 0.5);
     ctx.restore();
   },
   mines: ({ ctx, r, c, lw }) => {
@@ -369,6 +364,18 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
       bee(ctx, Math.cos(a) * r * 0.66, Math.sin(a) * r * 0.66, a + Math.PI / 2, r * 0.2);
     }
     neon(ctx, c, lw * 0.55, 0.5);
+  },
+  scythe: ({ ctx, r, c, lw }) => {
+    // Long handle on the diagonal, a curved blade at its top
+    ctx.moveTo(-r * 0.75, r * 0.85);
+    ctx.lineTo(r * 0.45, -r * 0.75);
+    neon(ctx, c, lw * 0.8);
+    ctx.beginPath();
+    ctx.moveTo(r * 0.5, -r * 0.82);
+    ctx.quadraticCurveTo(-r * 0.2, -r * 1.05, -r * 0.85, -r * 0.35);
+    ctx.quadraticCurveTo(-r * 0.25, -r * 0.72, r * 0.36, -r * 0.6);
+    ctx.closePath();
+    neon(ctx, '#ffffff', lw * 0.8, 0.4);
   },
   hornets: ({ ctx, r, c, lw }) => {
     // Arrow diving onto an explosion

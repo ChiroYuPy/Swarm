@@ -37,7 +37,7 @@ import { buildInfo, ownedLevel, runInfo, swapInfo } from './info';
 import { cameraZoom, landingFx } from './drop';
 import { FpsMeter, MENU_CATCHUP, PLAY_CATCHUP, STEP_MS, musicIntensity } from './loop';
 
-type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'dying' | 'dead' | 'replay';
+type Mode = 'menu' | 'playing' | 'levelup' | 'paused' | 'victory' | 'dying' | 'dead' | 'replay';
 
 const params = new URLSearchParams(location.search);
 
@@ -67,6 +67,8 @@ export class App implements AppApi {
   private deathTotal = 1;
   /** avoids recording the same run twice */
   private runFinished = false;
+  /** the victory screen was shown for this run (it only comes once) */
+  private victoryShown = false;
   private readonly fps = new FpsMeter();
   private time = 0;
   private readonly botMode = params.get('bot') === '1';
@@ -186,6 +188,7 @@ export class App implements AppApi {
     this.demo = false;
     this.replay = null;
     this.runFinished = false;
+    this.victoryShown = false;
     this.usePending = false;
     this.log.clear();
     this.fx.reset(this.state.seed);
@@ -227,6 +230,15 @@ export class App implements AppApi {
     this.audio.setDuck(1);
     if (this.mode === 'levelup') this.showLevelUp();
     else this.ui.hide();
+    this.acc = 0;
+    this.last = performance.now();
+  }
+
+  continueEndless(): void {
+    if (this.mode !== 'victory') return;
+    this.mode = 'playing';
+    this.ui.hide();
+    this.audio.setDuck(1);
     this.acc = 0;
     this.last = performance.now();
   }
@@ -327,6 +339,11 @@ export class App implements AppApi {
           } else this.resume();
         } else if (dir) this.ui.navigate(dir);
         else if (a === 'confirm') this.ui.activate();
+        break;
+      case 'victory':
+        if (dir) this.ui.navigate(dir);
+        else if (a === 'confirm') this.ui.activate();
+        else if (a === 'pause' || a === 'back') this.continueEndless();
         break;
       case 'replay':
         if (!this.replay) break;
@@ -432,6 +449,15 @@ export class App implements AppApi {
       this.audio.setDuck(0.3);
       return;
     }
+    // The last boss of the run is down: go on (endless) or end here.
+    if (s.won && !this.victoryShown && !this.botMode) {
+      this.victoryShown = true;
+      this.mode = 'victory';
+      this.usePending = false;
+      this.audio.setDuck(0.5);
+      this.ui.showVictory(this.runInfo());
+      return;
+    }
     if (!this.botMode && isAwaitingChoice(s)) {
       this.mode = 'levelup';
       this.usePending = false;
@@ -468,6 +494,7 @@ export class App implements AppApi {
       isReplay,
       sandbox: !!this.config.sandbox,
       survived: this.state.players[0].alive,
+      won: this.state.won,
     };
     this.mode = 'dead';
     this.audio.setIntensity(0);
@@ -590,7 +617,7 @@ export class App implements AppApi {
       quality: this.save.settings.quality,
       time: this.time,
       // When paused, the summary repeats everything the HUD shows: hide it.
-      hud: !this.demo && drop < 0 && this.mode !== 'paused',
+      hud: !this.demo && drop < 0 && this.mode !== 'paused' && this.mode !== 'victory',
       zoom,
       drop: drop >= 0 ? drop : undefined,
       showFps: this.save.settings.showFps && !this.demo,
@@ -604,7 +631,7 @@ export class App implements AppApi {
     });
     document.body.classList.toggle('demo', this.demo);
     document.body.classList.toggle('dead', this.mode === 'dead');
-    document.body.classList.toggle('paused', this.mode === 'paused');
+    document.body.classList.toggle('paused', this.mode === 'paused' || this.mode === 'victory');
     requestAnimationFrame((t) => this.frame(t));
   }
 }

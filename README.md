@@ -6,7 +6,7 @@ A neon survivor-like for the browser: survive an endless tide of geometric enemi
 
 ## How to play
 
-Move; your weapons fire on their own. Collect XP, and at each level pick 1 upgrade out of 3 (up to 5 weapons and 4 passives, 5 levels each). A maxed weapon plus its maxed passive evolves into a stronger weapon. Enemies drop timed bonuses and usable items (one stored at a time). Every 4 waves a boss arrives. There are three difficulties, a Sandbox mode for free setups (never ranked), a Codex with every weapon, item and enemy, and a local leaderboard per difficulty.
+Move; your weapons fire on their own. Collect XP, and at each level pick 1 upgrade out of 3 (up to 6 weapons and 4 passives, 5 levels each). A maxed weapon evolves into a stronger one. Enemies drop timed bonuses and usable items (one stored at a time). Every 4 waves a boss locks you in its arena; beat the 5th one to win the run, then go on in endless mode if you like. There are three difficulties, a Sandbox mode for free setups (never ranked), a Codex with a live preview of every enemy, boss, weapon (each level and its evolution), item and passive, and a local leaderboard per difficulty.
 
 ## Controls
 

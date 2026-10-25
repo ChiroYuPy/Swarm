@@ -9,11 +9,9 @@ export const LEGACY_ENEMY_IDS: Readonly<Record<string, string>> = {
   carre: 'block',
   pentagone: 'shooter',
   orbiteur: 'orbiter',
-  golem: 'golem',
-  golem2: 'golem_medium',
-  golem3: 'golem_small',
-  meneur: 'leader',
-  teleporteur: 'teleporter',
+  // the Golem and the Teleporter were replaced by the Hexagon and the Jumper (v5); the Leader was removed
+  golem: 'hexagon',
+  teleporteur: 'jumper',
   cercle: 'bomber',
   points: 'swarm',
   distributeur: 'bonus_crate',
@@ -58,6 +56,9 @@ export const LEGACY_WEAPON_IDS: Readonly<Record<string, string>> = {
  * Save v3 weapon ids renamed by the v4 weapon redesign. The other v3 ids are unchanged, except the removed
  * weapons (turret, scythe, phoenix, bastion, squadron), which are dropped.
  */
+/** Save v3 weapon ids removed by the v4 redesign (`scythe` is now another weapon, the Blade's evolution). */
+export const REMOVED_WEAPON_IDS_V4: ReadonlySet<string> = new Set(['turret', 'scythe', 'phoenix', 'bastion', 'squadron']);
+
 export const RENAMED_WEAPON_IDS_V4: Readonly<Record<string, string>> = {
   orbs: 'saws',
   laser: 'railgun',
@@ -65,6 +66,12 @@ export const RENAMED_WEAPON_IDS_V4: Readonly<Record<string, string>> = {
   drone: 'swarm',
   ricochet: 'shuriken',
   kamikaze_drones: 'hornets',
+};
+
+/** Save v4 enemy ids replaced by the v5 enemy redesign; the other removed ones (leader, golem_medium, golem_small) are dropped. */
+export const REPLACED_ENEMY_IDS_V5: Readonly<Record<string, string>> = {
+  golem: 'hexagon',
+  teleporter: 'jumper',
 };
 
 export const LEGACY_PASSIVE_IDS: Readonly<Record<string, string>> = {

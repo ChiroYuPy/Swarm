@@ -47,7 +47,7 @@ export class UI {
   codexReturn: () => void = () => this.showMenu();
   /** codex opened from the pause: shown over the run */
   codexOverlay = false;
-  codexTab: CodexTab = 'weapons';
+  codexTab: CodexTab = 'entities';
   countAnim = 0;
   levelOpenedAt = 0;
   /** displayed screen (leaving ones stay in #ui for a moment, inert) */
@@ -309,6 +309,7 @@ export class UI {
   activate(): boolean {
     this.setKbd(true);
     if (this.wake()) return true;
+    if (this.current === 'codex' && screens.codexNav(this, 'confirm')) return true;
     const ae = document.activeElement as HTMLElement | null;
     if (ae && ae.tagName === 'BUTTON' && this.screenEl?.contains(ae)) {
       ae.click();
@@ -393,7 +394,7 @@ export class UI {
     screens.showSettings(this, onBack);
   }
 
-  showCodex(tab: CodexTab, sel = 0, onBack?: () => void): void {
+  showCodex(tab: CodexTab, sel?: number, onBack?: () => void): void {
     screens.showCodex(this, tab, sel, onBack);
   }
 
@@ -415,6 +416,10 @@ export class UI {
 
   showPause(build: BuildInfo, run: RunInfo, instant = false): void {
     screens.showPause(this, build, run, instant);
+  }
+
+  showVictory(run: RunInfo): void {
+    screens.showVictory(this, run);
   }
 
   showDeath(d: DeathInfo): void {

@@ -62,7 +62,7 @@ describe('save migration', () => {
 
     const r = save.sandbox.rules;
     expect(save.sandbox.difficulty).toBe(0);
-    expect(r.enemies).toEqual(['hunter', 'rusher', 'golem', 'teleporter']);
+    expect(r.enemies).toEqual(['hunter', 'rusher', 'hexagon', 'jumper']);
     expect(r.duel).toBe('ricochet_star');
     expect(r.duelMark).toBe(3);
     expect(r.weapons).toEqual([
@@ -116,6 +116,12 @@ describe('save migration', () => {
     ]);
   });
 
+  it('v4 → v5: replaced enemies get their successor, removed ones are dropped', () => {
+    const v4 = { ...migrate(structuredClone(V2_SAVE)), version: 4 };
+    v4.sandbox.rules.enemies = ['marble', 'golem', 'leader', 'teleporter', 'golem_small', 'block', 'hexagon'];
+    expect(migrate(v4).sandbox.rules.enemies).toEqual(['marble', 'hexagon', 'jumper', 'block']);
+  });
+
   it('legacy tables only point at existing content ids', () => {
     const weapons = new Set(ALL_WEAPONS.map((w) => w.id));
     const passives = new Set(PASSIVES.map((p) => p.id));
@@ -124,9 +130,11 @@ describe('save migration', () => {
     for (const id of Object.values(RENAMED_WEAPON_IDS_V4)) expect(weapons.has(id), id).toBe(true);
     for (const id of Object.values(LEGACY_PASSIVE_IDS)) expect(passives.has(id), id).toBe(true);
     for (const id of Object.values(LEGACY_ENEMY_IDS)) expect(enemies.has(id), id).toBe(true);
-    expect(Object.keys(LEGACY_WEAPON_IDS)).toHaveLength(ALL_WEAPONS.length);
+    // (weapons: every one but those added after v3, which have no legacy name)
+    const added = ['scythe'];
+    expect(Object.keys(LEGACY_WEAPON_IDS)).toHaveLength(ALL_WEAPONS.filter((w) => !added.includes(w.id)).length);
     expect(Object.keys(LEGACY_PASSIVE_IDS)).toHaveLength(PASSIVES.length);
-    expect(Object.keys(LEGACY_ENEMY_IDS)).toHaveLength(ENEMIES.length);
+    // (enemies: the ones removed since v2 have no entry, the ones added since have no legacy name)
   });
 });
 
@@ -137,6 +145,6 @@ describe('language setting', () => {
     expect(migrate({ ...v3, settings: { ...v3.settings, language: 'de' } }).settings.language).toBe('fr');
     const { language: _drop, ...noLanguage } = v3.settings;
     expect(migrate({ ...v3, settings: noLanguage }).settings.language).toBe('fr');
-    expect(SAVE_VERSION).toBe(4);
+    expect(SAVE_VERSION).toBe(5);
   });
 });

@@ -19,6 +19,7 @@ function deathLine(d: DeathInfo): string {
   const k = d.record.kills;
   if (d.isReplay) return t('death.lines.replay');
   if (d.sandbox) return t('death.lines.sandbox');
+  if (d.won) return t('death.lines.won');
   if (d.rank === 1 && d.bestBefore > 0) return t('death.lines.newRecord');
   if (time < 60) return t('death.lines.underMinute');
   if (d.bossKills >= 2) return t('death.lines.bosses', { n: d.bossKills });
@@ -72,7 +73,7 @@ export function showDeath(ui: UI, d: DeathInfo): void {
     <div class="banner ${variant}">
       <div class="banner-band"></div>
       <div class="banner-content">
-        <h2 class="go">${t(d.isReplay ? 'death.replayDone' : d.sandbox && d.survived ? 'death.testDone' : 'death.gameOver')}</h2>
+        <h2 class="go">${t(d.isReplay ? 'death.replayDone' : d.sandbox && d.survived ? 'death.testDone' : d.won ? 'death.victory' : 'death.gameOver')}</h2>
         <div class="go-score"><small>${t('run.score')} · ${d.sandbox ? `${t('common.sandbox')} · ` : ''}<span style="color:${diff.color}">${esc(difficultyName(diff.id))}</span></small><b id="count">${pad7(0)}</b></div>
       </div>
       ${record ? `<span class="stamp">${t('death.stamp')}</span>` : ''}

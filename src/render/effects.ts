@@ -22,6 +22,9 @@ import {
   EV_ENEMY_SHOT,
   EV_EXPLOSION,
   EV_FUSE,
+  EV_LAND,
+  EV_VICTORY,
+  EV_ARENA,
   EV_MAP_ITEM,
   EV_FUSION,
   EV_GEM,
@@ -41,7 +44,6 @@ import {
   EV_WALL_HIT,
   EV_SHOT_DOWN,
   EV_SHATTER,
-  EV_BLINK,
   EV_REVIVE,
   EV_CLONE_END,
   EV_FLEE,
@@ -106,6 +108,7 @@ const MAXP = 1800;
 const MAXT = 36;
 const MAXL = 128;
 const MAXR = 48;
+const MAXB = 48;
 
 /** Pickup message: bonus = instant effect, usable = stored (Space to use it). Built on the fly, in the current locale. */
 const PICKUP_TOAST: Record<PickupKind, (d: PickupDef) => string> = {
@@ -182,6 +185,10 @@ const ENEMY_COL = ENEMIES.map((e) => fxColorIndex(e.color));
 const WEAPON_COL = ALL_WEAPONS.map((w) => fxColorIndex(w.color));
 const PICKUP_COL = PICKUPS.map((p) => fxColorIndex(p.color));
 
+/** how long a railgun beam stays visible (s), and how long its slug takes to cross the line */
+export const BEAM_LIFE = 0.32;
+export const BEAM_TRAVEL = 0.07;
+
 export class Effects {
   // Particles (structure of arrays)
   readonly px = new Float32Array(MAXP);
@@ -219,6 +226,16 @@ export class Effects {
   readonly rmax = new Float32Array(MAXR);
   readonly rcol = new Uint8Array(MAXR);
   rCount = 0;
+  // Railgun beams (fixed where they were fired)
+  readonly bx1 = new Float32Array(MAXB);
+  readonly by1 = new Float32Array(MAXB);
+  readonly bx2 = new Float32Array(MAXB);
+  readonly by2 = new Float32Array(MAXB);
+  readonly bw = new Float32Array(MAXB);
+  readonly blife = new Float32Array(MAXB);
+  /** weapon def index (its own colour, not the particle palette) */
+  readonly bdef = new Uint16Array(MAXB);
+  bCount = 0;
 
   shake = 0;
   flash = 0;
@@ -237,7 +254,7 @@ export class Effects {
 
   reset(seed: number): void {
     this.rng = new Rng(deriveSeed(seed, STREAM.COSMETIC));
-    this.pCount = this.tCount = this.lCount = this.rCount = 0;
+    this.pCount = this.tCount = this.lCount = this.rCount = this.bCount = 0;
     this.shake = this.flash = this.hurtFlash = 0;
   }
 
@@ -344,7 +361,19 @@ export class Effects {
           h.sfx('levelup');
           break;
         case EV_SHOOT: {
-          h.sfx(SHOT_SFX[weaponDef(e.k).behavior]);
+          const beh = weaponDef(e.k).behavior;
+          h.sfx(SHOT_SFX[beh]);
+          if (beh === 'rail' && this.bCount < MAXB) {
+            // Railgun: the line from the shot's start (x, y) to its end (x2, y2), v = width.
+            const k = this.bCount++;
+            this.bx1[k] = e.x;
+            this.by1[k] = e.y;
+            this.bx2[k] = e.x2;
+            this.by2[k] = e.y2;
+            this.bw[k] = e.v;
+            this.blife[k] = BEAM_LIFE;
+            this.bdef[k] = e.k;
+          }
           break;
         }
         case EV_EXPLOSION:
@@ -466,10 +495,25 @@ export class Effects {
           h.toast(t('toasts.revive'), '#ffb347');
           h.sfx('revive');
           break;
-        case EV_BLINK:
-          this.burst(e.x, e.y, 14, 23, 220, 0.4, 3);
-          this.ring(e.x, e.y, e.v, 23, 0.3);
-          h.sfx('blink');
+        case EV_LAND:
+          // a Jumper lands: an impact ring when it attacks (v = radius), a small puff otherwise
+          this.burst(e.x, e.y, e.v > 0 ? 14 : 6, ENEMY_COL[e.k], 200, 0.4, 3);
+          if (e.v > 0) {
+            this.ring(e.x, e.y, e.v, ENEMY_COL[e.k], 0.3);
+            this.addShake(2);
+            h.sfx('blink');
+          }
+          break;
+        case EV_ARENA:
+          // the boss arena closes (v = radius) or opens again (v = 0): drawn by draw-world.ts
+          if (e.v > 0) this.addShake(4);
+          break;
+        case EV_VICTORY:
+          this.flash = 0.5;
+          this.flashColor = '#ffd23a';
+          this.ring(e.x, e.y, 420, 11, 1.2);
+          this.burst(e.x, e.y, 90, 11, 460, 1.2, 5);
+          h.toast(t('toasts.victory'), '#ffd23a');
           break;
         case EV_CLONE_END:
           this.burst(e.x, e.y, 18, 17, 160, 0.5, 3);
@@ -550,6 +594,19 @@ export class Effects {
         this.llife[i] = this.llife[l];
         this.lcol[i] = this.lcol[l];
         this.lseed[i] = this.lseed[l];
+      }
+    }
+    for (let i = this.bCount - 1; i >= 0; i--) {
+      this.blife[i] -= dt;
+      if (this.blife[i] <= 0) {
+        const l = --this.bCount;
+        this.bx1[i] = this.bx1[l];
+        this.by1[i] = this.by1[l];
+        this.bx2[i] = this.bx2[l];
+        this.by2[i] = this.by2[l];
+        this.bw[i] = this.bw[l];
+        this.blife[i] = this.blife[l];
+        this.bdef[i] = this.bdef[l];
       }
     }
     for (let i = this.rCount - 1; i >= 0; i--) {

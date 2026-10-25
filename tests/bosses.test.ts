@@ -42,7 +42,7 @@ describe('waves and bosses', () => {
     const n = last();
     for (let i = 0; i < MIX_TICKS - WAVE_TICKS - 1; i++) step(s, [0]);
     expect(last()).toBe(n);
-    for (let i = 0; i < 30; i++) step(s, [0]);
+    for (let i = 0; i < 3 * 60; i++) step(s, [0]);
     expect(last()).toBeGreaterThan(n);
   });
 

@@ -1,7 +1,7 @@
 /**
  * Swarm: keeps `count` PJ_BEE agents around the player (their logic is in projectiles.ts, `bee`). A bee waits
- * in a calm ring around you, darts at a target (the nuisances first: shooters, orbiters, leaders,
- * teleporters, then the nearest enemy), plants itself in it for `stay` s dealing `damage` per second, dies,
+ * in a calm ring around you, darts at a target (the nuisances first: shooters, orbiters, jumpers,
+ * then the nearest enemy), plants itself in it for `stay` s dealing `damage` per second, dies,
  * and comes back to the ring after `respawn` s. Hornets (`dive`) explode on contact instead.
  */
 import type { WeaponLevel } from '../../data/weapons';
@@ -68,8 +68,8 @@ export function ringAngle(s: GameState, k: number, n: number): number {
   return a;
 }
 
-/** the nuisances, by behavior: they keep away from you (shooters, orbiters) or make the others worse */
-const NUISANCE_BEHAVIORS: number[] = [BEHAVIOR.SHOOTER, BEHAVIOR.ORBITER, BEHAVIOR.LEADER, BEHAVIOR.BLINKER];
+/** the nuisances, by behavior: they keep away from you (shooters, orbiters, jumpers) */
+const NUISANCE_BEHAVIORS: number[] = [BEHAVIOR.SHOOTER, BEHAVIOR.ORBITER, BEHAVIOR.JUMPER];
 const NUISANCE: boolean[] = ENEMY_BEHAVIOR.map((b) => NUISANCE_BEHAVIORS.includes(b));
 /** other enemies are only chased this close to you (share of the range) */
 const NEAR_SHARE = 0.7;

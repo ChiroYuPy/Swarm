@@ -6,7 +6,8 @@ import { PI, TWO_PI, datan2, dcos, dsin } from './dmath';
 import { spawnEnemy, spawnGem, spawnPickup } from './entities';
 import { circleHitsObstacle } from './map';
 import { clearShotsIn } from './shots';
-import { AFTER_BOSS_TICKS, BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO } from './registry';
+import { AFTER_BOSS_TICKS, BEHAVIOR, ENEMY_BEHAVIOR, SPLIT_INTO, VICTORY_BOSS } from './registry';
+import { DIFFICULTIES } from '../data/difficulty';
 import { dmgMul, hpMul, spdMul } from './spawner';
 import { ENEMIES } from '../data/enemies';
 import {
@@ -19,6 +20,8 @@ import {
   EV_KILL,
   EV_REVIVE,
   EV_SHATTER,
+  EV_ARENA,
+  EV_VICTORY,
   EF_BOSS,
   EF_PROP,
   DMG_COLD,
@@ -147,8 +150,15 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
     for (const p of s.players) if (p.master < 0) p.swaps = Math.min(LOOT.swaps.max, p.swaps + LOOT.swaps.perBoss);
     if (s.bossId === e.id) {
       s.bossId = -1;
-      // A bit of calm to pick up the chest before the waves resume.
+      // A bit of calm to pick up the chest before the waves resume; the arena opens.
       s.calmUntil = s.tick + AFTER_BOSS_TICKS;
+      s.arenaR = 0;
+      emit(s, EV_ARENA, s.arenaX, s.arenaY, 0);
+      // The last boss of the run: won (the game can go on, endless). Never in the sandbox.
+      if (e.aux2 === VICTORY_BOSS && !s.won && !s.sandbox) {
+        s.won = true;
+        emit(s, EV_VICTORY, e.x, e.y);
+      }
     }
     spawnPickup(s, PK_CHEST, e.x, e.y);
     spawnPickup(s, randomActive(s), e.x + 60, e.y);
@@ -168,7 +178,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
   }
   // Loot: always 2 draws (rate, family) to keep a steady stream.
   const luck = owner >= 0 ? s.players[owner].stats.luck : 1;
-  const mul = (swarm ? LOOT.swarmMul : 1) * luck;
+  const mul = (swarm ? LOOT.swarmMul : 1) * luck * DIFFICULTIES[s.difficulty].loot;
   const r = s.rngLoot.next();
   const pick = s.rngLoot.next();
   if (r < LOOT.activeChance * mul) spawnPickup(s, pickFrom(ACTIVE_KINDS, ACTIVE_W, pick), e.x, e.y);
@@ -176,7 +186,7 @@ export function killEnemy(s: GameState, idx: number, owner: number): void {
 }
 
 /**
- * Golem: its halves fly off to each side, perpendicular to its walk. They are born at the
+ * Splitter (Hexagon): its pieces burst out all around, the first ones to its sides. They are born at the
  * end of the pool (outside this tick's grid): no ongoing query is disturbed.
  */
 function split(s: GameState, x: number, y: number, fx: number, fy: number, type: number, target: number): void {
@@ -198,11 +208,11 @@ function split(s: GameState, x: number, y: number, fx: number, fy: number, type:
     }
     const f = spawnEnemy(s, into, cx, cy, hpMul(s), dmgMul(s), spdMul(s), target);
     if (!f) return;
-    f.kbx = ux * 260;
-    f.kby = uy * 260;
+    f.kbx = ux * 320;
+    f.kby = uy * 320;
     f.vx = ux;
     f.vy = uy;
-    f.stunUntil = s.tick + 12;
+    f.stunUntil = s.tick + 18;
   }
 }
 

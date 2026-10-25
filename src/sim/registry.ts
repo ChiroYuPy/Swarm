@@ -56,8 +56,7 @@ export const BEHAVIOR = {
   SWARM: 4,
   PROP: 5,
   BOSS: 6,
-  LEADER: 7,
-  BLINKER: 8,
+  JUMPER: 7,
   ORBITER: 9,
   WALL: 10,
   EGG: 11,
@@ -65,21 +64,11 @@ export const BEHAVIOR = {
 export const ENEMY_BEHAVIOR = ENEMIES.map((e) => BEHAVIOR[e.behavior.toUpperCase() as Uppercase<EnemyBehavior>]);
 /** Splitter: enemy type born on its death (-1: none). */
 export const SPLIT_INTO = ENEMIES.map((e) => (e.splitInto ? enemyId(e.splitInto) : -1));
-/**
- * Leaders: the leader type whose aura is the strongest (-1: none) and the speed bonus of a rallied enemy.
- * A rallied enemy only stores until when it is rallied (`boostUntil`), not by which leader (a new Enemy
- * field would change the state hash), so with several leader types the strongest `auraSpeed` applies to
- * all of them. Each leader's own `auraRadius` is read per type.
- */
-export const RALLY_TYPE = strongestLeader();
-function strongestLeader(): number {
-  let best = -1;
-  ENEMIES.forEach((e, i) => {
-    if (e.behavior === 'leader' && (best < 0 || (e.auraSpeed ?? 0) > (ENEMIES[best].auraSpeed ?? 0))) best = i;
-  });
-  return best;
-}
-export const RALLY_SPEED = RALLY_TYPE >= 0 ? (ENEMIES[RALLY_TYPE].auraSpeed ?? 0) : 0;
+/** Wave-stream pack size (1: alone) and cap on living ones (0: none), per type. */
+export const PACK = ENEMIES.map((e) => Math.max(1, e.pack ?? 1));
+export const CAP = ENEMIES.map((e) => e.cap ?? 0);
+/** Steering: how fast each type reaches the speed it wants (units/s²). */
+export const ACCEL = ENEMIES.map((e) => e.accel ?? Math.max(170, e.speed * 3));
 
 export interface CompiledFusion {
   result: number;
@@ -95,9 +84,9 @@ export interface CompiledRate {
   rate: number;
 }
 
-/** Spawn-rate curve for each difficulty (times × pace, rate × rate). */
+/** Spawn-rate curve for each difficulty (rate × the difficulty's rate). */
 export const RATES_BY_DIFFICULTY: CompiledRate[][] = DIFFICULTIES.map((d) =>
-  WAVES.rates.map((p) => ({ atTick: Math.round(p.at * d.pace * TICK_RATE), rate: p.rate * d.rate })),
+  WAVES.rates.map((p) => ({ atTick: Math.round(p.at * TICK_RATE), rate: p.rate * d.rate })),
 );
 
 /** One wave + its pause: one mix slot. */
@@ -107,50 +96,48 @@ export const WAVE_TICKS = Math.round(WAVES.waveLength * TICK_RATE);
 export const BOSS_TICKS = MIX_TICKS * WAVES.wavesPerBoss;
 export const AFTER_BOSS_TICKS = Math.round(WAVES.afterBoss * TICK_RATE);
 
-/**
- * Mix slot from which each type appears, per difficulty (-1: never in the stream).
- * The arrival is rounded up to the next slot.
- */
-export const UNLOCK_SLOT: Int32Array[] = DIFFICULTIES.map((d) => {
-  const out = new Int32Array(NUM_ENEMY_TYPES).fill(-1);
-  for (const [id, at] of Object.entries(WAVES.unlocks)) out[enemyId(id)] = Math.ceil((at * d.pace * TICK_RATE) / MIX_TICKS);
-  return out;
-});
-
 export interface CompiledMix {
   weights: Float64Array;
   total: number;
   types: number[];
-  /** draw weight: mixes with the most recent types come up more often */
-  pick: number;
 }
 
-/** arrival rank of each type (0 = the first) */
-const UNLOCK_RANK = new Int32Array(NUM_ENEMY_TYPES);
-Object.entries(WAVES.unlocks)
-  .sort((a, b) => a[1] - b[1])
-  .forEach(([id], i) => (UNLOCK_RANK[enemyId(id)] = i));
-
-export const MIXES: CompiledMix[] = WAVES.mixes.map((m) => {
+function compileMix(m: Record<string, number>): CompiledMix {
   const weights = new Float64Array(NUM_ENEMY_TYPES);
   let total = 0;
-  let rank = 0;
   const types: number[] = [];
   for (const [id, w] of Object.entries(m)) {
     const t = enemyId(id);
     weights[t] = w;
     total += w;
     types.push(t);
-    rank = Math.max(rank, UNLOCK_RANK[t]);
   }
-  return { weights, total, types, pick: (rank + 1) * Math.sqrt(rank + 1) };
-});
+  return { weights, total, types };
+}
 
-/** Debut mix of each type: the first one in the list that contains it. */
-export const DEBUT_MIX = new Int32Array(NUM_ENEMY_TYPES).fill(-1);
-MIXES.forEach((m, i) => {
-  for (const t of m.types) if (DEBUT_MIX[t] < 0) DEBUT_MIX[t] = i;
+/** The run's waves, in order (WAVES.plan), then the endless mode's mixes (WAVES.mixes). */
+export const PLAN_MIXES: CompiledMix[] = WAVES.plan.map(compileMix);
+export const ENDLESS_MIXES: CompiledMix[] = WAVES.mixes.map(compileMix);
+/** Number of planned waves; the boss after the last one is the last of the run (victory). */
+export const PLAN_WAVES = PLAN_MIXES.length;
+/** Rank (0 = the first) of the boss whose death wins the run. */
+export const VICTORY_BOSS = Math.floor(PLAN_WAVES / WAVES.wavesPerBoss) - 1;
+if (PLAN_WAVES % WAVES.wavesPerBoss !== 0 || VICTORY_BOSS < 0 || VICTORY_BOSS >= BOSS_ORDER.length)
+  throw new Error('WAVES.plan must be whole blocks of wavesPerBoss waves, one per boss of BOSS_ORDER at most');
+
+/**
+ * Wave slot (0 = the first wave) in which each type arrives, -1 if never: the first planned wave that
+ * contains it, or the first wave of its highlight (the Swarm). The same in every difficulty.
+ */
+export const UNLOCK_SLOT = new Int32Array(NUM_ENEMY_TYPES).fill(-1);
+PLAN_MIXES.forEach((m, slot) => {
+  for (const t of m.types) if (UNLOCK_SLOT[t] < 0) UNLOCK_SLOT[t] = slot;
 });
+{
+  const sw = enemyId(WAVES.swarm.type);
+  const at = WAVES.swarm.firstWave - 1;
+  if (UNLOCK_SLOT[sw] < 0 || UNLOCK_SLOT[sw] > at) UNLOCK_SLOT[sw] = at;
+}
 
 export const HORDE_TYPES = WAVES.horde.types.map(enemyId);
 

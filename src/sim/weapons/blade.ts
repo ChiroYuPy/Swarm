@@ -1,13 +1,14 @@
 /**
  * Blade: a sword sweep around the player toward the densest group in reach (big enemies count double),
- * alternating left and right; every third swing is a full turn (a bit longer reach, +30% damage). The blade
- * really sweeps: an enemy is hit when the blade passes over it, once per swing. No projectile; visuals read
- * w.angles (0 = start, 1 = signed sweep, 2 = current angle, 3 = full turn, 4 = reach), w.vN (sweep ticks),
- * w.tickTimer (ticks elapsed) and w.activeTicks (ticks left, sweep + fade).
+ * alternating left and right. With `arc` of a half turn or more (Scythe), every swing is a full turn, and
+ * enemies under the outer `tip` share of the reach take double damage. The blade really sweeps: an enemy is
+ * hit when the blade passes over it, once per swing. No projectile; visuals read w.angles (0 = start,
+ * 1 = signed sweep, 2 = current angle, 3 = tip share, 4 = reach), w.vN (sweep ticks), w.tickTimer (ticks
+ * elapsed) and w.activeTicks (ticks left, sweep + fade).
  */
 import type { WeaponLevel } from '../../data/weapons';
 import { INPUT_DIRS, MAX_WEAPON_SLOTS } from '../constants';
-import { TWO_PI, datan2 } from '../dmath';
+import { PI, TWO_PI, datan2 } from '../dmath';
 import { damageEnemy } from '../combat';
 import { EV_SHOOT, emit, type GameState, type Player, type WeaponInst } from '../state';
 import { BIG_RADIUS, RETRY_TICKS, angleDiff, cdTicks, inCone } from './common';
@@ -40,13 +41,13 @@ export function blade(s: GameState, p: Player, w: WeaponInst, slot: number, L: W
     return;
   }
   w.shots++;
-  const full = w.shots % 3 === 0;
+  const full = half >= PI;
   const dir = w.shots & 1 ? 1 : -1;
   w.angles[0] = full ? a0 : a0 - half * dir;
   w.angles[1] = (full ? TWO_PI : 2 * half) * dir;
   w.angles[2] = w.angles[0];
-  w.angles[3] = full ? 1 : 0;
-  w.angles[4] = full ? reach * 1.1 : reach;
+  w.angles[3] = L.tip ?? 0;
+  w.angles[4] = reach;
   w.vN = full ? BLADE_TURN_TICKS : BLADE_SWEEP_TICKS;
   w.tickTimer = 0;
   w.activeTicks = w.vN + BLADE_FADE_TICKS;
@@ -57,8 +58,8 @@ export function blade(s: GameState, p: Player, w: WeaponInst, slot: number, L: W
 /** Hits what the blade crossed between the angles `from` and `to`. */
 function cut(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel, from: number, to: number): void {
   const R = w.angles[4];
-  const full = w.angles[3] === 1;
-  const dmg = L.damage * p.stats.might * (full ? 1.3 : 1);
+  const tipR = R * (1 - w.angles[3]);
+  const dmg = L.damage * p.stats.might;
   const knock = L.knockback ?? 60;
   const mid = (from + to) / 2;
   const span = Math.abs(to - from) / 2 + 0.1;
@@ -74,7 +75,8 @@ function cut(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLeve
     if (!inCone(dx, dy, e.r, mid, span, R)) continue;
     e.immune[key] = s.tick + w.vN + 1;
     const d = Math.sqrt(dx * dx + dy * dy) || 1;
-    damageEnemy(s, idx, dmg, p.index, (dx / d) * knock, (dy / d) * knock);
+    const tip = w.angles[3] > 0 && d + e.r >= tipR;
+    damageEnemy(s, idx, tip ? dmg * 2 : dmg, p.index, (dx / d) * knock, (dy / d) * knock);
   }
 }
 

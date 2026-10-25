@@ -7,12 +7,12 @@ import { difficultyDesc, difficultyName } from '../../i18n/content';
 import { SCREEN_COLOR, cascade, esc, heading, keys, num } from '../html';
 import type { UI } from '../ui';
 
-type Meter = 'hp' | 'dmg' | 'rate' | 'pace';
+type Meter = 'hp' | 'dmg' | 'rate' | 'loot';
 
 // ---------- Difficulty picker ----------
 /**
- * One card per difficulty: threat level, description, compared meters (toughness, damage, numbers,
- * arrival pace of new types) and the record of the difficulty if there is one.
+ * One card per difficulty: threat level, description, compared meters (toughness, damage, numbers, items)
+ * and the record of the difficulty if there is one.
  */
 export function showDifficulty(ui: UI): void {
   const save = ui.app.save;
@@ -21,7 +21,7 @@ export function showDifficulty(ui: UI): void {
     ['hp', (d) => d.hp],
     ['dmg', (d) => d.dmg],
     ['rate', (d) => d.rate],
-    ['pace', (d) => 1 / d.pace],
+    ['loot', (d) => d.loot],
   ];
   const meter = (d: (typeof DIFFICULTIES)[number], [key, f]: (typeof crit)[number]) => {
     const max = Math.max(...DIFFICULTIES.map(f));

@@ -126,6 +126,13 @@ export function botInput(s: GameState, pi = 0): number {
     const kamikaze = ENEMY_BEHAVIOR[e.type] === BEHAVIOR.KAMIKAZE;
     NEAR_W[n] = kamikaze ? (e.ai === 1 ? 90 : 28) : (e.dmg + 4) * (e.r > 30 ? 4 : 1);
     n++;
+    // Jumpers about to land (crouching, in the air): the landing spot is what hurts, the circle is visible.
+    if (ENEMY_BEHAVIOR[e.type] === BEHAVIOR.JUMPER && (e.ai === 1 || e.ai === 2) && n < NEAR_X.length) {
+      NEAR_X[n] = e.ax;
+      NEAR_Y[n] = e.ay;
+      NEAR_W[n] = 90;
+      n++;
+    }
   }
   for (let i = 0; i < s.projCount && n < NEAR_X.length; i++) {
     const b = s.projectiles[i];
@@ -195,6 +202,13 @@ export function botInput(s: GameState, pi = 0): number {
     let score = 0;
     if (circleHitsObstacle(s.map, x2, y2, p.r)) score -= 25;
     if (circleHitsObstacle(s.map, p.x + dx * 170, p.y + dy * 170, p.r)) score -= 8;
+    // Boss arena: stay off its wall (it blocks, and the boss pins you there).
+    if (s.arenaR > 0) {
+      const ax = x2 - s.arenaX;
+      const ay = y2 - s.arenaY;
+      const lim = s.arenaR - 70;
+      if (ax * ax + ay * ay > lim * lim) score -= 30;
+    }
     let threat = 0;
     for (let i = 0; i < n; i++) {
       // Threat evaluated at two distances: the immediate step counts more.

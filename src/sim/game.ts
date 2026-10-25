@@ -19,9 +19,9 @@ import { computeStats, updatePlayer, useActivable } from './player';
 import { LOOT } from '../data/loot';
 import { addWeapon, applyChoice, handleSwapCode, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
-import { pushOutOfWalls, updateContacts, updateEnemies } from './enemies';
+import { keepInArena, pushOutOfWalls, updateContacts, updateEnemies } from './enemies';
 import { processShatters, updateBurns } from './combat';
-import { updateWeapons } from './weapons';
+import { SHURIKEN_BOX_X, SHURIKEN_BOX_Y, updateWeapons } from './weapons';
 import { updateProjectiles } from './projectiles';
 import { updateGems, updatePickups } from './pickups';
 import { compactEnemies } from './entities';
@@ -76,6 +76,12 @@ export function createGame(cfg: GameConfig): GameState {
     bossId: -1,
     clock: 0,
     calmUntil: 0,
+    arenaX: 0,
+    arenaY: 0,
+    arenaR: 0,
+    won: false,
+    boxX: SHURIKEN_BOX_X,
+    boxY: SHURIKEN_BOX_Y,
     chestCount: 0,
     totalKills: 0,
     clockUntil: 0,
@@ -168,6 +174,7 @@ function tick(s: GameState, inputs: ArrayLike<number>): void {
   for (let i = 0; i < s.players.length; i++) {
     updatePlayer(s, s.players[i], inputs[i] ?? 0);
     pushOutOfWalls(s, s.players[i]);
+    keepInArena(s, s.players[i]);
   }
   const a = anchor(s);
   updateSpawner(s);

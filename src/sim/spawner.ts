@@ -1,8 +1,8 @@
 /**
  * Waves: each wave (stream, swarm, horde or encirclement) is followed by a pause; every 4 waves, a boss,
- * alone on the field: the wave clock stops until it dies. Bonus crates keep coming.
- * Enemy types arrive progressively, more or less quickly depending on the difficulty. The stream only mixes
- * 2-3 types at a time (see WAVES.mixes), picked statelessly from the seed and the slot.
+ * alone with the player in its arena: the wave clock stops until it dies. Bonus crates keep coming.
+ * The run follows WAVES.plan, wave by wave (the same in every difficulty), and each wave only mixes 2-3
+ * types. After the plan (the run is won), the endless mode draws its mixes statelessly from the seed and the slot.
  *
  * Important invariant: consumption of the WAVES stream depends ONLY on the wave clock. Each spawn always draws
  * the same number of values, even if it fails (cap reached, obstacle). So the sequence
@@ -14,6 +14,7 @@ import { DIFFICULTIES } from '../data/difficulty';
 import { DT, TICK_RATE } from './constants';
 import { TWO_PI, dcos, dsin } from './dmath';
 import { circleHitsObstacle } from './map';
+import { keepInArena } from './enemies';
 import { spawnEnemy, spawnPickup } from './entities';
 import { rollMapItem } from './combat';
 import { LOOT } from '../data/loot';
@@ -21,22 +22,27 @@ import {
   BOSS_PATTERNS,
   BOSS_TICKS,
   BOSS_TYPES,
-  DEBUT_MIX,
+  CAP,
+  ENDLESS_MIXES,
   HORDE_TYPES,
-  MIXES,
   MIX_TICKS,
   NUM_ENEMY_TYPES,
+  PACK,
+  PLAN_MIXES,
+  PLAN_WAVES,
   PROP_TYPE,
   RATES_BY_DIFFICULTY,
   RING_TYPE,
   SWARM_TYPE,
   UNLOCK_SLOT,
   WAVE_TICKS,
+  type CompiledMix,
 } from './registry';
 import { deriveSeed } from './rng';
 import {
   EF_BOSS,
   EF_PROP,
+  EV_ARENA,
   EV_BOSS_SPAWN,
   EV_FLEE,
   EV_MAP_ITEM,
@@ -79,55 +85,37 @@ export function spawnRate(tick: number, difficulty = 1): { rate: number } {
   return { rate };
 }
 
-function mixAvailable(unlock: Int32Array, i: number, slot: number): boolean {
-  for (const t of MIXES[i].types) if (unlock[t] < 0 || unlock[t] > slot) return false;
-  return true;
+/** Endless mix of a slot, knowing the previous slot's one (`avoid`): a draw from the seed and the slot. */
+function pickEndless(seed: number, slot: number, avoid: number): number {
+  const n = ENDLESS_MIXES.length;
+  if (n <= 1) return 0;
+  const r = Math.floor((deriveSeed(seed, 0x6d6978, slot) / 4294967296) * (n - 1));
+  return avoid >= 0 && r >= avoid ? r + 1 : r;
 }
 
-/** Picks a slot's mix, knowing the previous slot's one (`avoid`). */
-function pickMix(seed: number, difficulty: number, slot: number, avoid: number): number {
-  const unlock = UNLOCK_SLOT[difficulty];
-  let debut = -1;
-  for (let t = 0; t < NUM_ENEMY_TYPES; t++) if (unlock[t] === slot && DEBUT_MIX[t] > debut) debut = DEBUT_MIX[t];
-  if (debut >= 0) return debut;
-  let total = 0;
-  for (let i = 0; i < MIXES.length; i++) if (i !== avoid && mixAvailable(unlock, i, slot)) total += MIXES[i].pick;
-  if (total <= 0) return Math.max(0, avoid);
-  let r = (deriveSeed(seed, 0x6d6978, slot) / 4294967296) * total;
-  let last = 0;
-  for (let i = 0; i < MIXES.length; i++) {
-    if (i === avoid || !mixAvailable(unlock, i, slot)) continue;
-    last = i;
-    r -= MIXES[i].pick;
-    if (r < 0) return i;
-  }
-  return last;
-}
-
-/** Mix sequence already computed for a seed and a difficulty (pure: just a cache). */
-const mixMemo = { seed: -1, difficulty: -1, list: [] as number[] };
+/** Endless mix sequence already computed for a seed (pure: just a cache). */
+const mixMemo = { seed: -1, list: [] as number[] };
 
 /**
- * Mix active during slot `slot` (index into MIXES). A newly arriving type forces its debut
- * mix; otherwise a weighted draw (seed + slot), never the same mix two waves in a row.
+ * Mix of wave slot `slot` (0 = the first wave): the planned wave, then (endless mode) a draw from the seed
+ * and the slot, never the same mix two waves in a row. The same in every difficulty.
  */
-export function mixAt(seed: number, difficulty: number, slot: number): number {
-  if (mixMemo.seed !== seed || mixMemo.difficulty !== difficulty) {
+export function mixAt(seed: number, slot: number): CompiledMix {
+  if (slot < PLAN_WAVES) return PLAN_MIXES[slot];
+  if (mixMemo.seed !== seed) {
     mixMemo.seed = seed;
-    mixMemo.difficulty = difficulty;
     mixMemo.list.length = 0;
   }
   const list = mixMemo.list;
-  while (list.length <= slot) list.push(pickMix(seed, difficulty, list.length, list.length > 0 ? list[list.length - 1] : -1));
-  return list[slot];
+  const k = slot - PLAN_WAVES;
+  while (list.length <= k) list.push(pickEndless(seed, PLAN_WAVES + list.length, list.length > 0 ? list[list.length - 1] : -1));
+  return ENDLESS_MIXES[list[k]];
 }
 
-/** Cap on living enemies for limited types (Golem): grows with the time since its arrival. */
+/** Strong types are capped (data/enemies.ts `cap`): no new one from the stream while that many live. */
 function underCap(s: GameState, type: number): boolean {
-  const d = ENEMIES[type];
-  if (!d.capStart) return true;
-  const since = Math.max(0, s.clock - Math.max(0, UNLOCK_SLOT[s.difficulty][type]) * MIX_TICKS);
-  const cap = Math.min(d.capMax ?? 99, d.capStart + Math.floor((since / (60 * TICK_RATE)) * (d.capPerMinute ?? 0)));
+  const cap = CAP[type];
+  if (cap <= 0) return true;
   let n = 0;
   for (let i = 0; i < s.enemyCount; i++) if (s.enemies[i].alive && s.enemies[i].type === type) n++;
   return n < cap;
@@ -209,7 +197,8 @@ function updateMapItems(s: GameState): void {
 }
 
 /**
- * The boss arrives: normal enemies flee, only it remains (and whatever it summons).
+ * The boss arrives: normal enemies flee, only it remains (and whatever it summons), and its arena closes
+ * around the player: a ring neither of them can leave until it dies.
  * `k` = its rank in the game (0 = the first): it sets the boss, its strength and its name (Mk II…).
  */
 function spawnBoss(s: GameState, k = s.bossSpawned): void {
@@ -221,7 +210,13 @@ function spawnBoss(s: GameState, k = s.bossSpawned): void {
     emit(s, EV_FLEE, o.x, o.y, o.r, o.type);
     o.alive = false;
   }
-  const e = spawnAround(s, type, a, 620, targetPlayer(s));
+  const target = targetPlayer(s);
+  const p = s.players[target];
+  s.arenaX = p.x;
+  s.arenaY = p.y;
+  s.arenaR = WAVES.arena.radius;
+  emit(s, EV_ARENA, p.x, p.y, s.arenaR);
+  const e = spawnAround(s, type, a, WAVES.arena.bossDistance, target);
   s.bossSpawned++;
   if (!e) return;
   const d = ENEMIES[type];
@@ -232,6 +227,7 @@ function spawnBoss(s: GameState, k = s.bossSpawned): void {
   e.ai = 0;
   e.timer = Math.round(BOSS_PATTERNS[type][0].duration * TICK_RATE);
   s.bossId = e.id;
+  keepInArena(s, e);
   emit(s, EV_BOSS_SPAWN, e.x, e.y, k, e.type);
 }
 
@@ -284,15 +280,12 @@ export function updateSpawner(s: GameState): void {
   const pool = sb?.enemies ?? null;
   const flux = pool ? pool.filter((t) => t !== SWARM_TYPE) : null;
 
-  const mix = MIXES[pool ? 0 : mixAt(s.seed, s.difficulty, slot)];
+  const mix = mixAt(s.seed, slot);
 
   // Wave start: announcement (and arrival of a new enemy type).
   if (pos === 0) {
     emit(s, EV_WAVE, 0, 0, slot + 1);
-    if (!pool) {
-      const unlock = UNLOCK_SLOT[s.difficulty];
-      for (let t = 0; t < NUM_ENEMY_TYPES; t++) if (unlock[t] === slot) emit(s, EV_NEW_ENEMY, 0, 0, 0, t);
-    }
+    if (!pool) for (let t = 0; t < NUM_ENEMY_TYPES; t++) if (UNLOCK_SLOT[t] === slot) emit(s, EV_NEW_ENEMY, 0, 0, 0, t);
   }
 
   s.spawnBudget += rate * DT * mul;
@@ -302,17 +295,27 @@ export function updateSpawner(s: GameState): void {
     const type = flux ? flux[Math.min(flux.length - 1, Math.floor(rngW.next() * flux.length))] : rngW.weighted(mix.weights, mix.total);
     const a = rngW.next() * TWO_PI;
     const j = rngW.next();
-    if (s.enemyCount >= WAVES.fluxCap || type === undefined) continue;
-    if (!underCap(s, type)) continue;
-    spawnAround(s, type, a, WAVES.spawnRadius + j * WAVES.spawnJitter, targetPlayer(s));
+    if (type === undefined) continue;
+    // A pack (Marbles) costs its size, whether it spawns or not (the stream only depends on the clock).
+    const n = PACK[type];
+    s.spawnBudget -= n - 1;
+    if (s.enemyCount >= WAVES.fluxCap || !underCap(s, type)) continue;
+    const target = targetPlayer(s);
+    const lead = spawnAround(s, type, a, WAVES.spawnRadius + j * WAVES.spawnJitter, target);
+    if (!lead || n <= 1) continue;
+    // the others around the first one, in a small disc
+    const r = ENEMIES[type].radius * 2.3;
+    for (let k = 1; k < n; k++) {
+      const ga = k * 2.399963229728653;
+      const rr = r * Math.sqrt(k);
+      spawnAt(s, type, lead.x + dcos(ga) * rr, lead.y + dsin(ga) * rr, target);
+    }
   }
   if (mul <= 0) return;
 
   // Swarm: once per wave.
   const sw = WAVES.swarm;
-  const swFirst = pool ? 0 : sw.firstAt * diff.pace;
-  if ((!pool || pool.includes(SWARM_TYPE)) && t >= swFirst && pos === Math.round(sw.at * TICK_RATE)) {
-    if (!pool && t - MIX_TICKS * DT < swFirst) emit(s, EV_NEW_ENEMY, 0, 0, 0, SWARM_TYPE);
+  if ((pool ? pool.includes(SWARM_TYPE) : slot >= sw.firstWave - 1) && pos === Math.round(sw.at * TICK_RATE)) {
     const a = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
     const p = s.players[target];
@@ -327,9 +330,9 @@ export function updateSpawner(s: GameState): void {
     emit(s, EV_SWARM, cx, cy, count);
   }
 
-  // Hordes (even waves): lots of older enemies at once, from a single side.
+  // Hordes (odd-numbered waves): lots of older enemies at once, from a single side.
   const hd = WAVES.horde;
-  if (!pool && slot % 2 === 0 && t >= hd.firstAt * diff.pace && pos === Math.round(hd.at * TICK_RATE)) {
+  if (!pool && slot % 2 === 0 && slot >= hd.firstWave - 1 && pos === Math.round(hd.at * TICK_RATE)) {
     const type = HORDE_TYPES[(slot / 2) % HORDE_TYPES.length];
     const a = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
@@ -345,10 +348,9 @@ export function updateSpawner(s: GameState): void {
     emit(s, EV_SWARM, cx, cy, count, type + 1);
   }
 
-  // Encirclements (odd waves)
+  // Encirclements (even-numbered waves)
   const rg = WAVES.ring;
-  const rgFirst = pool ? 0 : rg.firstAt * diff.pace;
-  if ((!pool || pool.includes(RING_TYPE)) && slot % 2 === 1 && t >= rgFirst && pos === Math.round(rg.at * TICK_RATE)) {
+  if ((pool ? pool.includes(RING_TYPE) : slot >= rg.firstWave - 1) && slot % 2 === 1 && pos === Math.round(rg.at * TICK_RATE)) {
     const a0 = rngW.next() * TWO_PI;
     const target = targetPlayer(s);
     const p = s.players[target];

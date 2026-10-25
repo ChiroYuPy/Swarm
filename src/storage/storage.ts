@@ -8,12 +8,21 @@ import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { HERO } from '../data/hero';
 import { DEFAULT_LOCALE, isLocale, type Locale } from '../i18n';
 import { ALL_WEAPONS } from '../data/weapons';
-import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, RENAMED_WEAPON_IDS_V4, upgradeId } from './legacy-ids';
+import { ENEMIES } from '../data/enemies';
+import {
+  LEGACY_ENEMY_IDS,
+  LEGACY_PASSIVE_IDS,
+  LEGACY_WEAPON_IDS,
+  REMOVED_WEAPON_IDS_V4,
+  RENAMED_WEAPON_IDS_V4,
+  REPLACED_ENEMY_IDS_V5,
+  upgradeId,
+} from './legacy-ids';
 
 export const SAVE_KEY = 'swarm.save';
 /** Key used before the project was renamed, moved to SAVE_KEY on first load. */
 export const LEGACY_SAVE_KEY = 'neonawak.save';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const TOP_PER_DIFFICULTY = 10;
 
 export interface Settings {
@@ -122,6 +131,11 @@ export function migrate(raw: unknown): SaveData {
     data = { ...data, sandbox: upgradeSandboxWeaponsV4(data.sandbox) };
     version = 4;
   }
+  if (version === 4) {
+    // v4 → v5: enemy redesign, sandbox enemies replaced (golem → hexagon, teleporter → jumper) and removed ones dropped.
+    data = { ...data, sandbox: upgradeSandboxEnemiesV5(data.sandbox) };
+    version = 5;
+  }
   if (version > SAVE_VERSION) return base; // save from a future version: do not break it, ignore it
   const d = typeof data.difficulty === 'number' ? data.difficulty : DEFAULT_DIFFICULTY;
   const settings: Settings = { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) };
@@ -171,11 +185,25 @@ function upgradeSandboxWeaponsV4(raw: unknown): unknown {
   if (!rules || typeof rules !== 'object' || !Array.isArray(rules.weapons)) return setup;
   const weapons = rules.weapons.flatMap((x) => {
     const old = x && typeof x === 'object' ? (x as { id?: unknown }).id : undefined;
-    if (typeof old !== 'string') return [];
+    if (typeof old !== 'string' || REMOVED_WEAPON_IDS_V4.has(old)) return [];
     const id = RENAMED_WEAPON_IDS_V4[old] ?? old;
     return ALL_WEAPONS.some((w) => w.id === id) ? [{ ...(x as object), id }] : [];
   });
   return { ...setup, rules: { ...rules, weapons } };
+}
+
+/** v4 → v5 sandbox setup: replaced enemy ids mapped to their successors, enemies that no longer exist dropped. */
+function upgradeSandboxEnemiesV5(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const setup = raw as Record<string, unknown>;
+  const rules = setup.rules as Record<string, unknown> | undefined;
+  if (!rules || typeof rules !== 'object' || !Array.isArray(rules.enemies)) return setup;
+  const enemies = rules.enemies.flatMap((old) => {
+    if (typeof old !== 'string') return [];
+    const id = REPLACED_ENEMY_IDS_V5[old] ?? old;
+    return ENEMIES.some((e) => e.id === id) ? [id] : [];
+  });
+  return { ...setup, rules: { ...rules, enemies: [...new Set(enemies)] } };
 }
 
 /** Sandbox settings read back carefully: any missing or invalid field falls back to its default value. */
