@@ -168,13 +168,24 @@ describe('weapons', () => {
     expect(on / (6 * TICK_RATE)).toBeLessThan(((L.duration ?? 0) / ((L.duration ?? 0) + (L.cooldown ?? 0))) * 1.5);
   });
 
-  it('Mines: one every cooldown, even with no enemy around, and a blast does not set off the others', () => {
+  it('Mines: one every cooldown while moving, even with no enemy around, never overlapping, and a blast does not set off the others', () => {
     const s = empty('mines', 1);
-    run(s, 5);
+    // Moving in a straight line at full speed (input code 1).
+    for (let i = 0; i < 5 * TICK_RATE; i++) step(s, [1]);
     const L = weaponDef(s.players[0].weapons[0].def).levels[0];
     const n = projs(s, PJ_MINE).length;
     expect(n).toBeGreaterThanOrEqual(Math.floor(5 / (L.cooldown ?? 1)));
     expect(n).toBeLessThanOrEqual(Math.floor(5 / (L.cooldown ?? 1)) + 1);
+    // Standing still: the first mine only, the next ones would overlap its blast zone.
+    const still = empty('mines', 1);
+    run(still, 5);
+    expect(projs(still, PJ_MINE).length).toBe(1);
+    // Moving slowly: every mine is at least two blast radii from the others.
+    const slow = empty('mines', 1);
+    for (let i = 0; i < 5 * TICK_RATE; i++) step(slow, [65]);
+    const mines = projs(slow, PJ_MINE);
+    expect(mines.length).toBeGreaterThan(1);
+    for (const a of mines) for (const b of mines) if (a !== b) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(a.b + b.b);
     const c = empty('mines', 1);
     const p = c.players[0];
     p.weapons.length = 0;

@@ -238,11 +238,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'arc',
     color: '#5fa8ff',
     levels: prog(
-      { damage: 5, cooldown: 2.5, duration: 0.6, tick: 0.2, range: 230, jumps: 1, jumpRange: 110, stun: 0.15 },
-      { damage: 7, duration: 0.8, jumps: 2 },
-      { damage: 9, duration: 1.0, stun: 0.2 },
-      { damage: 11, duration: 1.3, jumps: 3 },
-      { damage: 14, duration: 1.6, stun: 0.25 },
+      { damage: 4, cooldown: 2.5, duration: 0.6, tick: 0.2, range: 230, jumps: 1, jumpRange: 110, stun: 0.1 },
+      { damage: 5, duration: 0.8, jumps: 2 },
+      { damage: 6, duration: 1.0, stun: 0.12 },
+      { damage: 8, duration: 1.2, jumps: 3 },
+      { damage: 10, duration: 1.4, stun: 0.15 },
     ),
   },
   {
@@ -338,7 +338,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'arc',
     color: '#9fd0ff',
     fusion: true,
-    levels: [{ damage: 20, cooldown: 1.4, duration: 1.6, tick: 0.2, range: 300, jumps: 6, jumpRange: 150, stun: 0.3, sideStun: 0.2 }],
+    levels: [{ damage: 14, cooldown: 2.0, duration: 1.4, tick: 0.2, range: 300, jumps: 5, jumpRange: 140, stun: 0.15, sideStun: 0.1 }],
   },
   {
     id: 'hornets',

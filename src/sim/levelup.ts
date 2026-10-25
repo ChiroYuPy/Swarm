@@ -1,10 +1,10 @@
 /**
  * Level-up offers, applying choices, evolutions.
  *
- * Reproducibility: for level L, the fixed universe of items (all base weapons + passives) is shuffled
- * with a PRNG derived from (seed, LEVELUP, L). This order is IDENTICAL for all players of a seed;
- * then the first 3 offers valid for the player's build are kept. Two players with the same build
- * therefore see exactly the same offers.
+ * Reproducibility: the offers of level L are drawn with a PRNG derived from (seed, LEVELUP, L), among
+ * candidates listed in data order from the player's build only. Two players with the same build at the
+ * same level of a seed therefore see exactly the same offers, whatever the path to get there.
+ * The rules (early free draw, then upgrades with at most one new item, sometimes a heal) are in LOOT.offers.
  */
 import { ALL_WEAPONS, BASE_WEAPONS } from '../data/weapons';
 import { PASSIVES } from '../data/passives';
@@ -31,39 +31,16 @@ import {
   type Player,
 } from './state';
 
-interface UniverseItem {
-  kind: typeof OFFER_WEAPON | typeof OFFER_PASSIVE;
-  id: number;
+/** Cards per level-up. */
+const OFFER_COUNT = 3;
+
+interface Candidate {
+  offer: Offer;
   weight: number;
 }
 
-const UNIVERSE: UniverseItem[] = [
-  ...BASE_WEAPONS.map((w, i): UniverseItem => ({ kind: OFFER_WEAPON, id: i, weight: w.weight ?? 1 })),
-  ...PASSIVES.map((p, i): UniverseItem => ({ kind: OFFER_PASSIVE, id: i, weight: p.weight ?? 0.85 })),
-];
-
-/** Offer order for a given level: only depends on (seed, level). */
-export function offerOrder(seed: number, level: number): number[] {
-  const rng = new Rng(deriveSeed(seed, STREAM.LEVELUP, level));
-  const remaining = UNIVERSE.map((_, i) => i);
-  const order: number[] = [];
-  while (remaining.length > 0) {
-    let total = 0;
-    for (const i of remaining) total += UNIVERSE[i].weight;
-    let r = rng.next() * total;
-    let pick = remaining.length - 1;
-    for (let k = 0; k < remaining.length; k++) {
-      r -= UNIVERSE[remaining[k]].weight;
-      if (r < 0) {
-        pick = k;
-        break;
-      }
-    }
-    order.push(remaining[pick]);
-    remaining.splice(pick, 1);
-  }
-  return order;
-}
+const weaponWeight = (id: number): number => BASE_WEAPONS[id].weight ?? 1;
+const passiveWeight = (id: number): number => PASSIVES[id].weight ?? 0.85;
 
 function findWeapon(p: Player, def: number): WeaponInst | undefined {
   for (const w of p.weapons) if (w.def === def) return w;
@@ -72,18 +49,6 @@ function findWeapon(p: Player, def: number): WeaponInst | undefined {
 function findPassive(p: Player, def: number): PassiveInst | undefined {
   for (const x of p.passives) if (x.def === def) return x;
   return undefined;
-}
-
-function makeOffer(p: Player, u: UniverseItem): Offer | null {
-  if (u.kind === OFFER_WEAPON) {
-    const owned = findWeapon(p, u.id);
-    if (owned) return owned.level < weaponMaxLevel(u.id) ? { kind: u.kind, id: u.id, toLevel: owned.level + 1 } : null;
-    if (p.banned.includes(u.id)) return null;
-    return p.weapons.length < MAX_WEAPON_SLOTS ? { kind: u.kind, id: u.id, toLevel: 1 } : null;
-  }
-  const owned = findPassive(p, u.id);
-  if (owned) return owned.level < MAX_ITEM_LEVEL ? { kind: u.kind, id: u.id, toLevel: owned.level + 1 } : null;
-  return p.passives.length < MAX_PASSIVE_SLOTS ? { kind: u.kind, id: u.id, toLevel: 1 } : null;
 }
 
 /** Indices of the evolutions available to this player: their weapon is at max level (data priority order). */
@@ -98,21 +63,83 @@ export function availableFusions(p: Player): number[] {
   return out;
 }
 
+/** What the player could be offered: upgrades of what they hold (evolutions included), new weapons, new passives. */
+function candidates(p: Player): { ups: Candidate[]; newWeapons: Candidate[]; newPassives: Candidate[] } {
+  const ups: Candidate[] = [];
+  const newWeapons: Candidate[] = [];
+  const newPassives: Candidate[] = [];
+  const fusions = availableFusions(p);
+  for (let id = 0; id < BASE_WEAPONS.length; id++) {
+    const weight = weaponWeight(id);
+    const owned = findWeapon(p, id);
+    if (owned) {
+      if (owned.level < weaponMaxLevel(id)) ups.push({ offer: { kind: OFFER_WEAPON, id, toLevel: owned.level + 1 }, weight });
+      else {
+        // The upgrade of a max-level weapon is its evolution, if it has one.
+        const f = fusions.find((k) => FUSION_TABLE[k].weapon === id);
+        if (f !== undefined) ups.push({ offer: { kind: OFFER_FUSION, id: f, toLevel: 1 }, weight });
+      }
+    } else if (!p.banned.includes(id) && p.weapons.length < MAX_WEAPON_SLOTS) {
+      newWeapons.push({ offer: { kind: OFFER_WEAPON, id, toLevel: 1 }, weight });
+    }
+  }
+  for (let id = 0; id < PASSIVES.length; id++) {
+    const weight = passiveWeight(id);
+    const owned = findPassive(p, id);
+    if (owned) {
+      if (owned.level < MAX_ITEM_LEVEL) ups.push({ offer: { kind: OFFER_PASSIVE, id, toLevel: owned.level + 1 }, weight });
+    } else if (p.passives.length < MAX_PASSIVE_SLOTS) {
+      newPassives.push({ offer: { kind: OFFER_PASSIVE, id, toLevel: 1 }, weight });
+    }
+  }
+  return { ups, newWeapons, newPassives };
+}
+
+/** Weighted draw of one candidate, removed from the pool. */
+function draw(rng: Rng, pool: Candidate[]): Offer {
+  let total = 0;
+  for (const c of pool) total += c.weight;
+  let r = rng.next() * total;
+  let pick = pool.length - 1;
+  for (let k = 0; k < pool.length; k++) {
+    r -= pool[k].weight;
+    if (r < 0) {
+      pick = k;
+      break;
+    }
+  }
+  return pool.splice(pick, 1)[0].offer;
+}
+
 export function rollOffers(s: GameState, p: Player): void {
   p.swapSlot = -1;
   const level = p.level - p.pendingLevels + 1;
   p.offerLevel = level;
+  const cfg = LOOT.offers;
+  const rng = new Rng(deriveSeed(s.seed, STREAM.LEVELUP, level));
+  const { ups, newWeapons, newPassives } = candidates(p);
   const offers: Offer[] = [];
-  const fusions = availableFusions(p);
-  // Every possible evolution is offered first.
-  for (const f of fusions) if (offers.length < 3) offers.push({ kind: OFFER_FUSION, id: f, toLevel: 1 });
-  const order = offerOrder(s.seed, level);
-  for (const idx of order) {
-    if (offers.length >= 3) break;
-    const o = makeOffer(p, UNIVERSE[idx]);
-    if (o) offers.push(o);
+  let heal = false;
+  if (level <= 1 + cfg.earlyLevels) {
+    // First level-ups: new items and upgrades mixed freely.
+    const all = [...ups, ...newWeapons, ...newPassives];
+    while (offers.length < OFFER_COUNT && all.length > 0) offers.push(draw(rng, all));
+  } else {
+    const r = rng.next();
+    let fresh: Candidate[] = [];
+    if (r < cfg.newWeapon) fresh = newWeapons.length > 0 ? newWeapons : newPassives;
+    else if (r < cfg.newWeapon + cfg.newPassive) fresh = newPassives.length > 0 ? newPassives : newWeapons;
+    heal = rng.chance(ups.length <= cfg.fewUpgrades ? cfg.healFew : cfg.heal);
+    const cards = OFFER_COUNT - (heal ? 1 : 0);
+    const upCards = cards - (fresh.length > 0 ? 1 : 0);
+    while (offers.length < upCards && ups.length > 0) offers.push(draw(rng, ups));
+    // The new item takes a random place among the upgrades.
+    if (fresh.length > 0) offers.splice(rng.int(offers.length + 1), 0, draw(rng, fresh));
+    // Not enough upgrades left: more new items fill in.
+    const rest = [...newWeapons, ...newPassives];
+    while (offers.length < cards && rest.length > 0) offers.push(draw(rng, rest));
   }
-  if (offers.length === 0) offers.push({ kind: OFFER_HEAL, id: 0, toLevel: 0 });
+  if (heal || offers.length < OFFER_COUNT) offers.push({ kind: OFFER_HEAL, id: 0, toLevel: 0 });
   p.offers = offers;
 }
 

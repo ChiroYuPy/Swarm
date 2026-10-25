@@ -154,7 +154,7 @@ export const fr = {
     /** level picker: the evolution, after level 5 */
     evo: 'Évolution',
     evolutionHint:
-      'Proposée au level-up qui suit le niveau 5 de l’arme, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement.',
+      'Une fois l’arme au niveau 5, proposée aux level-up comme une amélioration de l’arme, ou offerte par le coffre du boss. Elle remplace l’arme d’origine, au même emplacement.',
     tiles: {
       damage: 'Dégâts',
       cooldown: 'Recharge',
@@ -171,7 +171,7 @@ export const fr = {
       active: 'Rangé dans l’emplacement « Objet » et déclenché avec Espace (bouton A). Un seul en réserve : en ramasser un autre le remplace.',
       relic:
         'Gardée à part (elle n’occupe pas l’emplacement « Objet ») et affichée au-dessus de ta barre. Une seule à la fois. Très rare : lâchée par les ennemis et les caisses bonus.',
-      instant: 'Lâché au hasard par les ennemis, et proposé au level-up quand ton équipement est complet.',
+      instant: 'Lâché au hasard par les ennemis, et parfois proposé au level-up, plus souvent quand il reste peu d’améliorations.',
     },
     enemy: {
       hp: 'PV',
@@ -209,7 +209,7 @@ export const fr = {
     reload: 'recharge {n} s',
     every: 'toutes les {n} s',
     hitsEvery: 'touche toutes les {n} s',
-    evolutionHint: 'Niveau max : évolue en {names} au prochain niveau.',
+    evolutionHint: 'Niveau max : pourra évoluer en {names}.',
     or: ' ou ',
   },
   levelup: {
@@ -224,6 +224,7 @@ export const fr = {
     swapLevel: 'Échange · niveau {n}',
     replaces: 'Remplace {name}',
     full: 'Équipement complet',
+    heal: 'Soin immédiat',
     cancelSwap: 'Annuler l’échange',
     swapCharges: {
       one: 'Échanger une arme · <b>{n}</b> charge',
@@ -491,16 +492,16 @@ export const fr = {
       name: 'Arc électrique',
       desc: 'Toutes les 2,5 s, un éclair s’accroche au plus gros ennemi proche et le bloque un court instant. Il électrocute aussi les ennemis autour de lui.',
       levels: [
-        'Éclair de 0,6 s, 5 dégâts toutes les 0,2 s, saute sur 1 voisin.',
-        'Dure 0,8 s, dégâts 7, 2 voisins',
-        'Dure 1 s, dégâts 9, bloque plus longtemps',
-        'Dure 1,3 s, dégâts 11, 3 voisins',
-        'Dure 1,6 s, dégâts 14, bloque plus longtemps',
+        'Éclair de 0,6 s, 4 dégâts toutes les 0,2 s, saute sur 1 voisin.',
+        'Dure 0,8 s, dégâts 5, 2 voisins',
+        'Dure 1 s, dégâts 6, bloque plus longtemps',
+        'Dure 1,2 s, dégâts 8, 3 voisins',
+        'Dure 1,4 s, dégâts 10, bloque plus longtemps',
       ],
     },
     mines: {
       name: 'Mines',
-      desc: 'Pose une mine sous toi toutes les 1,2 s. Elle reste 8 s et explose quand un ennemi marche dessus.',
+      desc: 'Pose une mine sous toi toutes les 1,2 s, jamais sur la zone d’une autre. Elle reste 8 s et explose quand un ennemi marche dessus.',
       levels: [
         'Mines de 45 dégâts.',
         'Dégâts 55, zone plus large',
@@ -560,7 +561,7 @@ export const fr = {
     electric_storm: {
       name: 'Tempête électrique',
       desc: 'Évolution de l’Arc électrique.',
-      levels: ['Toutes les 1,4 s, un éclair de 1,6 s s’accroche au plus gros ennemi et électrocute 6 ennemis autour de lui, bloqués eux aussi.'],
+      levels: ['Toutes les 2 s, un éclair de 1,4 s s’accroche au plus gros ennemi et électrocute 5 ennemis autour de lui, bloqués eux aussi par à-coups.'],
     },
     hornets: {
       name: 'Frelons',

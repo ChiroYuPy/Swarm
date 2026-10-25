@@ -83,6 +83,15 @@ export const LOOT = {
    * most often a Vacuum, otherwise a random active item or bonus. At most `maxVacuums` Vacuums on the ground.
    */
   mapItems: { every: 28, minDist: 320, maxDist: 620, vacuumChance: 0.6, activeChance: 0.5, maxVacuums: 2 },
+  /**
+   * Level-up offers (3 cards). The first `earlyLevels` level-ups draw freely among new items and upgrades.
+   * After that the cards are upgrades of what the player holds (an evolution is the upgrade of a max-level
+   * weapon, drawn like any other), with at most one new item: a new weapon with chance `newWeapon`, else a
+   * new passive with chance `newPassive` (the other kind if no slot is left for it). A heal takes one card
+   * with chance `heal`, `healFew` once `fewUpgrades` upgrades or fewer are left. Cards the upgrades cannot
+   * fill go to new items, then to a heal.
+   */
+  offers: { earlyLevels: 3, newWeapon: 0.5, newPassive: 0.25, heal: 0.1, healFew: 0.35, fewUpgrades: 4 },
   /** Weapon swap at level-up: starting charges, gained per boss defeated, maximum */
   swaps: { start: 1, perBoss: 1, max: 3 },
   /** bonus crate: probability of an active item (otherwise a bonus) */

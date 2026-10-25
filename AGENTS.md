@@ -57,7 +57,7 @@ Caught automatically: missing text or level lines (`i18n.test.ts`), missing icon
 
 ### An evolution (fusion)
 
-An evolution is what a base weapon becomes once it is at max level: an "Evolution" card at the next level-up (or the boss chest). It replaces the weapon in the same slot. Passives play no part. At most one evolution per base weapon.
+An evolution is what a base weapon becomes once it is at max level: an "Evolution" card drawn at level-ups like any upgrade of the weapon (`LOOT.offers`), or the boss chest. It replaces the weapon in the same slot. Passives play no part. At most one evolution per base weapon.
 
 1. `src/data/weapons.ts`: append to `FUSED_WEAPONS` with `fusion: true` and a single level.
 2. `src/data/fusions.ts`: append `{ result, weapon }`. List order is the priority when several evolutions are possible.

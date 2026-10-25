@@ -2,7 +2,7 @@ import { version } from '../../package.json';
 import { MAP_GEN } from '../data/map';
 
 /** Simulation version: bump it as soon as a change breaks replay compatibility. */
-export const SIM_VERSION = 25;
+export const SIM_VERSION = 26;
 /** Displayed game version, stored in scores. */
 export const GAME_VERSION: string = version;
 
@@ -35,7 +35,7 @@ export const NORMAL_MAX_RADIUS = 24;
 /**
  * Input code: 0 = idle, 1..64 = full-speed direction, 65..128 = half speed,
  * 130 = auto aim, 131..194 = aim in direction (code-131) × 360°/64,
- * 200..202 = level-up choice, 210 = use the active item, 220..224 / 229 = weapon swap. Codes ≥ 130 are "zero-time" steps.
+ * 200..202 = level-up choice, 210 = use the active item, 211 = dash, 220..224 / 229 = weapon swap. Codes ≥ 130 are "zero-time" steps.
  */
 export const INPUT_IDLE = 0;
 export const INPUT_DIRS = 64;
@@ -43,6 +43,7 @@ export const INPUT_AIM_AUTO = 130;
 export const INPUT_AIM_BASE = 131;
 export const INPUT_CHOICE_BASE = 200;
 export const INPUT_USE = 210;
+export const INPUT_DASH = 211;
 /** 220..224 = swap the weapon in slot (code-220) at level-up, 229 = cancel the swap ("zero-time" steps) */
 export const INPUT_SWAP_BASE = 220;
 export const INPUT_SWAP_CANCEL = 229;

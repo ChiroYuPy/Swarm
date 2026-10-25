@@ -87,7 +87,7 @@ export function showLevelUp(
       } else {
         // Exhaustive: an OfferKind without its card fails to typecheck here.
         o.kind satisfies typeof OFFER_HEAL;
-        tag = t('levelup.full');
+        tag = offers.length === 1 ? t('levelup.full') : t('levelup.heal');
         name = pickupName(PICKUPS[0].id);
         line = pickupDesc(PICKUPS[0].id);
         color = PICKUPS[0].color;

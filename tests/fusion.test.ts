@@ -34,12 +34,11 @@ function givePassive(p: Player, id: string, level: number) {
   p.passives.push(x);
 }
 
-/** Forces a level-up offer on the next step and picks offer 0. */
-function levelUpAndPickFirst(s: GameState): void {
+/** Forces a level-up whose only card is the player's first available evolution, and picks it. */
+function levelUpAndPickEvolution(s: GameState): void {
   const p = s.players[0];
   p.pendingLevels = 1;
-  p.offers = [];
-  step(s, [0]); // rolls the offers
+  p.offers = [{ kind: OFFER_FUSION, id: availableFusions(p)[0], toLevel: 1 }];
   expect(isAwaitingChoice(s)).toBe(true);
   step(s, [200]);
 }
@@ -67,7 +66,7 @@ describe('fusions', () => {
     const p = s.players[0];
     p.weapons[0].level = 5;
     givePassive(p, 'overclock', 2);
-    levelUpAndPickFirst(s);
+    levelUpAndPickEvolution(s);
     expect(p.weapons.map((w) => weaponDef(w.def).id)).toEqual(['spiral']);
     expect(p.passives.map((x) => PASSIVES[x.def].id)).toEqual(['overclock']);
     // The base weapon can no longer be offered again.
@@ -92,7 +91,7 @@ describe('fusions', () => {
     const slot = p.weapons.findIndex((w) => weaponDef(w.def).id === 'electric_arc');
     const fi = FUSION_TABLE.findIndex((f) => weaponDef(f.result).id === 'electric_storm');
     expect(availableFusions(p)).toContain(fi);
-    levelUpAndPickFirst(s);
+    levelUpAndPickEvolution(s);
     expect(weaponDef(p.weapons[slot].def).id).toBe('electric_storm');
     expect(p.weapons.length).toBe(before);
     expect(p.passives.some((x) => PASSIVES[x.def].id === 'overclock')).toBe(true);

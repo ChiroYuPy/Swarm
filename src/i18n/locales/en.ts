@@ -141,7 +141,7 @@ export const en: LocaleShape = {
     },
     evo: 'Evolution',
     evolutionHint:
-      'Offered at the level-up after the weapon reaches level 5, or given by the boss chest. It replaces the original weapon, in the same slot.',
+      'Once the weapon is at level 5, offered at level-ups as an upgrade of the weapon, or given by the boss chest. It replaces the original weapon, in the same slot.',
     tiles: {
       damage: 'Damage',
       cooldown: 'Cooldown',
@@ -158,7 +158,7 @@ export const en: LocaleShape = {
       active: 'Stored in the “Item” slot and triggered with Space (A button). Only one in stock: picking up another replaces it.',
       relic:
         'Kept apart (it does not take the “Item” slot) and shown above your bar. Only one at a time. Very rare: dropped by enemies and bonus crates.',
-      instant: 'Dropped at random by enemies, and offered at level-up once your gear is full.',
+      instant: 'Dropped at random by enemies, and sometimes offered at level-up, more often when few upgrades are left.',
     },
     enemy: {
       hp: 'HP',
@@ -195,7 +195,7 @@ export const en: LocaleShape = {
     reload: 'cooldown {n}s',
     every: 'every {n}s',
     hitsEvery: 'hits every {n}s',
-    evolutionHint: 'Max level: evolves into {names} at the next level-up.',
+    evolutionHint: 'Max level: can then evolve into {names}.',
     or: ' or ',
   },
   levelup: {
@@ -210,6 +210,7 @@ export const en: LocaleShape = {
     swapLevel: 'Swap · level {n}',
     replaces: 'Replaces {name}',
     full: 'Gear full',
+    heal: 'Instant heal',
     cancelSwap: 'Cancel swap',
     swapCharges: {
       one: 'Swap a weapon · <b>{n}</b> charge',
@@ -455,16 +456,16 @@ export const en: LocaleShape = {
       name: 'Electric Arc',
       desc: 'Every 2.5 s, a bolt locks onto the biggest enemy nearby and holds it in place for a moment. It shocks the enemies around it too.',
       levels: [
-        '0.6 s bolt, 5 damage every 0.2 s, jumps to 1 neighbour.',
-        'Lasts 0.8 s, damage 7, 2 neighbours',
-        'Lasts 1 s, damage 9, holds longer',
-        'Lasts 1.3 s, damage 11, 3 neighbours',
-        'Lasts 1.6 s, damage 14, holds longer',
+        '0.6 s bolt, 4 damage every 0.2 s, jumps to 1 neighbour.',
+        'Lasts 0.8 s, damage 5, 2 neighbours',
+        'Lasts 1 s, damage 6, holds longer',
+        'Lasts 1.2 s, damage 8, 3 neighbours',
+        'Lasts 1.4 s, damage 10, holds longer',
       ],
     },
     mines: {
       name: 'Mines',
-      desc: 'Drops a mine under you every 1.2 s. It stays 8 s and blows up when an enemy steps on it.',
+      desc: 'Drops a mine under you every 1.2 s, never on another one’s zone. It stays 8 s and blows up when an enemy steps on it.',
       levels: [
         'Mines dealing 45 damage.',
         'Damage 55, wider area',
@@ -518,7 +519,7 @@ export const en: LocaleShape = {
     electric_storm: {
       name: 'Electric Storm',
       desc: 'Evolution of the Electric Arc.',
-      levels: ['Every 1.4 s, a 1.6 s bolt locks onto the biggest enemy and shocks 6 enemies around it, held in place as well.'],
+      levels: ['Every 2 s, a 1.4 s bolt locks onto the biggest enemy and shocks 5 enemies around it, which stutter in place as well.'],
     },
     hornets: {
       name: 'Hornets',
