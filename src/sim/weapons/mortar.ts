@@ -1,76 +1,104 @@
 /**
- * Mortar / meteors: PJ_SHELL lobbed onto the densest groups (vx/vy = start, tx/ty = target, a = flight ticks,
- * b = blast radius, c = meteor flag; see projectiles.ts). Meteors leave a PJ_BLAZE crater (r = radius, a = dps).
- * Picked targets go in the shared HITS buffer.
+ * Mortar / meteors: PJ_SHELL lobbed onto groups of enemies (vx/vy = start, tx/ty = target, a = flight ticks,
+ * b = blast radius, c = meteor flag; see projectiles.ts). The mortar only aims at groups far from you, and
+ * where they will be when the shell lands (they walk toward you). Meteors leave a PJ_BLAZE crater
+ * (r = radius, a = dps). Enemies of a group already shelled go in the shared HITS buffer.
  */
 import type { WeaponLevel } from '../../data/weapons';
+import { DT } from '../constants';
 import { spawnProjectile } from '../entities';
-import { EV_SHOOT, PJ_BLAZE, PJ_SHELL, emit, type GameState, type Player, type WeaponInst } from '../state';
-import { RETRY_TICKS, cdTicks, isExcludedHit, pushHit, resetHits, target, ticks } from './common';
+import { EF_PROP, EV_SHOOT, PJ_BLAZE, PJ_SHELL, emit, type GameState, type Player, type WeaponInst } from '../state';
+import { BIG_RADIUS, RETRY_TICKS, cdTicks, isExcludedHit, pushHit, resetHits, ticks } from './common';
 
 /** the Mortar does not target enemies closer to you than this */
-const MORTAR_MIN = 200;
+const MORTAR_MIN = 210;
+/** predicted enemies stop this far from their player */
+const STOP_SHORT = 30;
 
-/** Mortar candidates (copied: the neighbour search reuses the grid). */
-const CAND = new Int32Array(24);
+/** Mortar candidates: index and predicted position at impact. */
+const CAND = new Int32Array(48);
+const CX = new Float64Array(48);
+const CY = new Float64Array(48);
+/** aimed point found by `mortarTarget` */
+let AIM_X = 0;
+let AIM_Y = 0;
 
-/** The Mortar targets the densest group in range (excluding enemies right next to you), or the nearest one. */
-function mortarTarget(s: GameState, p: Player, range: number, minDist: number): number {
+/**
+ * The Mortar aims at the predicted centre of the heaviest group (big enemies count triple) among the enemies
+ * farther than `minDist`, `flight` ticks ahead. False if nobody is in range.
+ */
+function mortarTarget(s: GameState, p: Player, range: number, minDist: number, radius: number, flight: number): boolean {
   const g = s.grid;
   const m = g.query(s.enemies, p.x, p.y, range);
+  const t = flight * DT;
   let c = 0;
   for (let q = 0; q < m && c < CAND.length; q++) {
-    const e = s.enemies[g.out[q]];
-    if (!e.alive || e.speed === 0 || isExcludedHit(e.id)) continue;
+    const idx = g.out[q];
+    const e = s.enemies[idx];
+    if (!e.alive || e.speed === 0 || e.flags & EF_PROP || isExcludedHit(e.id)) continue;
     const dx = e.x - p.x;
     const dy = e.y - p.y;
-    if (dx * dx + dy * dy < minDist * minDist) continue;
-    CAND[c++] = g.out[q];
+    const d2 = dx * dx + dy * dy;
+    if (d2 < minDist * minDist || d2 > range * range) continue;
+    // It walks toward its player (still while stunned or frozen).
+    const tp = s.players[e.target] ?? p;
+    const tx = tp.x - e.x;
+    const ty = tp.y - e.y;
+    const td = Math.sqrt(tx * tx + ty * ty) || 1;
+    const held = e.stunUntil > s.tick || e.frozenUntil > s.tick;
+    const slow = e.slowUntil > s.tick ? 1 - e.slowFactor : 1;
+    const step = held ? 0 : Math.min(e.speed * slow * t, Math.max(0, td - STOP_SHORT));
+    CAND[c] = idx;
+    CX[c] = e.x + (tx / td) * step;
+    CY[c++] = e.y + (ty / td) * step;
   }
-  let best = -1;
-  let bestN = -1;
+  let bestScore = 0;
   for (let k = 0; k < c; k++) {
-    const e = s.enemies[CAND[k]];
-    const n = g.query(s.enemies, e.x, e.y, 70);
-    if (n > bestN) {
-      bestN = n;
-      best = CAND[k];
+    let score = 0;
+    let sx = 0;
+    let sy = 0;
+    let n = 0;
+    for (let j = 0; j < c; j++) {
+      const dx = CX[j] - CX[k];
+      const dy = CY[j] - CY[k];
+      if (dx * dx + dy * dy > radius * radius) continue;
+      score += s.enemies[CAND[j]].r >= BIG_RADIUS ? 3 : 1;
+      sx += CX[j];
+      sy += CY[j];
+      n++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      AIM_X = sx / n;
+      AIM_Y = sy / n;
     }
   }
-  return best >= 0 ? best : target(s, p.x, p.y, range);
+  if (bestScore === 0) return false;
+  // That group is taken: the next shell of the same volley looks for another one.
+  for (let j = 0; j < c; j++) {
+    const dx = CX[j] - AIM_X;
+    const dy = CY[j] - AIM_Y;
+    if (dx * dx + dy * dy <= radius * radius) pushHit(s.enemies[CAND[j]].id);
+  }
+  return true;
 }
 
 /** Mortar / Meteors: shells (or meteors) onto groups of enemies. */
 export function mortar(s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel): void {
   w.timer -= 1;
   if (w.timer > 0) return;
-  const range = L.range ?? 480;
+  const range = L.range ?? 520;
   const n = L.count ?? 1;
+  const radius = (L.radius ?? 88) * p.stats.area;
+  const flight = ticks(L.duration, 0.9);
   resetHits();
   let fired = 0;
   for (let k = 0; k < n; k++) {
-    const t = mortarTarget(s, p, range, L.meteor ? 0 : MORTAR_MIN);
-    if (t < 0) break;
-    const e = s.enemies[t];
-    pushHit(e.id);
+    if (!mortarTarget(s, p, range, L.meteor ? 0 : MORTAR_MIN, radius, flight)) break;
     // A meteor falls from the sky right onto its target; a shell starts from you.
-    const sx = L.meteor ? e.x : p.x;
-    const sy = L.meteor ? e.y : p.y;
-    spawnShell(
-      s,
-      p.index,
-      slot,
-      w.def,
-      sx,
-      sy,
-      e.x,
-      e.y,
-      ticks(L.duration, 0.7),
-      (L.radius ?? 70) * p.stats.area,
-      L.damage * p.stats.might,
-      L.knockback ?? 160,
-      L.meteor ? 1 : 0,
-    );
+    const sx = L.meteor ? AIM_X : p.x;
+    const sy = L.meteor ? AIM_Y : p.y;
+    spawnShell(s, p.index, slot, w.def, sx, sy, AIM_X, AIM_Y, flight, radius, L.damage * p.stats.might, L.knockback ?? 100, L.meteor ? 1 : 0);
     fired++;
   }
   if (!fired) {

@@ -123,19 +123,16 @@ const SHOT_SFX: Record<Behavior, SfxName> = {
   spiral: 'shoot',
   orbit: 'shoot',
   aura: 'shoot',
-  beam: 'laser',
+  rail: 'laser',
   mine: 'mine',
   boomerang: 'boomerang',
-  chain: 'zap',
+  arc: 'zap',
   pulse: 'shoot',
-  whip: 'boomerang',
-  scythe: 'boomerang',
+  blade: 'boomerang',
   flame: 'laser',
-  turret: 'mine',
-  drone: 'shoot',
-  ricochet: 'boomerang',
+  swarm: 'shoot',
+  shuriken: 'boomerang',
   mortar: 'mine',
-  phoenix: 'boomerang',
 };
 
 type ActivateFx = (fx: Effects, e: SimEvent, h: FxHooks) => void;
@@ -202,6 +199,8 @@ export class Effects {
   readonly tlife = new Float32Array(MAXT);
   readonly tval = new Float32Array(MAXT);
   readonly tbig = new Uint8Array(MAXT);
+  /** damage type (DMG_*): the colour of the number */
+  readonly ttype = new Uint8Array(MAXT);
   tCount = 0;
   // Lightning
   readonly lx1 = new Float32Array(MAXL);
@@ -274,7 +273,7 @@ export class Effects {
     this.rcol[k] = col;
   }
 
-  private text(x: number, y: number, v: number, big: boolean): void {
+  private text(x: number, y: number, v: number, big: boolean, type: number): void {
     if (!this.damageNumbers || this.tCount >= MAXT) return;
     const k = this.tCount++;
     this.tx[k] = x + (this.rng.next() - 0.5) * 14;
@@ -282,6 +281,7 @@ export class Effects {
     this.tlife[k] = big ? 0.9 : 0.55;
     this.tval[k] = v;
     this.tbig[k] = big ? 1 : 0;
+    this.ttype[k] = type;
   }
 
   private line(x1: number, y1: number, x2: number, y2: number, col: number): void {
@@ -306,12 +306,12 @@ export class Effects {
       const e = s.events[i];
       switch (e.type) {
         case EV_HIT:
-          // Ground fire burn (x2 = 1): no sparks or sound on every tick, just the numbers.
+          // Burn (x2 = 1): no sparks or sound on every tick, just the numbers (coloured by damage type, y2).
           if (e.x2 !== 1 && this.hitBudget-- > 0) {
             this.burst(e.x, e.y + 6, 2, 0, 140, 0.18, 2);
             h.sfx('hit');
           }
-          if (e.v >= 1 && (this.textBudget-- > 0 || e.v >= 100)) this.text(e.x, e.y, e.v, e.v >= 100);
+          if (e.v >= 1 && (this.textBudget-- > 0 || e.v >= 100)) this.text(e.x, e.y, e.v, e.v >= 100, e.y2);
           break;
         case EV_KILL: {
           const def = ENEMIES[e.k];
@@ -536,6 +536,7 @@ export class Effects {
         this.tlife[i] = this.tlife[l];
         this.tval[i] = this.tval[l];
         this.tbig[i] = this.tbig[l];
+        this.ttype[i] = this.ttype[l];
       }
     }
     for (let i = this.lCount - 1; i >= 0; i--) {

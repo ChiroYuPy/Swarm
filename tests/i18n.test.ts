@@ -69,7 +69,7 @@ describe('t()', () => {
   it('interpolates and follows the current locale', () => {
     expect(t('toasts.wave', { n: 3 })).toBe('Vague 3');
     expect(weaponName('electric_arc')).toBe('Arc électrique');
-    expect(weaponLevelText('blaster', 1)).toBe('1 projectile vers l’ennemi le plus proche.');
+    expect(weaponLevelText('blaster', 1)).toBe('Rafale de 1 tir vers l’ennemi le plus proche.');
     expect(weaponLevelText('spiral', 4)).toBe('Tir continu en spirale et rafales ciblées.');
     expect(enemyShortName('ricochet_star')).toBe('Étoile');
     setLocale('en');

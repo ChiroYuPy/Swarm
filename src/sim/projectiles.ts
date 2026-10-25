@@ -1,19 +1,36 @@
-/** Projectile update: bullets, enemy bullets, mines, boomerangs, waves. */
+/** Projectile update: bullets, enemy bullets, mines, boomerangs, waves, shurikens, bees, shells, ground fire. */
 import { DT, MAX_WEAPON_SLOTS, TICK_RATE } from './constants';
 import { LOOT } from '../data/loot';
 import { clearShotsIn } from './shots';
 import { pointInObstacle } from './map';
-import { TWO_PI, datan2, dcos, dsin, turnToward } from './dmath';
+import { PI, TWO_PI, datan2, dcos, dsin } from './dmath';
 import { removeProjectile } from './entities';
 import { damageEnemy, explode, hurtPlayer } from './combat';
 import { weaponLevel } from './registry';
-import { DRONE_LIFE, huntTarget, spawnBlaze, spawnBullet, spawnDisc, spawnMine, spawnRing, ticks } from './weapons';
+import {
+  BEE_DEAD,
+  BEE_GO,
+  BEE_HOME,
+  BEE_IDLE,
+  BEE_LIFE,
+  BEE_RING,
+  BEE_STUCK,
+  RING_FADE,
+  SHURIKEN_BOX_X,
+  SHURIKEN_BOX_Y,
+  beeTarget,
+  ringAngle,
+  spawnBlaze,
+  spawnMine,
+  ticks,
+} from './weapons';
 import {
   EF_BOSS,
   EF_PROP,
   EV_SHOT_DOWN,
   EV_WALL_HIT,
-  EV_EXPLOSION,
+  DMG_FIRE,
+  PJ_BEE,
   PJ_BOOMERANG,
   PJ_BULLET,
   PJ_EBULLET,
@@ -21,11 +38,8 @@ import {
   PJ_RING,
   PJ_FIRE,
   PJ_BLAZE,
-  PJ_DRONE,
-  PJ_PHOENIX,
-  PJ_RICOCHET,
   PJ_SHELL,
-  PJ_TURRET,
+  PJ_SHURIKEN,
   emit,
   type GameState,
   type Player,
@@ -74,23 +88,17 @@ export function updateProjectiles(s: GameState): void {
       case PJ_FIRE:
         fire(s, b);
         break;
-      case PJ_TURRET:
-        dead = turret(s, b);
-        break;
-      case PJ_RICOCHET:
-        dead = ricochet(s, b);
+      case PJ_SHURIKEN:
+        dead = shuriken(s, b);
         break;
       case PJ_BLAZE:
         blaze(s, b);
         break;
-      case PJ_DRONE:
-        dead = droneAgent(s, b);
+      case PJ_BEE:
+        dead = bee(s, b);
         break;
       case PJ_SHELL:
         dead = shell(s, b);
-        break;
-      case PJ_PHOENIX:
-        dead = phoenix(s, b);
         break;
       default:
         // Exhaustive: a ProjectileKind without its case fails to typecheck here.
@@ -99,7 +107,7 @@ export function updateProjectiles(s: GameState): void {
     if (!dead) {
       b.life--;
       if (b.life <= 0) {
-        if (b.kind === PJ_MINE) explode(s, b.x, b.y, b.b, b.damage, b.owner, b.knock);
+        if (b.kind === PJ_MINE) mineBlast(s, b);
         dead = true;
       }
     }
@@ -175,7 +183,7 @@ function fire(s: GameState, b: Projectile): void {
 function hitByShot(s: GameState, b: Projectile): boolean {
   for (let j = 0; j < s.projCount; j++) {
     const o = s.projectiles[j];
-    if ((o.kind !== PJ_BULLET && o.kind !== PJ_BOOMERANG && o.kind !== PJ_RICOCHET && o.kind !== PJ_PHOENIX) || o.life <= 0) continue;
+    if ((o.kind !== PJ_BULLET && o.kind !== PJ_BOOMERANG && o.kind !== PJ_SHURIKEN) || o.life <= 0) continue;
     const dx = o.x - b.x;
     const dy = o.y - b.y;
     const rr = o.r + b.r;
@@ -189,7 +197,7 @@ function hitByShot(s: GameState, b: Projectile): boolean {
   return false;
 }
 
-/** Player's ground fire (Meteor crater, Phoenix trail): burns the enemies on it, in small ticks. */
+/** Player's ground fire (Meteor crater): burns the enemies on it, in small ticks. */
 function blaze(s: GameState, b: Projectile): void {
   if ((s.tick + b.age) % FIRE_TICK !== 0) return;
   const g = s.grid;
@@ -197,119 +205,10 @@ function blaze(s: GameState, b: Projectile): void {
   const dmg = (b.a * FIRE_TICK) / TICK_RATE;
   for (let k = 0; k < n; k++) {
     const idx = g.out[k];
-    if (s.enemies[idx].alive) damageEnemy(s, idx, dmg, b.owner, 0, 0, true);
+    if (s.enemies[idx].alive) damageEnemy(s, idx, dmg, b.owner, 0, 0, true, DMG_FIRE);
   }
 }
 
-/** Turret: aims at the nearest enemy in range and shoots; the Bastion also releases knockback waves. */
-function turret(s: GameState, b: Projectile): boolean {
-  const o = s.players[b.owner];
-  if (!o || !o.alive) return true;
-  const L = weaponLevel(b.weapon, b.lv);
-  b.a -= 1;
-  if (b.a <= 0) {
-    const ti = s.grid.nearest(s.enemies, b.x, b.y, L.range ?? 320, undefined, 0, true);
-    if (ti < 0) b.a = 6;
-    else {
-      const e = s.enemies[ti];
-      const ang = datan2(e.y - b.y, e.x - b.x);
-      b.vx = dcos(ang);
-      b.vy = dsin(ang);
-      const nb = L.burstCount ?? 1;
-      const spread = L.spread ?? 0;
-      // Bullets go just a bit further than the turret's range.
-      const life = Math.max(1, Math.round((((L.range ?? 320) + 60) / (L.speed ?? 520)) * TICK_RATE));
-      for (let k = 0; k < nb; k++) {
-        const t = spawnBullet(s, o, b.slot, b.weapon, ang + (k - (nb - 1) / 2) * spread, L, b.x + b.vx * 12, b.y + b.vy * 12);
-        if (t) t.life = life;
-      }
-      b.a += Math.max(1, Math.round((L.fireEvery ?? 0.45) * o.stats.cooldownMul * TICK_RATE));
-    }
-  }
-  if (L.ringEvery) {
-    b.d -= 1;
-    if (b.d <= 0) {
-      b.d += Math.max(1, Math.round(L.ringEvery * TICK_RATE));
-      spawnRing(s, o, b.slot, b.weapon, b.x, b.y, L);
-    }
-  }
-  return false;
-}
-
-/** Ricochet disc: bounces off obstacles, and from enemy to enemy. `a` = bounces left. */
-function ricochet(s: GameState, b: Projectile): boolean {
-  // Homing: targets the nearest not-yet-hit enemy and steers toward it.
-  const g0 = s.grid;
-  if ((b.age & 3) === 1 || !validTarget(s, b)) {
-    b.c = g0.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
-    if (b.c >= 0) b.ty = s.enemies[b.c].id;
-  }
-  if (b.c >= 0) steer(b, s.enemies[b.c].x, s.enemies[b.c].y, RICOCHET_STEER);
-  const nx = b.x + b.vx * DT;
-  const ny = b.y + b.vy * DT;
-  if (pointInObstacle(s.map, nx, ny)) {
-    if (!pointInObstacle(s.map, nx, b.y)) b.vy = -b.vy;
-    else if (!pointInObstacle(s.map, b.x, ny)) b.vx = -b.vx;
-    else {
-      b.vx = -b.vx;
-      b.vy = -b.vy;
-    }
-    emit(s, EV_WALL_HIT, b.x, b.y, 0, b.weapon);
-    return --b.a < 0;
-  }
-  b.x = nx;
-  b.y = ny;
-  const g = s.grid;
-  const n = g.query(s.enemies, b.x, b.y, b.r);
-  for (let k = 0; k < n; k++) {
-    const idx = g.out[k];
-    const e = s.enemies[idx];
-    if (!e.alive || hasHit(b, e.id)) continue;
-    const dx = e.x - b.x;
-    const dy = e.y - b.y;
-    const rr = b.r + e.r;
-    if (dx * dx + dy * dy >= rr * rr) continue;
-    addHit(b, e.id);
-    const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
-    damageEnemy(s, idx, b.damage, b.owner, (b.vx / sp) * b.knock, (b.vy / sp) * b.knock);
-    if (--b.a < 0) return true;
-    // Bounce deflected toward the nearest not-yet-hit enemy (only halfway: it can miss it).
-    const t = g.nearest(s.enemies, b.x, b.y, RICOCHET_SEEK, b.hitIds, b.hitCount < 8 ? b.hitCount : 8, true);
-    b.c = t;
-    if (t >= 0) {
-      b.ty = s.enemies[t].id;
-      steer(b, s.enemies[t].x, s.enemies[t].y, RICOCHET_BOUNCE);
-    }
-    break;
-  }
-  return false;
-}
-/** homing range, turn share per step in flight, and deflection when bouncing off an enemy */
-const RICOCHET_SEEK = 190;
-const RICOCHET_STEER = 0.06;
-const RICOCHET_BOUNCE = 0.55;
-
-/** Is the tracked target (index `c`, id `ty`) still the same one and alive? */
-function validTarget(s: GameState, b: Projectile): boolean {
-  if (b.c < 0 || b.c >= s.enemyCount) return false;
-  const e = s.enemies[b.c];
-  return e.alive && e.id === b.ty;
-}
-
-/** Steers the velocity toward (x, y) without changing its magnitude; `k` = turn share per step (0..1). */
-function steer(b: Projectile, x: number, y: number, k: number): void {
-  const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-  if (sp < 1e-6) return;
-  const dx = x - b.x;
-  const dy = y - b.y;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  if (d < 1e-6) return;
-  const vx = (b.vx / sp) * (1 - k) + (dx / d) * k;
-  const vy = (b.vy / sp) * (1 - k) + (dy / d) * k;
-  const n = Math.sqrt(vx * vx + vy * vy) || 1;
-  b.vx = (vx / n) * sp;
-  b.vy = (vy / n) * sp;
-}
 
 /** Weapon of player `o` that created this projectile (null if it is gone: evolution, swap). */
 function ownerWeapon(o: Player, def: number): WeaponInst | null {
@@ -317,157 +216,168 @@ function ownerWeapon(o: Player, def: number): WeaponInst | null {
   return null;
 }
 
+/** Index of the enemy a bee tracks (index `c`, id `ty`), found again by id if the pool moved it; -1 if it is gone. */
+function trackTarget(s: GameState, b: Projectile): number {
+  if (b.c < 0) return -1;
+  if (b.c < s.enemyCount && s.enemies[b.c].alive && s.enemies[b.c].id === b.ty) return b.c;
+  for (let k = 0; k < s.enemyCount; k++) {
+    const e = s.enemies[k];
+    if (e.alive && e.id === b.ty) return (b.c = k);
+  }
+  return (b.c = -1);
+}
+
+/** Shuriken: flies straight, bounces off the edges of the screen box around its player, cuts what it crosses. */
+function shuriken(s: GameState, b: Projectile): boolean {
+  const o = s.players[b.owner];
+  if (!o || !o.alive) return true;
+  b.x += b.vx * DT;
+  b.y += b.vy * DT;
+  if (b.x > o.x + SHURIKEN_BOX_X || b.x < o.x - SHURIKEN_BOX_X) {
+    b.vx = b.x > o.x ? -Math.abs(b.vx) : Math.abs(b.vx);
+    b.x = b.x > o.x ? o.x + SHURIKEN_BOX_X : o.x - SHURIKEN_BOX_X;
+  }
+  if (b.y > o.y + SHURIKEN_BOX_Y || b.y < o.y - SHURIKEN_BOX_Y) {
+    b.vy = b.y > o.y ? -Math.abs(b.vy) : Math.abs(b.vy);
+    b.y = b.y > o.y ? o.y + SHURIKEN_BOX_Y : o.y - SHURIKEN_BOX_Y;
+  }
+  const w = ownerWeapon(o, b.weapon);
+  const hitCd = Math.round((w ? (weaponLevel(b.weapon, w.level).hitCd ?? 0.3) : 0.3) * TICK_RATE);
+  const key = b.owner * MAX_WEAPON_SLOTS + (b.slot % MAX_WEAPON_SLOTS);
+  const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+  const g = s.grid;
+  const n = g.query(s.enemies, b.x, b.y, b.r);
+  for (let k = 0; k < n; k++) {
+    const idx = g.out[k];
+    const e = s.enemies[idx];
+    if (!e.alive || e.immune[key] > s.tick) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    const rr = b.r + e.r;
+    if (dx * dx + dy * dy >= rr * rr) continue;
+    e.immune[key] = s.tick + hitCd;
+    damageEnemy(s, idx, b.damage, b.owner, (b.vx / sp) * b.knock, (b.vy / sp) * b.knock);
+  }
+  return false;
+}
+
+/** Steers a bee toward (x, y): limited turn rate, and it slows down in tight turns (small curves, no big loops). */
+function steerBee(b: Projectile, x: number, y: number, speed: number, turn: number): void {
+  const want = datan2(y - b.y, x - b.x);
+  let d = want - b.tx;
+  while (d > PI) d -= TWO_PI;
+  while (d < -PI) d += TWO_PI;
+  b.tx += d > turn ? turn : d < -turn ? -turn : d;
+  const c = dcos(d);
+  const sp = speed * (0.45 + 0.55 * (c > 0 ? c : 0));
+  b.x += dcos(b.tx) * sp * DT;
+  b.y += dsin(b.tx) * sp * DT;
+}
+
+/** a waiting bee looks for a target this often (ticks) */
+const BEE_LOOK = 18;
+/** a bee chasing a target that gets this much further than the range comes back */
+const BEE_LEASH = 1.25;
+
 /**
- * Autonomous drone: it goes hunting a target (nuisances first, except kamikazes which charge into the pack),
- * avoiding those your other drones already target. It flies like a plane: it only turns while moving forward
- * and only shoots ahead. Drone: strafing passes, then it breaks away and comes back. Squadron (`orbit`): it circles
- * its target at a distance and launches its homing discs straight ahead. Shot down on contact with enemies,
- * it respawns near you. `tx` = break-away ticks left after a pass.
+ * Bee (Swarm, Hornets): see weapons/swarm.ts. It waits in its slot of the ring around the player, darts at
+ * its target, plants itself in it (or explodes, for hornets), dies and comes back to its slot after a while.
  */
-function droneAgent(s: GameState, b: Projectile): boolean {
+function bee(s: GameState, b: Projectile): boolean {
   const o = s.players[b.owner];
   if (!o || !o.alive) return true;
   const w = ownerWeapon(o, b.weapon);
   if (!w) return true;
   const L = weaponLevel(b.weapon, w.level);
-  b.life = DRONE_LIFE;
-  const range = L.range ?? 520;
-  const lx = b.x - o.x;
-  const ly = b.y - o.y;
-  const leashed = lx * lx + ly * ly > DRONE_LEASH * DRONE_LEASH;
-  if (leashed) b.c = -1;
-  else if (b.age % 30 === 0 || !validTarget(s, b)) {
-    // Targets are searched around you, avoiding the other drones' ones.
-    b.c = huntTarget(s, o.x, o.y, range, !L.dive, CLAIMED, claimTargets(s, b));
-    if (b.c >= 0) b.ty = s.enemies[b.c].id;
-    b.tx = 0;
-  }
-  const speed = L.speed ?? 260;
-  const e = b.c >= 0 && validTarget(s, b) ? s.enemies[b.c] : null;
-  if (!e) b.c = -1;
-  const sp0 = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-  const heading = sp0 > 1e-6 ? datan2(b.vy, b.vx) : 0;
-  let want = speed;
-  let desired: number;
-  if (e && b.tx > 0) {
-    // Break-away: it veers off its target at an angle before coming back for a new pass.
-    b.tx--;
-    desired = heading + (b.d & 1 ? 1 : -1);
-  } else if (e && L.orbit) {
-    // Aims at a point on the circle around the target, slightly ahead of itself: it circles around.
-    const keep = (L.attackRange ?? 280) * 0.7;
-    const a = datan2(b.y - e.y, b.x - e.x) + (b.d & 1 ? 0.6 : -0.6);
-    desired = datan2(e.y + dsin(a) * keep - b.y, e.x + dcos(a) * keep - b.x);
-  } else if (e) {
-    const ex = e.x - b.x;
-    const ey = e.y - b.y;
-    desired = datan2(ey, ex);
-    const brk = (L.attackRange ?? 180) * 0.4 + e.r;
-    if (!L.dive && ex * ex + ey * ey < brk * brk) b.tx = DRONE_BREAK;
-  } else {
-    // Patrol: it circles around you.
-    const a = b.age * 0.025 + b.d * 1.9;
-    desired = datan2(o.y + dsin(a) * 70 - b.y, o.x + dcos(a) * 70 - b.x);
-    want = speed * 0.6;
-  }
-  if (leashed) want = speed * 1.6;
-  // Spacing from your other drones: they do not pile up in the same spot.
-  let sx = 0;
-  let sy = 0;
-  for (let j = 0; j < s.projCount; j++) {
-    const q = s.projectiles[j];
-    if (q === b || q.kind !== PJ_DRONE || q.owner !== b.owner) continue;
-    const qx = b.x - q.x;
-    const qy = b.y - q.y;
-    const d2 = qx * qx + qy * qy;
-    if (d2 >= DRONE_SPACING * DRONE_SPACING || d2 < 1e-6) continue;
-    const d = Math.sqrt(d2);
-    const k = (DRONE_SPACING - d) / (DRONE_SPACING * d);
-    sx += qx * k;
-    sy += qy * k;
-  }
-  if (sx !== 0 || sy !== 0) {
-    const dvx = dcos(desired) + sx * 1.5;
-    const dvy = dsin(desired) + sy * 1.5;
-    desired = datan2(dvy, dvx);
-  }
-  // Limited turn rate, and never stopped: it must move forward to turn.
-  const h = turnToward(heading, desired, (L.turn ?? 3.2) * DT);
-  const sp = Math.max(speed * 0.4, sp0 + (want - sp0) * 0.08);
-  b.vx = dcos(h) * sp;
-  b.vy = dsin(h) * sp;
-  b.x += b.vx * DT;
-  b.y += b.vy * DT;
-
-  if (L.dive) {
-    // Kamikaze: a bomb that explodes on contact, then it respawns near you.
-    if (!e) return false;
-    const ex = e.x - b.x;
-    const ey = e.y - b.y;
-    const rr = e.r + 14;
-    if (ex * ex + ey * ey > rr * rr) return false;
-    explode(s, b.x, b.y, (L.radius ?? 150) * o.stats.area, L.damage * o.stats.might, b.owner, L.knockback ?? 260);
-    w.burstTimer = ticks(L.respawn, 1.6);
-    return true;
-  }
-
-  // Shooting: only if the target is ahead of it, in range (when orbiting, its homing discs catch up with it).
-  b.a -= 1;
-  if (b.a <= 0 && e) {
-    const ex = e.x - b.x;
-    const ey = e.y - b.y;
-    const reach = L.attackRange ?? 180;
-    const ang = datan2(ey, ex);
-    let diff = ang - h;
-    while (diff > Math.PI) diff -= TWO_PI;
-    while (diff < -Math.PI) diff += TWO_PI;
-    if (ex * ex + ey * ey <= reach * reach && (L.orbit || Math.abs(diff) < DRONE_CONE)) {
-      if (L.bounces) spawnDisc(s, o, b.slot, b.weapon, b.x, b.y, L.orbit ? h : ang, L);
-      else {
-        const t = spawnBullet(s, o, b.slot, b.weapon, ang, L, b.x, b.y);
-        if (t) t.life = Math.max(1, Math.round(((reach + 60) / (L.shotSpeed ?? 600)) * TICK_RATE));
+  b.life = BEE_LIFE;
+  const n = Math.min(16, L.count ?? 3);
+  if (b.d >= n) return true;
+  const ra = ringAngle(s, b.d, n);
+  const sx = o.x + dcos(ra) * BEE_RING;
+  const sy = o.y + dsin(ra) * BEE_RING;
+  const speed = L.speed ?? 275;
+  const turn = (L.turn ?? 11) * DT;
+  const range = L.range ?? 300;
+  switch (b.a) {
+    case BEE_DEAD:
+      if (--b.b > 0) return false;
+      b.a = BEE_IDLE;
+      b.x = b.px = sx;
+      b.y = b.py = sy;
+      b.tx = ra + PI / 2;
+      b.b = 12;
+      b.age = 0;
+      return false;
+    case BEE_IDLE: {
+      const k = Math.min(1, 8 * DT);
+      b.x += (sx - b.x) * k;
+      b.y += (sy - b.y) * k;
+      b.tx = ra + PI / 2;
+      if (--b.b > 0) return false;
+      b.b = BEE_LOOK;
+      const t = beeTarget(s, b, o.x, o.y, range);
+      if (t >= 0) {
+        b.a = BEE_GO;
+        b.c = t;
+        b.ty = s.enemies[t].id;
       }
-      b.a = Math.max(1, Math.round((L.cooldown ?? 0.7) * o.stats.cooldownMul * TICK_RATE));
-    } else b.a = 2;
-  }
-
-  // On contact with enemies, it takes damage.
-  const g = s.grid;
-  const n = g.query(s.enemies, b.x, b.y, b.r);
-  for (let k = 0; k < n; k++) {
-    const en = s.enemies[g.out[k]];
-    if (!en.alive || en.dmg <= 0 || en.speed === 0) continue;
-    const ox = en.x - b.x;
-    const oy = en.y - b.y;
-    const rr = en.r + b.r;
-    if (ox * ox + oy * oy < rr * rr) b.b -= en.dmg * DT * 2;
-  }
-  if (b.b <= 0) {
-    emit(s, EV_EXPLOSION, b.x, b.y, 20, 0);
-    w.burstTimer = ticks(L.respawn, 3);
-    return true;
+      return false;
+    }
+    case BEE_HOME: {
+      steerBee(b, sx, sy, speed, turn);
+      const dx = sx - b.x;
+      const dy = sy - b.y;
+      if (dx * dx + dy * dy < 100) {
+        b.a = BEE_IDLE;
+        b.b = 6;
+      }
+      return false;
+    }
+    case BEE_GO: {
+      const t = trackTarget(s, b);
+      const e = t >= 0 ? s.enemies[t] : null;
+      const lim = range * BEE_LEASH;
+      if (!e || (e.x - o.x) * (e.x - o.x) + (e.y - o.y) * (e.y - o.y) > lim * lim) {
+        b.a = BEE_HOME;
+        b.c = b.ty = -1;
+        return false;
+      }
+      steerBee(b, e.x, e.y, speed, turn);
+      const dx = e.x - b.x;
+      const dy = e.y - b.y;
+      const rr = e.r + 4;
+      if (dx * dx + dy * dy > rr * rr) return false;
+      if (L.dive) {
+        explode(s, b.x, b.y, (L.radius ?? 110) * o.stats.area, L.damage * o.stats.might, b.owner, L.knockback ?? 220);
+        beeDies(b, L);
+        return false;
+      }
+      b.a = BEE_STUCK;
+      b.vx = b.x - e.x;
+      b.vy = b.y - e.y;
+      b.b = ticks(L.stay, 1.5);
+      return false;
+    }
+    case BEE_STUCK: {
+      const t = trackTarget(s, b);
+      if (t >= 0) {
+        const e = s.enemies[t];
+        b.x = e.x + b.vx;
+        b.y = e.y + b.vy;
+        const tk = ticks(L.tick, 0.3);
+        if (b.b % tk === 0) damageEnemy(s, t, L.damage * o.stats.might * (tk / TICK_RATE), b.owner, 0, 0);
+      }
+      if (--b.b <= 0 || t < 0 || !s.enemies[t].alive) beeDies(b, L);
+      return false;
+    }
   }
   return false;
 }
-/** beyond this distance from the player, a drone comes back */
-const DRONE_LEASH = 650;
-/** break-away duration after a strafing pass */
-const DRONE_BREAK = 30;
-/** half-angle of the firing cone, ahead of the drone */
-const DRONE_CONE = 0.3;
-/** distance below which two drones move apart */
-const DRONE_SPACING = 46;
 
-/** Ids of the targets already claimed by the same player's other drones. */
-const CLAIMED = new Int32Array(32);
-function claimTargets(s: GameState, self: Projectile): number {
-  let n = 0;
-  for (let j = 0; j < s.projCount && n < CLAIMED.length; j++) {
-    const q = s.projectiles[j];
-    if (q === self || q.kind !== PJ_DRONE || q.owner !== self.owner || q.c < 0) continue;
-    CLAIMED[n++] = q.ty;
-  }
-  return n;
+function beeDies(b: Projectile, L: { respawn?: number }): void {
+  b.a = BEE_DEAD;
+  b.b = ticks(L.respawn, 0.8);
+  b.c = b.ty = -1;
 }
 
 /** Shell: flies to its target and explodes (burning crater for a meteor). */
@@ -498,51 +408,16 @@ function shell(s: GameState, b: Projectile): boolean {
   return true;
 }
 
-/**
- * Phoenix: a firebird launched along the line picked by weapons/phoenix.ts, which then flies straight through
- * the horde without ever turning. It burns every enemy it touches (at most once per `hitCd`) and leaves a
- * trail of fire on the ground. (vx, vy) = heading.
- */
-function phoenix(s: GameState, b: Projectile): boolean {
-  const o = s.players[b.owner];
-  if (!o || !o.alive) return true;
-  const L = weaponLevel(b.weapon, 1);
-  const key = b.owner * MAX_WEAPON_SLOTS + (b.slot % MAX_WEAPON_SLOTS);
-  const g = s.grid;
-  const sp = L.speed ?? 470;
-  b.x += b.vx * sp * DT;
-  b.y += b.vy * sp * DT;
-  if (b.age % PHOENIX_TRAIL === 0) {
-    spawnBlaze(
-      s,
-      b.owner,
-      b.weapon,
-      b.x,
-      b.y,
-      (L.blazeRadius ?? 28) * o.stats.area,
-      (L.blazeDamage ?? 18) * o.stats.might,
-      ticks(L.blazeLife, 1.8),
-    );
-  }
-  const hitCd = Math.round((L.hitCd ?? 0.35) * TICK_RATE);
-  const n = g.query(s.enemies, b.x, b.y, b.r);
-  for (let k = 0; k < n; k++) {
-    const idx = g.out[k];
-    const e = s.enemies[idx];
-    if (!e.alive || e.immune[key] > s.tick) continue;
-    const ex = e.x - b.x;
-    const ey = e.y - b.y;
-    const rr = b.r + e.r;
-    if (ex * ex + ey * ey >= rr * rr) continue;
-    e.immune[key] = s.tick + hitCd;
-    damageEnemy(s, idx, b.damage, b.owner, b.vx * b.knock, b.vy * b.knock);
-  }
-  return false;
-}
-/** one fire puddle every N ticks behind the Phoenix */
-const PHOENIX_TRAIL = 9;
+/** a mine caught in another one's blast goes off this many ticks later (the chain reaction is visible) */
+const CHAIN_TICKS = 6;
 
+/** Mine: armed after `a` ticks, goes off when an enemy enters its trigger radius, or when a blast sets it off. */
 function mine(s: GameState, b: Projectile): boolean {
+  if (b.d > 0) {
+    if (--b.d > 0) return false;
+    mineBlast(s, b);
+    return true;
+  }
   if (b.age < b.a) return false;
   const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, b.c);
@@ -559,34 +434,49 @@ function mine(s: GameState, b: Projectile): boolean {
     }
   }
   if (!trigger) return false;
-  explode(s, b.x, b.y, b.b, b.damage, b.owner, b.knock);
+  mineBlast(s, b);
   return true;
 }
 
-function boomerang(s: GameState, b: Projectile): boolean {
-  if (b.a === 0) {
-    b.d -= b.b * DT;
-    if (b.d <= 0) {
-      b.a = 1;
-      b.d = 0;
-      b.hitCount = 0;
-    } else {
-      b.x += b.vx * b.d * DT;
-      b.y += b.vy * b.d * DT;
-    }
-  } else {
-    const o = s.players[b.owner];
-    if (!o || !o.alive) return true;
+/** A mine explodes and sets off the same player's other mines inside its blast. */
+function mineBlast(s: GameState, b: Projectile): void {
+  explode(s, b.x, b.y, b.b, b.damage, b.owner, b.knock);
+  for (let j = 0; j < s.projCount; j++) {
+    const o = s.projectiles[j];
+    if (o === b || o.kind !== PJ_MINE || o.owner !== b.owner || o.d > 0 || o.life <= 0) continue;
     const dx = o.x - b.x;
     const dy = o.y - b.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 22) return true;
-    b.d = Math.min(b.d + b.b * DT * 1.6, 640);
-    const step = Math.min(dist, b.d * DT);
-    b.vx = dx / dist;
-    b.vy = dy / dist;
-    b.x += b.vx * step;
-    b.y += b.vy * step;
+    if (dx * dx + dy * dy <= b.b * b.b) o.d = CHAIN_TICKS;
+  }
+}
+
+/**
+ * Boomerang: out along (vx, vy) for `b` ticks, fast at the throw and slowing down to a stop at range `d`, then
+ * back to where the player is now, mirroring the way out (slow start, back to full speed when it arrives).
+ * (tx, ty) = start point, then the turning point. Each way hits an enemy once.
+ */
+function boomerang(s: GameState, b: Projectile): boolean {
+  const o = s.players[b.owner];
+  if (!o || !o.alive) return true;
+  if (b.a === 0) {
+    const k = b.age / b.b;
+    if (k >= 1) {
+      b.a = 1;
+      b.tx = b.x;
+      b.ty = b.y;
+      b.hitCount = 0;
+    } else {
+      const f = dsin((k * PI) / 2);
+      b.x = b.tx + b.vx * b.d * f;
+      b.y = b.ty + b.vy * b.d * f;
+    }
+  }
+  if (b.a === 1) {
+    const k = (b.age - b.b) / b.b;
+    if (k >= 1) return true;
+    const f = 1 - dcos((k * PI) / 2);
+    b.x = b.tx + (o.x - b.tx) * f;
+    b.y = b.ty + (o.y - b.ty) * f;
   }
 
   // Mine boomerang: drops mini mines along the way.
@@ -595,7 +485,6 @@ function boomerang(s: GameState, b: Projectile): boolean {
     b.c -= 1;
     if (b.c <= 0) {
       b.c += Math.max(1, Math.round(L.dropEvery * TICK_RATE));
-      const o = s.players[b.owner];
       spawnMine(
         s,
         b.owner,
@@ -612,6 +501,9 @@ function boomerang(s: GameState, b: Projectile): boolean {
     }
   }
 
+  const mx = b.x - b.px;
+  const my = b.y - b.py;
+  const ml = Math.sqrt(mx * mx + my * my) || 1;
   const g = s.grid;
   const n = g.query(s.enemies, b.x, b.y, b.r);
   for (let k = 0; k < n; k++) {
@@ -623,13 +515,20 @@ function boomerang(s: GameState, b: Projectile): boolean {
     const rr = b.r + e.r;
     if (dx * dx + dy * dy >= rr * rr) continue;
     addHit(b, e.id);
-    damageEnemy(s, idx, b.damage, b.owner, b.vx * b.knock, b.vy * b.knock);
+    damageEnemy(s, idx, b.damage, b.owner, (mx / ml) * b.knock, (my / ml) * b.knock);
   }
   return false;
 }
 
+/**
+ * Shockwave: grows to its radius `a` in `b` ticks, hurting and pushing each enemy once as the front reaches it,
+ * then keeps growing a little while it fades (no more effect).
+ */
 function ring(s: GameState, b: Projectile): boolean {
-  if (b.age > b.b) return true;
+  if (b.age > b.b) {
+    b.r = b.a * (1 + (0.85 * (b.age - b.b)) / b.b);
+    return b.age > b.b * (1 + RING_FADE);
+  }
   const prevR = (b.a * (b.age - 1)) / b.b;
   const rr = (b.a * b.age) / b.b;
   b.r = rr;

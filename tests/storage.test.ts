@@ -3,7 +3,7 @@ import { migrate, SAVE_VERSION, topScores } from '../src/storage/storage';
 import { ALL_WEAPONS } from '../src/data/weapons';
 import { PASSIVES } from '../src/data/passives';
 import { ENEMIES } from '../src/data/enemies';
-import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS } from '../src/storage/legacy-ids';
+import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, RENAMED_WEAPON_IDS_V4 } from '../src/storage/legacy-ids';
 
 /** A save as written by the game before the id rename (v2: French content ids, `tempsSurvecu`). */
 const V2_SAVE = {
@@ -68,8 +68,7 @@ describe('save migration', () => {
     expect(r.weapons).toEqual([
       { id: 'blaster', level: 5 },
       { id: 'force_field', level: 3 },
-      { id: 'laser', level: 2 },
-      { id: 'squadron', level: 1 },
+      { id: 'railgun', level: 2 },
     ]);
     expect(r.passives).toEqual([
       { id: 'overclock', level: 5 },
@@ -97,11 +96,32 @@ describe('save migration', () => {
     expect(migrate(structuredClone(v3))).toEqual(v3);
   });
 
+  it('v3 → v4: renamed weapons get their new id, removed ones are dropped', () => {
+    const v3 = { ...migrate(structuredClone(V2_SAVE)), version: 3 };
+    v3.sandbox.rules.weapons = [
+      { id: 'orbs', level: 2 },
+      { id: 'laser', level: 3 },
+      { id: 'turret', level: 1 },
+      { id: 'whip', level: 4 },
+      { id: 'kamikaze_drones', level: 1 },
+      { id: 'scythe', level: 1 },
+      { id: 'mines', level: 2 },
+    ];
+    expect(migrate(v3).sandbox.rules.weapons).toEqual([
+      { id: 'saws', level: 2 },
+      { id: 'railgun', level: 3 },
+      { id: 'blade', level: 4 },
+      { id: 'hornets', level: 1 },
+      { id: 'mines', level: 2 },
+    ]);
+  });
+
   it('legacy tables only point at existing content ids', () => {
     const weapons = new Set(ALL_WEAPONS.map((w) => w.id));
     const passives = new Set(PASSIVES.map((p) => p.id));
     const enemies = new Set(ENEMIES.map((e) => e.id));
     for (const id of Object.values(LEGACY_WEAPON_IDS)) expect(weapons.has(id), id).toBe(true);
+    for (const id of Object.values(RENAMED_WEAPON_IDS_V4)) expect(weapons.has(id), id).toBe(true);
     for (const id of Object.values(LEGACY_PASSIVE_IDS)) expect(passives.has(id), id).toBe(true);
     for (const id of Object.values(LEGACY_ENEMY_IDS)) expect(enemies.has(id), id).toBe(true);
     expect(Object.keys(LEGACY_WEAPON_IDS)).toHaveLength(ALL_WEAPONS.length);
@@ -117,6 +137,6 @@ describe('language setting', () => {
     expect(migrate({ ...v3, settings: { ...v3.settings, language: 'de' } }).settings.language).toBe('fr');
     const { language: _drop, ...noLanguage } = v3.settings;
     expect(migrate({ ...v3, settings: noLanguage }).settings.language).toBe('fr');
-    expect(SAVE_VERSION).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
   });
 });

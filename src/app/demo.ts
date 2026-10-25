@@ -22,7 +22,7 @@ const DEMO_SANDBOX: SandboxConfig = {
   weapons: [
     { id: 'force_field', level: 4 },
     { id: 'boomerang', level: 4 },
-    { id: 'laser', level: 3 },
+    { id: 'railgun', level: 3 },
     { id: 'blaster', level: 4 },
   ],
   passives: [

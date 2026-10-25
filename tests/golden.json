@@ -1,130 +1,125 @@
 {
   "bot-0": [
-    "ea8779ebdfb3276b",
-    "2c201412302b6590",
-    "d670ddb655d67a5c",
-    "3fa3ece9981e89d0",
-    "4d67a62d0f3fbd75",
-    "abb1b6eb5104bb9e",
-    "8f141dc6653c44f8",
-    "87a91628b7798d33",
-    "88c7c8400cea107c",
-    "00592625ae6902f7",
-    "end@9000:00592625ae6902f7"
+    "1ceb4a8ab63b2e78",
+    "d1edb09ab58a9d26",
+    "968b8dc63310e93e",
+    "eac15da6d3d3d588",
+    "07eaa5e1ad701347",
+    "6dbd485518007eb1",
+    "e5bec14645476157",
+    "79af3709eb6218df",
+    "314d78b4c3b6b213",
+    "4090d400614b8b55",
+    "end@9000:4090d400614b8b55"
   ],
   "bot-1": [
-    "9fabe3ce28b041a3",
-    "8a59419d73fd430d",
-    "3cbbc81d4d20beb1",
-    "74e2d119ba2fb2cf",
-    "c72b88040aaf9e32",
-    "cab46732bf23005f",
-    "8ffe6e2692927abf",
-    "437447a737d96ba3",
-    "f8f7b732d04394c7",
-    "81ce8e6673c06ade",
-    "79b85e75cb321a75",
-    "ae3b52af46c1364f",
-    "5c300d9ced7a1722",
-    "5ed6c6d0521b0d7b",
-    "afcbf2be14fe02c9",
-    "3211e554efe18123",
-    "91f76758fa908836",
-    "c366ee7f800a6967",
-    "17c3209e7185415d",
-    "ea35ebe30ed0f4c5",
-    "end@18000:ea35ebe30ed0f4c5"
+    "1fe6dd9b0e20533b",
+    "ef93a5131a05c881",
+    "63782886b3340b49",
+    "31cd885d742adc38",
+    "8366a9629f0b3851",
+    "a81fb1d7cfd3a1a5",
+    "bd0882f6a3d5d48d",
+    "57b641e50b32a09d",
+    "68fb672e728943aa",
+    "c546c08f57d3afc0",
+    "fa856bbb5abc00fa",
+    "81bb5f2c7d69af7e",
+    "c61bad601671f1f0",
+    "3c947bfb8c586ccd",
+    "3b944de6283074bb",
+    "a96d26d21d924be2",
+    "ed6cf77a2825e0ce",
+    "73240b57c90b6205",
+    "6da872d5e026abec",
+    "54dd61728dc0447a",
+    "end@18000:54dd61728dc0447a"
   ],
   "bot-2": [
-    "b621b73ae2e021bb",
-    "1e0bdada254b2378",
-    "6945d6a6fb453d6a",
-    "ab3d56a41597a792",
-    "cbdeee3a3a8a8a99",
-    "9ba58ecef429be33",
-    "7e49a80b42fdd15b",
-    "354d7769068d2c56",
-    "ca26438f094c634d",
-    "78a89607af64925a",
-    "end@9000:78a89607af64925a"
+    "d5f6e3632e07cfff",
+    "0e83f549fae70372",
+    "4274d60a40064846",
+    "8d0bd811dbb42a8a",
+    "8b43c4141d09d787",
+    "2f8aaa711a2515c2",
+    "b8b3531077bf5d82",
+    "be74ba2be3aab478",
+    "9e15fa1218c659a5",
+    "4549a12c762ce5d1",
+    "end@9000:4549a12c762ce5d1"
   ],
   "weapons-0": [
-    "bc484bc406f43f5b",
-    "e391d3a3a51ac41a",
-    "end@26700:dad8bcf5c1ac91bb"
+    "9141cc609c48bdeb",
+    "9b2c34b63da82031",
+    "end@26700:2c231a44d1b5be15"
   ],
   "weapons-1": [
-    "408134eba5f8cfb0",
-    "65b86ad0183ac029",
-    "end@26700:7053695e1f80094d"
+    "2d1e5f3f2f4758c4",
+    "d105a7327cc4576c",
+    "end@26700:e82449342d8caa0e"
   ],
   "weapons-2": [
-    "4d5d64bc729acc89",
-    "8fbce28533a9d17d",
-    "end@26700:5b37d3714db1213b"
+    "f2ff625ff095349b",
+    "0b59d06ebafbcee5",
+    "end@26700:96a8ce01244385cc"
   ],
   "weapons-3": [
-    "7431e43b887594f0",
-    "9af73597aee1dd6a",
-    "end@26700:dbbf0fc8a94cea52"
+    "f48bfa86f417a84d",
+    "2aabffe669314ba4",
+    "end@26700:d08de5cfcb0e0f61"
   ],
   "weapons-4": [
-    "693fa5150451538c",
-    "095ca09e176811e1",
-    "end@26700:3f100f54eff20ddd"
-  ],
-  "weapons-5": [
-    "d3e283779f12b2b8",
-    "e3d18f3f7628611b",
-    "end@26700:cad7bcb4f5554a84"
+    "4a9c9a8bdb7037f9",
+    "e172f58ba170a0a1",
+    "end@26700:9148215fb850dcfd"
   ],
   "boss-0": [
-    "2f92d038a2caad89",
-    "888f6e5f157b5059",
-    "end@26700:81a623a53f7c0e3e"
+    "f795c63082f864be",
+    "91e2d7979261f4b5",
+    "end@26700:3a963fc508628823"
   ],
   "boss-1": [
-    "e7643ac0a247657b",
-    "05d1ef4028ecdf09",
-    "end@26700:39c0d5e766e24849"
+    "0292a61bcb037c70",
+    "b0515e8a419d267a",
+    "end@26700:49fcd6cecc7cde78"
   ],
   "boss-2": [
-    "312932d8ebc01d1b",
-    "c0e1a62d3b11112d",
-    "end@26700:6345a7b977376f65"
+    "18fcef843995da95",
+    "47cae7ff26981977",
+    "end@26700:9d69b630b69c0624"
   ],
   "boss-3": [
-    "f6f18eb07d2834a6",
-    "201dcea1205381b2",
-    "end@26700:968cfdb10ac589ac"
+    "bac460d8fcca28dd",
+    "6b65675e92b7be00",
+    "end@26700:527bfe3b9c917c0f"
   ],
   "boss-4": [
-    "d1a12a6a6f427af6",
-    "f63d081dc9bbc601",
-    "end@26700:2b7a36d51a07b6ba"
+    "a3339d8d7dfb0e62",
+    "717dc48e336ba46a",
+    "end@26700:2f8c9ee0e6903359"
   ],
   "item-7": [
-    "8a4e7d387d498a60",
-    "end@25500:5b2ef5a078ae0506"
+    "a5b1a77ca2a67b10",
+    "end@25500:065377a94b8bde7a"
   ],
   "item-8": [
-    "e8e2b300d1ddb87f",
-    "end@25500:e4b4f971ee7dd339"
+    "376271a2273dee2c",
+    "end@25500:46c498e1df21f9da"
   ],
   "item-9": [
-    "b457525d31fabf2e",
-    "end@25500:6555391a5d5ae3e5"
+    "272046d1c1c6934d",
+    "end@25500:f47be20153ab8ecb"
   ],
   "item-10": [
-    "cb68f7225d0fad08",
-    "end@25500:6bba3002a04aa102"
+    "f3a4767d3a98d4fb",
+    "end@25500:e78b9f8debf279eb"
   ],
   "item-11": [
-    "14ec3efc5ee229f3",
-    "end@25500:19366795123e2a86"
+    "33f05127153cc909",
+    "end@25500:4af09e8b49a0bc4b"
   ],
   "item-12": [
-    "8c7d929832f83b28",
-    "end@25500:eca13e3a403bace0"
+    "4149422a14bc426d",
+    "end@25500:cbeaf570282ec30b"
   ]
 }

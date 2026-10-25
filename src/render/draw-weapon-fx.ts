@@ -1,56 +1,18 @@
 /**
- * Weapon effects around the player: aura, orbits (black hole), whip, scythe, flame jet, beam;
- * plus the shockwave and phoenix shapes drawn for their projectiles.
+ * Weapon effects around the player: force field / vampire field bubble, saws and black holes, blade sweep,
+ * flame jets, railgun charge and shot, electric arc lock; plus the shockwave shape drawn for its projectiles.
  */
-import { DT, BLACK_HOLE_WEAPON, weaponDef, weaponLevel, type GameState, type Player } from '../sim';
-import { SCYTHE_FX_TICKS, WHIP_FX_TICKS } from '../sim/weapons';
+import { DT, BLACK_HOLE_WEAPON, VAMPIRE_FIELD_WEAPON, weaponDef, weaponLevel, type GameState, type Player, type WeaponInst } from '../sim';
+import { BLADE_FADE_TICKS, RAIL_FX_TICKS } from '../sim/weapons';
+import { sawPath } from './icons';
 import { hash01, lerp, type RenderView } from './view';
 
-/**
- * Whip: the lash unrolls with a wave (t from 0 to 0.45), cracks at the tip (spark), then fades.
- * Drawn as a curve that thins towards the tip.
- */
-function drawWhip(view: RenderView, x: number, y: number, angles: Float64Array, n: number, len: number, width: number, t: number, color: string): void {
-  const ctx = view.ctx;
-  const ext = Math.min(1, t / 0.45);
-  const e = 1 - (1 - ext) * (1 - ext);
-  const fade = t < 0.45 ? 1 : Math.max(0, 1 - (t - 0.45) / 0.55);
-  const SEG = 18;
-  for (let b = 0; b < n; b++) {
-    const ux = Math.cos(angles[b]);
-    const uy = Math.sin(angles[b]);
-    const side = b % 2 === 0 ? 1 : -1;
-    // Three strokes, thinner and thinner towards the tip.
-    for (let part = 0; part < 3; part++) {
-      ctx.beginPath();
-      for (let k = (part * SEG) / 3; k <= ((part + 1) * SEG) / 3; k++) {
-        const u = k / SEG;
-        const along = len * e * u;
-        const wave = Math.sin(u * Math.PI * 2.2 - t * 14) * width * 0.9 * (1 - e * 0.85) * u * side;
-        const px = x + ux * along - uy * wave;
-        const py = y + uy * along + ux * wave;
-        if (k === (part * SEG) / 3) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.globalAlpha = fade;
-      view.glow(color, 3.2 - part * 0.9);
-    }
-    // Crack: a spark at the tip, when the lash snaps taut.
-    if (t > 0.35 && t < 0.7) {
-      const k = 1 - Math.abs(t - 0.5) / 0.2;
-      const tx = x + ux * len;
-      const ty = y + uy * len;
-      ctx.beginPath();
-      for (let r = 0; r < 6; r++) {
-        const a = angles[b] + (r * Math.PI) / 3 + 0.3;
-        ctx.moveTo(tx + Math.cos(a) * 6, ty + Math.sin(a) * 6);
-        ctx.lineTo(tx + Math.cos(a) * (10 + 12 * k), ty + Math.sin(a) * (10 + 12 * k));
-      }
-      ctx.globalAlpha = Math.max(0, k);
-      view.glow('#ffffff', 1.6);
-    }
-  }
-  ctx.globalAlpha = 1;
+const TAU = Math.PI * 2;
+
+/** "rgba(...)" of a "#rrggbb" color with this opacity. */
+export function rgba(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 /**
@@ -81,62 +43,30 @@ function drawFlameJet(view: RenderView, x: number, y: number, a: number, len: nu
 }
 
 /**
- * Shockwave: a thick front racing outwards (fast, then slowing), a band of compressed air behind it,
- * two thinner echoes and dust streaks blown outwards. `quake` (Earthquake, which slows down
- * hard): the ground cracks in a star under the wave. `f` = progress (0..1).
+ * Shockwave: a sharp front with a short gradient behind it (clear centre). Once its damage is done it keeps
+ * growing while it fades. `f` = progress over its damage time (0..1, then beyond while fading). `quake`
+ * (Earthquake, which slows hard): the ground cracks in a star under the wave.
  */
 export function drawShockwave(view: RenderView, x: number, y: number, maxR: number, f: number, color: string, quake: boolean, seed: number): void {
   const ctx = view.ctx;
-  const e = 1 - (1 - f) * (1 - f);
-  const R = Math.max(2, maxR * e);
-  const fade = 1 - f;
-  // Compressed air band, denser near the front.
-  for (let k = 0; k < 3; k++) {
-    const r0 = R * (1 - 0.1 * (k + 1));
-    const r1 = R * (1 - 0.1 * k);
-    ctx.beginPath();
-    ctx.arc(x, y, r1, 0, Math.PI * 2);
-    ctx.arc(x, y, r0, Math.PI * 2, 0, true);
-    ctx.fillStyle = color;
-    ctx.globalAlpha = (0.2 - k * 0.06) * fade;
-    ctx.fill();
-  }
-  // Echoes
-  for (const [k, w] of [
-    [0.84, 1.5],
-    [0.7, 1],
-  ]) {
-    ctx.beginPath();
-    ctx.arc(x, y, R * k, 0, Math.PI * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = w;
-    ctx.globalAlpha = 0.45 * fade;
-    ctx.stroke();
-  }
-  // Front
+  const R = Math.max(2, f <= 1 ? maxR * f : maxR * (1 + 0.85 * (f - 1)));
+  const fade = f <= 1 ? 1 : Math.max(0, 1 - (R - maxR) / (maxR * 0.6));
+  if (fade <= 0) return;
+  const inner = R * 0.72;
+  const g = ctx.createRadialGradient(x, y, inner, x, y, R);
+  g.addColorStop(0, rgba(color, 0));
+  g.addColorStop(1, rgba(color, 0.38 * fade));
   ctx.beginPath();
-  ctx.arc(x, y, R, 0, Math.PI * 2);
-  ctx.globalAlpha = 0.4 + 0.6 * fade;
-  view.glow(color, 2 + 4 * fade);
-  // Dust streaks just ahead of the front.
-  ctx.beginPath();
-  const N = 18;
-  for (let k = 0; k < N; k++) {
-    const a = ((k + hash01(seed * 31 + k) * 0.6) / N) * Math.PI * 2;
-    const r0 = R * (1.02 + 0.04 * hash01(k * 7 + seed));
-    const r1 = r0 + 6 + 14 * fade;
-    ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
-    ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
-  }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.6 * fade;
-  ctx.stroke();
+  ctx.arc(x, y, R, 0, TAU);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.globalAlpha = fade;
+  view.glow(color, 2.2);
   if (quake) {
     // Zigzag cracks, from the center to the front.
     ctx.beginPath();
     for (let c = 0; c < 7; c++) {
-      let a = ((c + hash01(seed * 13 + c)) / 7) * Math.PI * 2;
+      let a = ((c + hash01(seed * 13 + c)) / 7) * TAU;
       let px = x;
       let py = y;
       ctx.moveTo(px, py);
@@ -155,116 +85,203 @@ export function drawShockwave(view: RenderView, x: number, y: number, maxR: numb
   ctx.globalAlpha = 1;
 }
 
-/**
- * Scythe: the blade makes a full turn around the player (fast, then slowing), followed by a fading
- * fan-shaped trail. `t` = animation progress (0..1).
- */
-function drawScythe(view: RenderView, x: number, y: number, angles: Float64Array, n: number, R: number, t: number, color: string): void {
+/** Black hole: black centre fading to a violet halo, with debris falling in. */
+function drawBlackHole(view: RenderView, x: number, y: number, r: number, t: number, color: string): void {
   const ctx = view.ctx;
-  const ease = 1 - (1 - t) * (1 - t) * (1 - t);
-  const fade = t < 0.7 ? 1 : (1 - t) / 0.3;
-  for (let b = 0; b < n; b++) {
-    const a = angles[b] + ease * Math.PI * 2;
-    // Trail: ring slices, paler and paler behind the blade.
-    const trail = Math.min(ease * Math.PI * 2, 2.4);
-    const SEG = 12;
-    ctx.fillStyle = color;
-    for (let k = 0; k < SEG; k++) {
-      const a1 = a - (trail * k) / SEG;
-      const a0 = a - (trail * (k + 1)) / SEG;
-      ctx.beginPath();
-      ctx.arc(x, y, R, a0, a1);
-      ctx.arc(x, y, R * 0.45, a1, a0, true);
-      ctx.closePath();
-      ctx.globalAlpha = 0.28 * (1 - k / SEG) * (1 - k / SEG) * fade;
-      ctx.fill();
-    }
-    // Sharp edge of the trail
+  const g = ctx.createRadialGradient(x, y, r * 0.3, x, y, r * 1.6);
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.45, 'rgba(40,10,70,0.9)');
+  g.addColorStop(0.75, rgba(color, 0.35));
+  g.addColorStop(1, rgba(color, 0));
+  ctx.beginPath();
+  ctx.arc(x, y, r * 1.6, 0, TAU);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.45, 0, TAU);
+  ctx.fillStyle = '#000000';
+  ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = '#e6d4ff';
+  for (let k = 0; k < 5; k++) {
+    const p = (((t * 1.2 + k / 5) % 1) + 1) % 1;
+    const a = k * 1.9 + p * 2;
+    const d = r * 1.5 * (1 - p);
+    ctx.globalAlpha = 1 - p;
     ctx.beginPath();
-    ctx.arc(x, y, R, a - trail * 0.8, a);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.6 * fade;
-    ctx.stroke();
-    // Handle, then the crescent blade curving forward.
-    const P = (r: number, ang: number): [number, number] => [x + Math.cos(ang) * r, y + Math.sin(ang) * r];
-    ctx.beginPath();
-    ctx.moveTo(...P(R * 0.15, a));
-    ctx.lineTo(...P(R * 0.98, a));
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#fff4ec';
-    ctx.globalAlpha = 0.8 * fade;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(...P(R * 1.02, a - 0.04));
-    ctx.quadraticCurveTo(...P(R * 1.08, a + 0.4), ...P(R * 0.72, a + 0.78));
-    ctx.quadraticCurveTo(...P(R * 0.9, a + 0.36), ...P(R * 0.84, a - 0.02));
-    ctx.closePath();
-    ctx.fillStyle = '#ffffff';
-    ctx.globalAlpha = 0.85 * fade;
+    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 2, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 6;
-    ctx.globalAlpha = 0.35 * fade;
-    ctx.stroke();
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = fade;
-    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Force field / vampire field: a bubble, clear in the middle and bright at the rim, flashing on each hit. */
+function drawBubble(view: RenderView, x: number, y: number, R: number, flash: number, color: string, tint: string): void {
+  const ctx = view.ctx;
+  const g = ctx.createRadialGradient(x, y, R * 0.2, x, y, R);
+  g.addColorStop(0, rgba(tint, 0));
+  g.addColorStop(0.7, rgba(tint, 0.06 + flash * 0.08));
+  g.addColorStop(1, rgba(tint, 0.3 + flash * 0.2));
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, TAU);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.globalAlpha = 0.9;
+  view.glow(color, 2.2);
+  ctx.globalAlpha = 1;
+}
+
+/** Vampire field: red drops flying back from the enemies hit by the last tick to the player. */
+function drawDrops(view: RenderView, s: GameState, w: WeaponInst, x: number, y: number, R: number, period: number, alpha: number): void {
+  const since = period - w.tickTimer + alpha;
+  if (w.vS !== 1 || since > period) return;
+  const k = Math.min(1, since / Math.min(period, 30));
+  if (k >= 1) return;
+  const e2 = 1 - (1 - k) * (1 - k);
+  const ctx = view.ctx;
+  ctx.fillStyle = '#ff3b5c';
+  let n = 0;
+  for (let i = 0; i < s.enemyCount && n < 16; i++) {
+    const e = s.enemies[i];
+    if (!e.alive || hash01(e.id) > 0.35) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    if (dx * dx + dy * dy > R * R) continue;
+    n++;
+    ctx.globalAlpha = 1 - k * 0.4;
+    ctx.beginPath();
+    ctx.arc(lerp(e.x, x, e2), lerp(e.y, y, e2), 4, 0, TAU);
+    ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
 
-/** Phoenix: body, flapping wings, flame tail. (vx, vy) = flight direction. */
-export function drawPhoenix(view: RenderView, x: number, y: number, vx: number, vy: number, r: number, color: string, time: number): void {
+/** Blade: the sword and the fading wedge it leaves behind. */
+function drawBlade(view: RenderView, w: WeaponInst, x: number, y: number, color: string, alpha: number): void {
   const ctx = view.ctx;
-  const n = Math.hypot(vx, vy) || 1;
-  const ux = vx / n;
-  const uy = vy / n;
-  const nx = -uy;
-  const ny = ux;
-  const flap = Math.sin(time * 0.45);
-  r *= 0.9;
-  const P = (f: number, s: number): [number, number] => [x + ux * f * r + nx * s * r, y + uy * f * r + ny * s * r];
-  // Fire trail behind it.
-  const core = view.softPuff('#fff3c4');
-  const mid = view.softPuff(color);
-  const end = view.softPuff('#ff3d1a');
-  for (let k = 0; k < 6; k++) {
-    const t = (((time / 12 + k / 6) % 1) + 1) % 1;
-    const [px, py] = P(-0.5 - t * 1.6, Math.sin(time * 0.4 + k * 1.7) * 0.25 * t);
-    const R = r * (0.42 - 0.22 * t);
-    ctx.globalAlpha = (1 - t) * 0.4;
-    ctx.drawImage(t < 0.2 ? core : t < 0.55 ? mid : end, px - R, py - R, R * 2, R * 2);
-  }
-  ctx.globalAlpha = 1;
-  // Wings
-  ctx.beginPath();
-  for (const side of [-1, 1]) {
-    const [ax, ay] = P(0.1, 0);
-    const [cx, cy] = P(-0.2, side * (0.9 + 0.35 * flap));
-    const [tx, ty] = P(-0.75, side * (1.25 + 0.5 * flap));
-    const [bx, by] = P(-0.45, side * 0.35);
-    ctx.moveTo(ax, ay);
-    ctx.quadraticCurveTo(cx, cy, tx, ty);
-    ctx.quadraticCurveTo(bx + (tx - bx) * 0.2, by + (ty - by) * 0.2, bx, by);
+  const from = w.angles[0];
+  const sweep = w.angles[1];
+  const R = w.angles[4];
+  const sweeping = w.tickTimer < w.vN;
+  const at = (ticks: number) => {
+    const k = Math.max(0, Math.min(1, ticks / w.vN));
+    return from + sweep * (1 - (1 - k) * (1 - k));
+  };
+  const now = sweeping ? w.tickTimer + alpha : w.vN;
+  const fade = sweeping ? 1 : Math.max(0, (w.activeTicks - alpha) / BLADE_FADE_TICKS);
+  const dir = sweep >= 0;
+  // Trail: the angles of the last ticks, fading with age.
+  const TRAIL = 10;
+  ctx.fillStyle = color;
+  for (let j = 0; j < TRAIL; j++) {
+    const a1 = at(now - j);
+    const a0 = at(now - j - 1);
+    if (Math.abs(a1 - a0) < 1e-4) continue;
+    ctx.beginPath();
+    ctx.arc(x, y, R, a0, a1, !dir);
+    ctx.arc(x, y, R * 0.35, a1, a0, dir);
     ctx.closePath();
+    ctx.globalAlpha = 0.35 * (1 - j / TRAIL) * fade;
+    ctx.fill();
   }
-  ctx.globalAlpha = 0.3;
-  ctx.fill();
   ctx.globalAlpha = 1;
-  view.glow(color, 1.6);
-  // Body and head
+  if (!sweeping) return;
+  const a = at(now);
+  const ux = Math.cos(a);
+  const uy = Math.sin(a);
   ctx.beginPath();
-  const [hx, hy] = P(0.55, 0);
-  const [tx, ty] = P(-0.55, 0);
-  ctx.moveTo(hx, hy);
-  ctx.quadraticCurveTo(...P(0, 0.32), tx, ty);
-  ctx.quadraticCurveTo(...P(0, -0.32), hx, hy);
-  ctx.fillStyle = '#fff1b8';
-  ctx.globalAlpha = 0.45;
-  ctx.fill();
+  ctx.moveTo(x + ux * 18, y + uy * 18);
+  ctx.lineTo(x + ux * R, y + uy * R);
+  view.glow('#ffffff', 3.5);
+  ctx.beginPath();
+  ctx.moveTo(x + ux * 12, y + uy * 12);
+  ctx.lineTo(x + ux * 22, y + uy * 22);
+  view.glow(color, 5);
+}
+
+/** Railgun: dashed aim line(s) and a closing circle while it charges, then the shot itself (beam + shock rings). */
+function drawRail(view: RenderView, w: WeaponInst, x: number, y: number, color: string, alpha: number): void {
+  const ctx = view.ctx;
+  if (w.burstLeft > 0) {
+    const k = Math.max(0, Math.min(1, 1 - (w.burstTimer - alpha) / Math.max(1, w.vS)));
+    ctx.beginPath();
+    for (let b = 0; b < w.vN; b++) {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(w.angles[b]) * w.vLen, y + Math.sin(w.angles[b]) * w.vLen);
+    }
+    ctx.setLineDash([8, 12]);
+    ctx.globalAlpha = 0.25 + k * 0.4;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(x, y, 34 - k * 20, 0, TAU);
+    ctx.globalAlpha = k;
+    view.glow(color, 2);
+    ctx.globalAlpha = 1;
+  }
+  if (w.activeTicks > 0) {
+    const k = Math.max(0, (w.activeTicks - alpha) / RAIL_FX_TICKS);
+    for (let b = 0; b < w.vN; b++) {
+      const a = w.angles[b];
+      const ux = Math.cos(a);
+      const uy = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + ux * w.vLen, y + uy * w.vLen);
+      ctx.globalAlpha = k;
+      view.glow(color, w.vW * k + 1.5);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5 * k + 0.8;
+      ctx.stroke();
+      // Shock rings along the shot, widening as they fade.
+      for (let d = 60; d < w.vLen; d += 120) {
+        ctx.save();
+        ctx.translate(x + ux * d, y + uy * d);
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4 + (1 - k) * 4, 9 + (1 - k) * 18, 0, 0, TAU);
+        ctx.globalAlpha = k * 0.8;
+        view.glow(color, 1.5);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+/** Electric arc: a crackling bolt from the player to the locked target, and a ring around it. */
+function drawArcLock(view: RenderView, s: GameState, w: WeaponInst, x: number, y: number, color: string): void {
+  if (w.activeTicks <= 0 || w.lockIdx < 0 || w.lockIdx >= s.enemyCount) return;
+  const e = s.enemies[w.lockIdx];
+  if (!e.alive || e.id !== w.lockId) return;
+  const ctx = view.ctx;
+  const dx = e.x - x;
+  const dy = e.y - y;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const seed = s.tick >> 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  const segs = 8;
+  for (let k = 1; k < segs; k++) {
+    const off = (hash01(seed * 7 + k) - 0.5) * Math.min(36, len * 0.25);
+    ctx.lineTo(x + (dx * k) / segs + nx * off, y + (dy * k) / segs + ny * off);
+  }
+  ctx.lineTo(e.x, e.y);
+  ctx.globalAlpha = 0.9;
+  view.glow(color, 2.5);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(e.x, e.y, e.r + 6, 0, TAU);
+  ctx.globalAlpha = 0.7;
+  view.glow('#9fd0ff', 1.5);
   ctx.globalAlpha = 1;
-  view.glow(color, 1.4);
 }
 
 export function drawWeaponFx(view: RenderView, s: GameState, alpha: number, under: boolean): void {
@@ -275,83 +292,61 @@ function drawPlayerWeaponFx(view: RenderView, s: GameState, p: Player, alpha: nu
   const ctx = view.ctx;
   const x = lerp(p.px, p.x, alpha);
   const y = lerp(p.py, p.y, alpha);
+  const time = (s.tick + alpha) * DT;
   for (const w of p.weapons) {
     const def = weaponDef(w.def);
     const L = weaponLevel(w.def, w.level);
-    if (under && def.behavior === 'aura') {
+    if (def.behavior === 'aura') {
       const R = w.vR || (L.radius ?? 80);
-      ctx.beginPath();
-      ctx.arc(x, y, R, 0, Math.PI * 2);
-      ctx.fillStyle = def.color;
-      ctx.globalAlpha = 0.05 + (w.activeTicks > 0 ? 0.05 * (w.activeTicks / 8) : 0);
-      ctx.fill();
-      ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = def.color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 10]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
+      const vampire = w.def === VAMPIRE_FIELD_WEAPON;
+      if (under) drawBubble(view, x, y, R, w.activeTicks > 0 ? w.activeTicks / 8 : 0, def.color, vampire ? '#ff5a8c' : def.color);
+      else if (vampire) drawDrops(view, s, w, x, y, R, Math.max(1, Math.round((L.tick ?? 0.5) / DT)), alpha);
+      continue;
     }
     if (under) continue;
-    if (def.behavior === 'orbit') {
-      const n = w.vN;
-      const ang = w.angle + (L.rotSpeed ?? 3) * DT * alpha;
-      ctx.beginPath();
-      for (let k = 0; k < n; k++) {
-        const a = ang + (k * Math.PI * 2) / n;
-        const ox = x + Math.cos(a) * w.vR;
-        const oy = y + Math.sin(a) * w.vR;
-        ctx.moveTo(ox + w.vS, oy);
-        ctx.arc(ox, oy, w.vS, 0, Math.PI * 2);
-      }
-      if (w.def === BLACK_HOLE_WEAPON) {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = '#000000';
-        ctx.fill();
-        ctx.globalCompositeOperation = 'lighter';
-      }
-      view.glow(def.color, w.def === BLACK_HOLE_WEAPON ? 3 : 2.5);
-      if (w.def === BLACK_HOLE_WEAPON) {
-        ctx.beginPath();
+    switch (def.behavior) {
+      case 'orbit': {
+        const n = w.vN;
+        const ang = w.angle + (L.rotSpeed ?? 3) * DT * alpha;
+        const hole = w.def === BLACK_HOLE_WEAPON;
+        if (hole) ctx.globalCompositeOperation = 'source-over';
         for (let k = 0; k < n; k++) {
-          const a = ang + (k * Math.PI * 2) / n;
+          const a = ang + (k * TAU) / n;
           const ox = x + Math.cos(a) * w.vR;
           const oy = y + Math.sin(a) * w.vR;
-          for (let j = 0; j < 3; j++) {
-            const sa = -ang * 3 + (j * Math.PI * 2) / 3;
-            ctx.moveTo(ox + Math.cos(sa) * w.vS, oy + Math.sin(sa) * w.vS);
-            ctx.quadraticCurveTo(
-              ox + Math.cos(sa + 1) * w.vS * 1.7,
-              oy + Math.sin(sa + 1) * w.vS * 1.7,
-              ox + Math.cos(sa + 1.8) * w.vS * 1.9,
-              oy + Math.sin(sa + 1.8) * w.vS * 1.9,
-            );
+          if (hole) {
+            drawBlackHole(view, ox, oy, w.vS, time + k * 0.37, def.color);
+            continue;
           }
+          ctx.beginPath();
+          sawPath(ctx, ox, oy, w.vS * 0.62, w.vS, 7, time * 9);
+          ctx.fillStyle = def.color;
+          ctx.globalAlpha = 0.28;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          view.glow(def.color, 2.2);
+          ctx.beginPath();
+          ctx.arc(ox, oy, w.vS * 0.2, 0, TAU);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
         }
-        ctx.globalAlpha = 0.6;
-        view.glow(def.color, 1.5);
-        ctx.globalAlpha = 1;
+        if (hole) ctx.globalCompositeOperation = 'lighter';
+        break;
       }
-    } else if (def.behavior === 'whip' && w.activeTicks > 0) {
-      drawWhip(view, x, y, w.angles, w.vN, w.vLen, w.vW, 1 - (w.activeTicks - alpha) / WHIP_FX_TICKS, def.color);
-    } else if (def.behavior === 'scythe' && w.activeTicks > 0) {
-      drawScythe(view, x, y, w.angles, w.vN, w.vLen, Math.min(1, 1 - (w.activeTicks - alpha) / SCYTHE_FX_TICKS), def.color);
-    } else if (def.behavior === 'flame' && w.activeTicks > 0) {
-      for (let b = 0; b < w.vN; b++) drawFlameJet(view, x, y, w.angles[b], w.vLen, w.vW, def.color, s.tick + alpha, b);
-    } else if (def.behavior === 'beam' && w.activeTicks > 0) {
-      ctx.beginPath();
-      for (let b = 0; b < w.vN; b++) {
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(w.angles[b]) * w.vLen, y + Math.sin(w.angles[b]) * w.vLen);
-      }
-      const flick = 0.75 + 0.25 * ((s.tick >> 1) & 1);
-      ctx.globalAlpha = flick;
-      view.glow(def.color, w.vW * 1.4);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = Math.max(1.5, w.vW * 0.35);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      case 'blade':
+        if (w.activeTicks > 0) drawBlade(view, w, x, y, def.color, alpha);
+        break;
+      case 'flame':
+        if (w.activeTicks > 0) for (let b = 0; b < w.vN; b++) drawFlameJet(view, x, y, w.angles[b], w.vLen, w.vW, def.color, s.tick + alpha, b);
+        break;
+      case 'rail':
+        drawRail(view, w, x, y, def.color, alpha);
+        break;
+      case 'arc':
+        drawArcLock(view, s, w, x, y, def.color);
+        break;
+      default:
+        break;
     }
   }
 }

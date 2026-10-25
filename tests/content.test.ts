@@ -29,14 +29,14 @@ describe('content', () => {
     expect(BASE_WEAPONS.every((w) => w.levels.length === 5)).toBe(true);
   });
 
-  it('there are as many orbs in play as the weapon level', () => {
+  it('there is one more saw in play than the weapon level', () => {
     const s = createGame({ seed: 'ORBES' });
     const p = s.players[0];
-    const w = addWeapon(p, weaponId('orbs'));
+    const w = addWeapon(p, weaponId('saws'));
     for (let l = 1; l <= 5; l++) {
       w.level = l;
       step(s, [0]);
-      expect(w.vN).toBe(l);
+      expect(w.vN).toBe(l + 1);
     }
   });
 

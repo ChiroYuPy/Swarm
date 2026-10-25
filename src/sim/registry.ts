@@ -84,13 +84,10 @@ export const RALLY_SPEED = RALLY_TYPE >= 0 ? (ENEMIES[RALLY_TYPE].auraSpeed ?? 0
 export interface CompiledFusion {
   result: number;
   weapon: number;
-  /** required passive */
-  with: number;
 }
 export const FUSION_TABLE: CompiledFusion[] = FUSIONS.map((f) => ({
   result: weaponId(f.result),
   weapon: weaponId(f.weapon),
-  with: passiveId(f.with),
 }));
 
 export interface CompiledRate {
@@ -211,7 +208,7 @@ function uniqueType(b: EnemyBehavior): number {
  * Content that engine code refers to by id (render variants, bot taste). Kept here so a renamed or
  * removed id throws at load instead of silently matching nothing.
  */
-export const SQUADRON_WEAPON = weaponId('squadron');
-export const KAMIKAZE_DRONES_WEAPON = weaponId('kamikaze_drones');
+export const HORNETS_WEAPON = weaponId('hornets');
 export const BLACK_HOLE_WEAPON = weaponId('black_holes');
+export const VAMPIRE_FIELD_WEAPON = weaponId('vampire_field');
 export const BOT_FAVORITE_PASSIVES = ['vitality', 'might', 'armor'].map(passiveId);

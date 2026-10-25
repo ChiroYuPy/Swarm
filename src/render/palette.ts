@@ -25,6 +25,9 @@ export const COLORS = {
   sandbox: '#b48cff',
 };
 
+/** Damage number colour per damage type (DMG_* index): physical, fire, cold, electric. */
+export const DAMAGE_COLORS = ['#ffffff', '#ff4a3a', '#8fe8ff', '#b48cff'];
+
 /** Indexed particle palette (drawing is batched by color). */
 export const FX_COLORS = [
   '#ffffff', // 0

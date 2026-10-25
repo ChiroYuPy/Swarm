@@ -7,29 +7,28 @@
 import { ALL_WEAPONS, type Behavior, type WeaponLevel } from '../../data/weapons';
 import { weaponLevel } from '../registry';
 import type { GameState, Player, WeaponInst } from '../state';
+import { arc } from './arc';
 import { aura } from './aura';
-import { beam } from './beam';
+import { blade } from './blade';
 import { boomerang } from './boomerang';
-import { chain } from './chain';
-import { drone } from './drone';
 import { flame } from './flame';
-import { scythe, whip } from './melee';
 import { mine } from './mine';
 import { mortar } from './mortar';
 import { orbit } from './orbit';
-import { phoenix } from './phoenix';
 import { projectile, spiral } from './projectile';
 import { pulse } from './pulse';
-import { ricochet } from './ricochet';
-import { turret } from './turret';
+import { rail } from './rail';
+import { shuriken } from './shuriken';
+import { swarm } from './swarm';
 
 export { ticks } from './common';
-export { spawnBullet } from './projectile';
 export { spawnMine } from './mine';
-export { spawnRing } from './pulse';
-export { SCYTHE_FX_TICKS, WHIP_FX_TICKS } from './melee';
-export { DRONE_LIFE, huntTarget } from './drone';
-export { spawnDisc } from './ricochet';
+export { RING_FADE } from './pulse';
+export { RAIL_FX_TICKS } from './rail';
+export { lockedTarget } from './arc';
+export { BLADE_FADE_TICKS } from './blade';
+export { BEE_DEAD, BEE_GO, BEE_HOME, BEE_IDLE, BEE_LIFE, BEE_RING, BEE_STUCK, beeTarget, ringAngle } from './swarm';
+export { SHURIKEN_BOX_X, SHURIKEN_BOX_Y } from './shuriken';
 export { spawnBlaze, spawnShell } from './mortar';
 
 type WeaponUpdater = (s: GameState, p: Player, w: WeaponInst, slot: number, L: WeaponLevel) => void;
@@ -39,19 +38,16 @@ const UPDATER_BY_BEHAVIOR: Record<Behavior, WeaponUpdater> = {
   spiral,
   orbit,
   aura,
-  beam,
+  rail,
   mine,
   boomerang,
-  chain,
+  arc,
   pulse,
-  whip,
-  scythe,
-  mortar,
-  phoenix,
+  blade,
   flame,
-  turret,
-  drone,
-  ricochet,
+  swarm,
+  shuriken,
+  mortar,
 };
 /** Updater per weapon index, resolved once from the data. */
 const WEAPON_UPDATERS: WeaponUpdater[] = ALL_WEAPONS.map((d) => UPDATER_BY_BEHAVIOR[d.behavior]);

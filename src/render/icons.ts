@@ -102,52 +102,60 @@ function arcs(ctx: Ctx, n: number, r: number, spread: number): void {
   }
 }
 
-const paintOrbs: IconPainter = ({ ctx, r, c, lw, id }) => {
-  const black = id === 'black_holes';
-  ctx.arc(0, 0, r * 0.68, 0, TAU);
-  ctx.setLineDash([lw * 1.5, lw * 2]);
-  ctx.globalAlpha = 0.6;
-  ctx.strokeStyle = c;
-  ctx.lineWidth = lw * 0.6;
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.globalAlpha = 1;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.14, 0, TAU);
-  solid(ctx, '#ffffff', lw * 0.6);
-  const n = black ? 3 : 3;
-  const orb = black ? r * 0.27 : r * 0.2;
-  for (let i = 0; i < n; i++) {
-    const a = -Math.PI / 2 + (i * TAU) / n;
-    ctx.beginPath();
-    ctx.arc(Math.cos(a) * r * 0.68, Math.sin(a) * r * 0.68, orb, 0, TAU);
-    if (black) {
-      ctx.fillStyle = '#000';
-      ctx.fill();
-      neon(ctx, c, lw * 0.8);
-    } else neon(ctx, c, lw * 0.8, 0.8);
+/**
+ * Ratchet saw path: each tooth climbs slowly then drops straight, so the spin direction reads at a glance
+ * (the steep edge leads when `rot` increases). Shared with the in-game saws.
+ */
+export function sawPath(ctx: Ctx, x: number, y: number, ri: number, ro: number, n: number, rot: number): void {
+  const step = TAU / n;
+  for (let k = 0; k < n; k++) {
+    const a0 = rot + k * step;
+    const a1 = a0 + step;
+    const out = a1 - step * 0.08;
+    const mid = (a0 + out) / 2;
+    if (k === 0) ctx.moveTo(x + Math.cos(a0) * ri, y + Math.sin(a0) * ri);
+    ctx.quadraticCurveTo(x + Math.cos(mid) * ri * 1.02, y + Math.sin(mid) * ri * 1.02, x + Math.cos(out) * ro, y + Math.sin(out) * ro);
+    ctx.lineTo(x + Math.cos(a1) * ri, y + Math.sin(a1) * ri);
   }
-};
-const paintAura: IconPainter = ({ ctx, r, c, lw, id }) => {
+  ctx.closePath();
+}
+
+function dot(ctx: Ctx, x: number, y: number, r: number, color: string, lw: number): void {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  solid(ctx, color, lw);
+}
+
+/** Capsule along +x, from x0 to the rounded nose at x1, half height h. */
+function capsule(ctx: Ctx, x0: number, x1: number, h: number): void {
+  ctx.moveTo(x0, -h);
+  ctx.lineTo(x1, -h);
+  ctx.arc(x1, 0, h, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x0, h);
+  ctx.closePath();
+}
+
+/** Bubble zone (force field family): clear centre, bright rim; `center` draws the middle mark. */
+function bubble(ctx: Ctx, r: number, c: string, lw: number, center: () => void): void {
+  const g = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * 0.85);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(0.6, c + '22');
+  g.addColorStop(1, c + '99');
   ctx.arc(0, 0, r * 0.85, 0, TAU);
-  ctx.setLineDash([lw * 1.4, lw * 1.6]);
-  neon(ctx, c, lw * 0.6);
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.55, 0, TAU);
-  neon(ctx, c, lw * 0.8, 0.18);
-  ctx.beginPath();
-  if (id === 'vampire_field') {
-    // Heal cross in the center
-    const k = r * 0.13;
-    ctx.rect(-k, -k * 2.6, k * 2, k * 5.2);
-    ctx.rect(-k * 2.6, -k, k * 5.2, k * 2);
-    solid(ctx, '#8dff8d', lw * 0.6);
-  } else {
-    ctx.arc(0, 0, r * 0.2, 0, TAU);
-    solid(ctx, '#ffffff', lw * 0.6);
-  }
-};
+  ctx.fillStyle = g;
+  ctx.fill();
+  neon(ctx, c, lw * 1.1);
+  center();
+}
+
+function bee(ctx: Ctx, x: number, y: number, a: number, s: number): void {
+  ctx.moveTo(x + Math.cos(a) * s, y + Math.sin(a) * s);
+  ctx.lineTo(x + Math.cos(a + 2.45) * s * 0.85, y + Math.sin(a + 2.45) * s * 0.85);
+  ctx.lineTo(x - Math.cos(a) * s * 0.3, y - Math.sin(a) * s * 0.3);
+  ctx.lineTo(x + Math.cos(a - 2.45) * s * 0.85, y + Math.sin(a - 2.45) * s * 0.85);
+  ctx.closePath();
+}
+
 const paintBoomerang: IconPainter = ({ ctx, r, c, lw, id }) => {
   ctx.translate(0, id === 'mine_boomerang' ? -r * 0.15 : 0);
   boomerangShape(ctx, r);
@@ -176,81 +184,6 @@ const paintWaves: IconPainter = ({ ctx, r, c, lw, id }) => {
     neon(ctx, c, lw * 0.6);
   }
 };
-const paintLash: IconPainter = ({ ctx, r, c, lw, id }) => {
-  if (id === 'scythe') {
-    // Curved blade on a handle
-    ctx.moveTo(-r * 0.55, r * 0.85);
-    ctx.lineTo(r * 0.15, -r * 0.55);
-    neon(ctx, '#ffffff', lw * 0.8);
-    ctx.beginPath();
-    ctx.moveTo(r * 0.15, -r * 0.55);
-    ctx.quadraticCurveTo(-r * 0.2, -r * 1.0, -r * 0.9, -r * 0.55);
-    ctx.quadraticCurveTo(-r * 0.3, -r * 0.62, r * 0.05, -r * 0.35);
-    neon(ctx, c, lw, 0.35);
-  } else {
-    // Handle with a pommel, a lash that loops then stretches out thinner, a crack at the tip.
-    ctx.moveTo(-r * 0.92, r * 0.9);
-    ctx.lineTo(-r * 0.5, r * 0.48);
-    neon(ctx, '#ffffff', lw * 1.5);
-    ctx.beginPath();
-    ctx.arc(-r * 0.92, r * 0.9, r * 0.08, 0, TAU);
-    solid(ctx, '#ffffff', lw * 0.4);
-    const lash: [number, number, number, number, number, number, number][] = [
-      // c1x, c1y, c2x, c2y, x, y, thickness
-      [-r * 0.1, r * 0.4, r * 0.55, r * 0.45, r * 0.48, r * 0.1, 1.1],
-      [r * 0.42, -r * 0.62, -r * 0.55, -r * 0.6, -r * 0.32, -r * 0.2, 0.85],
-      [-r * 0.15, r * 0.05, r * 0.35, -r * 0.5, r * 0.82, -r * 0.62, 0.6],
-    ];
-    let px = -r * 0.5;
-    let py = r * 0.48;
-    for (const [c1x, c1y, c2x, c2y, x, y, k] of lash) {
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x, y);
-      neon(ctx, c, lw * k);
-      px = x;
-      py = y;
-    }
-    // Crack: a 4-pointed spark
-    ctx.beginPath();
-    const sx = r * 0.82;
-    const sy = -r * 0.62;
-    for (let k = 0; k < 4; k++) {
-      const a = (k * Math.PI) / 2 + Math.PI / 4;
-      ctx.moveTo(sx + Math.cos(a) * r * 0.1, sy + Math.sin(a) * r * 0.1);
-      ctx.lineTo(sx + Math.cos(a) * r * 0.26, sy + Math.sin(a) * r * 0.26);
-    }
-    neon(ctx, '#fff4d6', lw * 0.55);
-  }
-};
-const paintTurret: IconPainter = ({ ctx, r, c, lw, id }) => {
-  const big = id === 'bastion';
-  // Tripod
-  ctx.moveTo(0, r * 0.25);
-  ctx.lineTo(-r * 0.6, r * 0.9);
-  ctx.moveTo(0, r * 0.25);
-  ctx.lineTo(r * 0.6, r * 0.9);
-  ctx.moveTo(0, r * 0.25);
-  ctx.lineTo(0, r * 0.9);
-  neon(ctx, c, lw * 0.8);
-  // Dome
-  ctx.beginPath();
-  ctx.arc(-r * 0.05, r * 0.2, r * (big ? 0.48 : 0.4), Math.PI, 0);
-  ctx.closePath();
-  neon(ctx, c, lw, 0.3);
-  // Barrel(s), pointing to the top right
-  ctx.beginPath();
-  const offs = big ? [-0.14, 0.14] : [0];
-  for (const o of offs) {
-    ctx.moveTo(r * (0.1 + o), r * (0.0 + o));
-    ctx.lineTo(r * (0.85 + o), r * (-0.65 + o));
-  }
-  neon(ctx, c, lw * 1.2);
-  ctx.beginPath();
-  ctx.arc(-r * 0.05, r * 0.02, r * 0.1, 0, TAU);
-  solid(ctx, '#ffffff', lw * 0.4);
-};
-
 function paintWeaponFallback({ ctx, r, c, lw }: IconArgs): void {
   ctx.arc(0, 0, r * 0.6, 0, TAU);
   neon(ctx, c, lw);
@@ -259,21 +192,21 @@ function paintWeaponFallback({ ctx, r, c, lw }: IconArgs): void {
 /** Weapon icons by weapon id (tests/icons.test.ts checks the keys against ALL_WEAPONS). */
 export const WEAPON_PAINTERS: Record<string, IconPainter> = {
   blaster: ({ ctx, r, c, lw }) => {
-    // Capsule projectile + speed trails
-    ctx.moveTo(-r * 0.05, -r * 0.22);
-    ctx.lineTo(r * 0.5, -r * 0.22);
-    ctx.arc(r * 0.5, 0, r * 0.22, -Math.PI / 2, Math.PI / 2);
-    ctx.lineTo(-r * 0.05, r * 0.22);
-    ctx.closePath();
-    neon(ctx, c, lw, 0.35);
+    // Capsule projectile + speed trails, on the diagonal
+    lw *= 1.15;
+    ctx.save();
+    ctx.rotate(-Math.PI / 4);
+    capsule(ctx, -r * 0.05, r * 0.55, r * 0.2);
+    neon(ctx, c, lw, 0.45);
     ctx.beginPath();
-    ctx.moveTo(-r * 0.85, -r * 0.42);
-    ctx.lineTo(-r * 0.3, -r * 0.42);
+    ctx.moveTo(-r * 0.8, -r * 0.36);
+    ctx.lineTo(-r * 0.3, -r * 0.36);
     ctx.moveTo(-r * 0.95, 0);
-    ctx.lineTo(-r * 0.32, 0);
-    ctx.moveTo(-r * 0.85, r * 0.42);
-    ctx.lineTo(-r * 0.3, r * 0.42);
-    neon(ctx, c, lw * 0.7);
+    ctx.lineTo(-r * 0.3, 0);
+    ctx.moveTo(-r * 0.8, r * 0.36);
+    ctx.lineTo(-r * 0.3, r * 0.36);
+    neon(ctx, c, lw * 0.6);
+    ctx.restore();
   },
   spiral: ({ ctx, r, c, lw }) => {
     // Spiral + three projectiles
@@ -292,17 +225,60 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     }
     solid(ctx, '#ffffff', lw);
   },
-  orbs: paintOrbs,
-  black_holes: paintOrbs,
-  force_field: paintAura,
-  vampire_field: paintAura,
-  laser: ({ ctx, r, c, lw }) => {
-    ctx.moveTo(-r * 0.55, r * 0.55);
-    ctx.lineTo(r * 0.9, -r * 0.9);
-    neon(ctx, c, lw * 1.5);
+  saws: ({ ctx, r, c, lw }) => {
+    // Ratchet saw: the hooked teeth show which way it spins
+    lw *= 1.2;
+    sawPath(ctx, 0, 0, r * 0.6, r * 0.95, 8, -0.2);
+    neon(ctx, c, lw * 0.85, 0.22);
     ctx.beginPath();
-    ctx.rect(-r * 0.9, r * 0.35, r * 0.55, r * 0.55);
-    neon(ctx, c, lw * 0.8, 0.5);
+    ctx.arc(0, 0, r * 0.22, 0, TAU);
+    neon(ctx, c, lw * 0.6);
+    dot(ctx, 0, 0, r * 0.08, '#ffffff', lw * 0.4);
+  },
+  black_holes: ({ ctx, r, c }) => {
+    // Black centre fading to a violet halo, debris falling in
+    const g = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(0.45, 'rgba(40,10,70,0.95)');
+    g.addColorStop(0.8, c + '77');
+    g.addColorStop(1, c + '00');
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fillStyle = g;
+    ctx.fill();
+    for (const [a, d, s] of [
+      [0.6, 0.72, 0.07],
+      [2.4, 0.6, 0.06],
+      [4.2, 0.8, 0.05],
+    ]) dot(ctx, Math.cos(a) * r * d, Math.sin(a) * r * d, r * s, '#e6d4ff', 1);
+  },
+  force_field: ({ ctx, r, c, lw }) => bubble(ctx, r, c, lw, () => dot(ctx, 0, 0, r * 0.15, '#ffffff', lw * 0.4)),
+  vampire_field: ({ ctx, r, lw }) =>
+    bubble(ctx, r, '#ff5a8c', lw, () => {
+      // A drop of blood in the middle
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.38);
+      ctx.bezierCurveTo(r * 0.12, -r * 0.15, r * 0.26, 0, r * 0.26, r * 0.12);
+      ctx.arc(0, r * 0.12, r * 0.26, 0, Math.PI);
+      ctx.bezierCurveTo(-r * 0.26, 0, -r * 0.12, -r * 0.15, 0, -r * 0.38);
+      neon(ctx, '#ff3b5c', lw * 0.6, 0.7);
+    }),
+  railgun: ({ ctx, r, c, lw }) => {
+    // The Blaster capsule on the diagonal, its trails replaced by shock rings
+    lw *= 1.15;
+    ctx.save();
+    ctx.rotate(-Math.PI / 4);
+    capsule(ctx, -r * 0.05, r * 0.55, r * 0.18);
+    neon(ctx, c, lw * 0.9, 0.5);
+    for (const [x, k] of [
+      [-r * 0.35, 0.34],
+      [-r * 0.7, 0.26],
+      [-r * 1.0, 0.18],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(x, 0, r * 0.07, r * k, 0, 0, TAU);
+      neon(ctx, c, lw * 0.5);
+    }
+    ctx.restore();
   },
   mines: ({ ctx, r, c, lw }) => {
     mineShape(ctx, 0, 0, r * 0.9);
@@ -324,19 +300,47 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
   },
   shockwave: paintWaves,
   earthquake: paintWaves,
-  whip: paintLash,
-  scythe: paintLash,
-  flamethrower: ({ ctx, r, c, lw }) => {
-    // Flame
-    ctx.moveTo(0, r * 0.85);
-    ctx.bezierCurveTo(-r * 0.75, r * 0.5, -r * 0.3, -r * 0.2, 0, -r * 0.9);
-    ctx.bezierCurveTo(r * 0.25, -r * 0.35, r * 0.75, r * 0.2, 0, r * 0.85);
-    neon(ctx, c, lw, 0.35);
+  blade: ({ ctx, r, c, lw }) => {
+    // Straight sword on the diagonal: blade, guard, white grip, pommel
+    lw *= 1.15;
+    ctx.save();
+    ctx.rotate(Math.PI / 4);
+    ctx.moveTo(0, -r * 1.0);
+    ctx.lineTo(r * 0.13, -r * 0.82);
+    ctx.lineTo(r * 0.13, r * 0.25);
+    ctx.lineTo(-r * 0.13, r * 0.25);
+    ctx.lineTo(-r * 0.13, -r * 0.82);
+    ctx.closePath();
+    neon(ctx, c, lw * 0.8, 0.35);
     ctx.beginPath();
-    ctx.moveTo(0, r * 0.7);
-    ctx.bezierCurveTo(-r * 0.3, r * 0.5, -r * 0.1, r * 0.1, 0, -r * 0.2);
-    ctx.bezierCurveTo(r * 0.1, r * 0.1, r * 0.3, r * 0.5, 0, r * 0.7);
-    solid(ctx, '#fff1b8', lw * 0.4);
+    ctx.moveTo(-r * 0.38, r * 0.3);
+    ctx.lineTo(r * 0.38, r * 0.3);
+    neon(ctx, c, lw * 1.0);
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.35);
+    ctx.lineTo(0, r * 0.72);
+    neon(ctx, '#ffffff', lw * 0.9);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(-Math.SQRT1_2 * r * 0.82, Math.SQRT1_2 * r * 0.82, r * 0.09, 0, TAU);
+    solid(ctx, c, lw * 0.4);
+  },
+  flamethrower: ({ ctx, r, c, lw }) => {
+    // Clean flame with a bright heart
+    lw *= 1.15;
+    ctx.moveTo(0, r * 0.9);
+    ctx.bezierCurveTo(-r * 0.62, r * 0.9, -r * 0.7, r * 0.2, -r * 0.3, -r * 0.2);
+    ctx.quadraticCurveTo(-r * 0.15, r * 0.1, -r * 0.05, r * 0.15);
+    ctx.quadraticCurveTo(-r * 0.15, -r * 0.5, r * 0.15, -r * 0.95);
+    ctx.bezierCurveTo(r * 0.25, -r * 0.4, r * 0.7, -r * 0.15, r * 0.6, r * 0.4);
+    ctx.bezierCurveTo(r * 0.55, r * 0.75, r * 0.3, r * 0.9, 0, r * 0.9);
+    neon(ctx, c, lw * 0.85, 0.3);
+    ctx.beginPath();
+    ctx.moveTo(r * 0.02, r * 0.75);
+    ctx.bezierCurveTo(-r * 0.3, r * 0.7, -r * 0.25, r * 0.3, r * 0.08, r * 0.05);
+    ctx.bezierCurveTo(r * 0.12, r * 0.3, r * 0.35, r * 0.4, r * 0.28, r * 0.58);
+    ctx.quadraticCurveTo(r * 0.2, r * 0.75, r * 0.02, r * 0.75);
+    solid(ctx, '#fff1b8', lw * 0.35);
   },
   fire_tornado: ({ ctx, r, c, lw }) => {
     // Three jets swirling around a point
@@ -355,105 +359,18 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     ctx.arc(0, 0, r * 0.18, 0, TAU);
     solid(ctx, '#fff1b8', lw * 0.5);
   },
-  phoenix: ({ ctx, r, c, lw }) => {
-    // Fire bird, wings spread
-    ctx.moveTo(0, -r * 0.55);
-    ctx.quadraticCurveTo(-r * 0.5, -r * 0.75, -r * 0.95, -r * 0.2);
-    ctx.quadraticCurveTo(-r * 0.45, -r * 0.2, -r * 0.15, r * 0.05);
-    ctx.moveTo(0, -r * 0.55);
-    ctx.quadraticCurveTo(r * 0.5, -r * 0.75, r * 0.95, -r * 0.2);
-    ctx.quadraticCurveTo(r * 0.45, -r * 0.2, r * 0.15, r * 0.05);
-    neon(ctx, c, lw * 0.9, 0.25);
+  swarm: ({ ctx, r, c, lw }) => {
+    // A ring of bees around a white centre
+    lw *= 1.6;
+    dot(ctx, 0, 0, r * 0.13, '#ffffff', lw * 0.4);
     ctx.beginPath();
-    ctx.moveTo(0, -r * 0.75);
-    ctx.quadraticCurveTo(r * 0.22, -r * 0.1, 0, r * 0.35);
-    ctx.quadraticCurveTo(-r * 0.22, -r * 0.1, 0, -r * 0.75);
-    neon(ctx, '#fff1b8', lw * 0.7, 0.5);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.25, r * 0.4);
-    ctx.lineTo(-r * 0.35, r * 0.95);
-    ctx.moveTo(0, r * 0.4);
-    ctx.lineTo(0, r * 1.0);
-    ctx.moveTo(r * 0.25, r * 0.4);
-    ctx.lineTo(r * 0.35, r * 0.95);
-    neon(ctx, c, lw * 0.6);
+    for (let k = 0; k < 6; k++) {
+      const a = (k * TAU) / 6;
+      bee(ctx, Math.cos(a) * r * 0.66, Math.sin(a) * r * 0.66, a + Math.PI / 2, r * 0.2);
+    }
+    neon(ctx, c, lw * 0.55, 0.5);
   },
-  turret: paintTurret,
-  bastion: paintTurret,
-  drone: ({ ctx, r, c, lw }) => {
-    // Quadcopter seen from above: X arms, four rotors, a body with its eye facing forward.
-    const arm = r * 0.58;
-    for (const [sx, sy] of [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-    ]) {
-      ctx.moveTo(sx * r * 0.18, sy * r * 0.18);
-      ctx.lineTo(sx * arm, sy * arm);
-    }
-    neon(ctx, c, lw * 0.7);
-    ctx.beginPath();
-    for (const [sx, sy] of [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-    ]) {
-      ctx.moveTo(sx * arm + r * 0.3, sy * arm);
-      ctx.arc(sx * arm, sy * arm, r * 0.3, 0, TAU);
-    }
-    neon(ctx, c, lw * 0.75, 0.18);
-    // Blades (thin strokes across the rotors)
-    ctx.beginPath();
-    for (const [sx, sy] of [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-    ]) {
-      ctx.moveTo(sx * arm - r * 0.2, sy * arm + r * 0.07);
-      ctx.lineTo(sx * arm + r * 0.2, sy * arm - r * 0.07);
-    }
-    neon(ctx, '#ffffff', lw * 0.4, 0, false);
-    ctx.beginPath();
-    ctx.moveTo(r * 0.3, 0);
-    ctx.lineTo(0, r * 0.24);
-    ctx.lineTo(-r * 0.24, 0);
-    ctx.lineTo(0, -r * 0.24);
-    ctx.closePath();
-    neon(ctx, c, lw, 0.45);
-    ctx.beginPath();
-    ctx.arc(r * 0.07, 0, r * 0.08, 0, TAU);
-    solid(ctx, '#ffffff', lw * 0.4);
-  },
-  squadron: ({ ctx, r, c, lw }) => {
-    // Three drones orbiting a target, launching a disc.
-    ctx.arc(0, 0, r * 0.62, 0, TAU);
-    ctx.setLineDash([lw, lw * 1.8]);
-    neon(ctx, c, lw * 0.5, 0, false);
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.13, 0, TAU);
-    solid(ctx, '#ff4f9a', lw * 0.5);
-    ctx.beginPath();
-    for (let k = 0; k < 3; k++) {
-      const a = -Math.PI / 2 + (k * TAU) / 3;
-      const x = Math.cos(a) * r * 0.62;
-      const y = Math.sin(a) * r * 0.62;
-      // tangent arrow (rotation direction)
-      const tx = -Math.sin(a);
-      const ty = Math.cos(a);
-      const L = r * 0.26;
-      ctx.moveTo(x + tx * L, y + ty * L);
-      ctx.lineTo(x - tx * L * 0.6 + Math.cos(a) * L * 0.6, y - ty * L * 0.6 + Math.sin(a) * L * 0.6);
-      ctx.lineTo(x - tx * L * 0.25, y - ty * L * 0.25);
-      ctx.lineTo(x - tx * L * 0.6 - Math.cos(a) * L * 0.6, y - ty * L * 0.6 - Math.sin(a) * L * 0.6);
-      ctx.closePath();
-    }
-    neon(ctx, c, lw * 0.7, 0.45);
-  },
-  kamikaze_drones: ({ ctx, r, c, lw }) => {
+  hornets: ({ ctx, r, c, lw }) => {
     // Arrow diving onto an explosion
     ctx.moveTo(-r * 0.8, -r * 0.8);
     ctx.lineTo(-r * 0.05, -r * 0.35);
@@ -471,6 +388,22 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     }
     ctx.closePath();
     neon(ctx, '#ffd23a', lw * 0.8, 0.35);
+  },
+  shuriken: ({ ctx, r, c, lw }) => {
+    // Four-pointed star (two crossed diamonds)
+    lw *= 1.55;
+    ctx.moveTo(0, -r * 0.95);
+    ctx.lineTo(r * 0.4, 0);
+    ctx.lineTo(0, r * 0.95);
+    ctx.lineTo(-r * 0.4, 0);
+    ctx.closePath();
+    ctx.moveTo(-r * 0.95, 0);
+    ctx.lineTo(0, -r * 0.4);
+    ctx.lineTo(r * 0.95, 0);
+    ctx.lineTo(0, r * 0.4);
+    ctx.closePath();
+    neon(ctx, c, lw * 0.7, 0.22);
+    dot(ctx, 0, 0, r * 0.12, '#ffffff', lw * 0.4);
   },
   mortar: ({ ctx, r, c, lw }) => {
     // Tilted tube + arcing shell
@@ -507,48 +440,6 @@ export const WEAPON_PAINTERS: Record<string, IconPainter> = {
     ctx.moveTo(-r * 0.35 + r * 0.16, -r * 0.05);
     ctx.arc(-r * 0.35, -r * 0.05, r * 0.16, 0, TAU);
     solid(ctx, c, lw * 0.6);
-  },
-  ricochet: ({ ctx, r, c, lw }) => {
-    // Path bouncing off two impacts, then the saw disc flying off.
-    const hits: [number, number][] = [
-      [-r * 0.6, -r * 0.05],
-      [-r * 0.05, r * 0.62],
-    ];
-    ctx.moveTo(-r * 0.95, r * 0.75);
-    ctx.lineTo(...hits[0]);
-    ctx.lineTo(...hits[1]);
-    ctx.lineTo(r * 0.3, r * 0.05);
-    ctx.setLineDash([lw * 1.2, lw * 1.4]);
-    neon(ctx, c, lw * 0.55, 0, false);
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    for (const [hx, hy] of hits) {
-      for (let k = 0; k < 5; k++) {
-        const a = (k * TAU) / 5 + 0.3;
-        ctx.moveTo(hx + Math.cos(a) * r * 0.07, hy + Math.sin(a) * r * 0.07);
-        ctx.lineTo(hx + Math.cos(a) * r * 0.17, hy + Math.sin(a) * r * 0.17);
-      }
-    }
-    neon(ctx, '#ffffff', lw * 0.45, 0, false);
-    // Saw disc: 8 teeth
-    const dx = r * 0.45;
-    const dy = -r * 0.38;
-    ctx.beginPath();
-    const T = 8;
-    for (let k = 0; k < T; k++) {
-      const a0 = (k * TAU) / T;
-      const a1 = a0 + TAU / T;
-      const p0 = [dx + Math.cos(a0) * r * 0.36, dy + Math.sin(a0) * r * 0.36];
-      const p1 = [dx + Math.cos(a0 + 0.2) * r * 0.5, dy + Math.sin(a0 + 0.2) * r * 0.5];
-      if (k === 0) ctx.moveTo(p0[0], p0[1]);
-      ctx.lineTo(p1[0], p1[1]);
-      ctx.lineTo(dx + Math.cos(a1) * r * 0.36, dy + Math.sin(a1) * r * 0.36);
-    }
-    ctx.closePath();
-    neon(ctx, c, lw * 0.85, 0.3);
-    ctx.beginPath();
-    ctx.arc(dx, dy, r * 0.12, 0, TAU);
-    solid(ctx, '#ffffff', lw * 0.5);
   },
 };
 

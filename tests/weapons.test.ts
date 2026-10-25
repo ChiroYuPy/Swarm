@@ -4,24 +4,26 @@ import {
   step,
   availableFusions,
   FUSION_TABLE,
-  PassiveInst,
+  DMG_FIRE,
+  EV_HIT,
+  PJ_BEE,
   PJ_BLAZE,
-  PJ_DRONE,
+  PJ_BOOMERANG,
   PJ_EBULLET,
-  PJ_PHOENIX,
-  PJ_RICOCHET,
+  PJ_MINE,
+  PJ_RING,
   PJ_SHELL,
-  PJ_TURRET,
+  PJ_SHURIKEN,
   TICK_RATE,
   weaponDef,
   type GameState,
 } from '../src/sim';
 import { spawnEnemy } from '../src/sim/entities';
-import { enemyId, passiveId, weaponId } from '../src/sim/registry';
+import { enemyId, weaponId } from '../src/sim/registry';
+import { BEE_STUCK, SHURIKEN_BOX_X, SHURIKEN_BOX_Y, spawnMine } from '../src/sim/weapons';
 import { ALL_WEAPONS, FUSED_WEAPONS } from '../src/data/weapons';
-import { addWeapon, rollOffers } from '../src/sim/levelup';
+import { addWeapon } from '../src/sim/levelup';
 import { computeStats } from '../src/sim/player';
-import { OFFER_FUSION } from '../src/sim/state';
 
 /** Every weapon and evolution deals damage: the list comes from the data, nothing to add for a new weapon. */
 const DAMAGING = ALL_WEAPONS.map((w) => w.id);
@@ -42,6 +44,14 @@ function arena(id: string, level: number, hp = 50, type = 'block'): GameState {
   return s;
 }
 
+/** A game with a single weapon and no enemy (the test places its own). */
+function empty(id: string, level: number): GameState {
+  const s = arena(id, level);
+  for (let i = 0; i < s.enemyCount; i++) s.enemies[i].alive = false;
+  s.enemyCount = 0;
+  return s;
+}
+
 function run(s: GameState, seconds: number, each?: (s: GameState) => void): void {
   for (let i = 0; i < seconds * TICK_RATE && !s.over; i++) {
     step(s, [0]);
@@ -50,6 +60,7 @@ function run(s: GameState, seconds: number, each?: (s: GameState) => void): void
 }
 
 const projs = (s: GameState, kind: number) => s.projectiles.slice(0, s.projCount).filter((b) => b.kind === kind);
+const alive = (s: GameState) => s.enemies.slice(0, s.enemyCount).filter((e) => e.alive);
 
 describe('weapons', () => {
   it.each(DAMAGING)('%s deals damage (level 1 and max)', (id) => {
@@ -61,17 +72,7 @@ describe('weapons', () => {
     }
   });
 
-  it('the Whip hurts and knocks back', () => {
-    const s = arena('whip', 5, 5000);
-    const p = s.players[0];
-    const before = s.enemies.slice(0, s.enemyCount).map((e) => Math.hypot(e.x - p.x, e.y - p.y));
-    run(s, 0.8);
-    expect(p.damageDealt).toBeGreaterThan(0);
-    const pushed = s.enemies.slice(0, s.enemyCount).some((e, i) => e.kbx !== 0 || e.kby !== 0 || Math.hypot(e.x - p.x, e.y - p.y) > before[i] + 20);
-    expect(pushed).toBe(true);
-  });
-
-  it('every evolution is offered when the weapon and its passive are maxed', () => {
+  it('every evolution is offered once its weapon is maxed, without any passive', () => {
     for (const result of FUSED_WEAPONS.map((w) => w.id)) {
       const fi = FUSION_TABLE.findIndex((f) => f.result === weaponId(result));
       expect(fi, result).toBeGreaterThanOrEqual(0);
@@ -80,126 +81,217 @@ describe('weapons', () => {
       const p = s.players[0];
       p.weapons.length = 0;
       addWeapon(p, f.weapon).level = weaponDef(f.weapon).levels.length;
-      const x = new PassiveInst();
-      x.def = f.with;
-      x.level = 5;
-      p.passives.push(x);
+      expect(p.passives.length).toBe(0);
       expect(availableFusions(p), result).toContain(fi);
     }
   });
 
-  it('a weapon with two possible fusions offers both', () => {
-    const s = createGame({ seed: 'FUSIONS' });
-    const p = s.players[0];
-    p.weapons.length = 0;
-    addWeapon(p, weaponId('flamethrower')).level = 5;
-    for (const id of ['amplifier', 'vitality']) {
-      const x = new PassiveInst();
-      x.def = passiveId(id);
-      x.level = 5;
-      p.passives.push(x);
-    }
-    p.pendingLevels = 1;
-    rollOffers(s, p);
-    const fused = p.offers.filter((o) => o.kind === OFFER_FUSION).map((o) => FUSION_TABLE[o.id].result);
-    expect(fused).toContain(weaponId('fire_tornado'));
-    expect(fused).toContain(weaponId('phoenix'));
-  });
-
-  it('the Scythe removes a share of max HP, and finishes off nearly dead enemies', () => {
-    const s = arena('scythe', 1, 1);
-    for (let i = 0; i < s.enemyCount; i++) {
-      const e = s.enemies[i];
-      e.maxHp = 100000;
-      // one hit (15%) leaves these under the execute threshold
-      e.hp = i % 2 ? 20000 : 100000;
-    }
-    run(s, 1);
-    const L = weaponDef(weaponId('scythe')).levels[0];
-    // the healthy ones that were hit (the farthest are out of range) lose exactly their share of max HP
-    const hit = s.enemies.slice(0, s.enemyCount).filter((e) => e.alive && e.hp < e.maxHp && e.hp > 20000);
-    expect(s.players[0].kills).toBeGreaterThan(0);
-    expect(hit.length).toBeGreaterThan(0);
-    for (const e of hit) expect(e.hp).toBeCloseTo(e.maxHp * (1 - L.pctHp!), 0);
-  });
-
-  it('the turret stays put and fires without the player', () => {
-    const s = arena('turret', 1);
-    run(s, 0.5);
-    const t = projs(s, PJ_TURRET)[0];
-    expect(t).toBeDefined();
-    const before = s.players[0].damageDealt;
-    run(s, 4);
-    const t2 = projs(s, PJ_TURRET)[0];
-    expect([t2?.x, t2?.y]).toEqual([t.x, t.y]);
-    expect(s.players[0].damageDealt).toBeGreaterThan(before);
-  });
-
-  it('a ricochet disc hits several enemies (max level)', () => {
-    const s = arena('ricochet', 5);
-    let maxHits = 0;
-    run(s, 3, (st) => {
-      for (const b of projs(st, PJ_RICOCHET)) maxHits = Math.max(maxHits, b.hitCount);
+  it('the Blaster fires its level as a burst of shots in a row', () => {
+    const s = arena('blaster', 4, 100000);
+    let most = 0;
+    let fired = 0;
+    run(s, 0.8, (st) => {
+      fired = Math.max(fired, st.players[0].weapons[0].burstLeft);
+      most = Math.max(most, st.projectiles.slice(0, st.projCount).filter((b) => b.kind === 0 && b.age === 1).length);
     });
-    expect(maxHits).toBeGreaterThan(1);
+    // One bullet per tick at most (a burst, not a fan), 3 still to come after the first.
+    expect(most).toBe(1);
+    expect(fired).toBe(3);
   });
 
-  it('drones go hunting, and come back near the player when shot down', () => {
-    const s = arena('drone', 2, 50, 'shooter');
-    run(s, 1);
-    expect(projs(s, PJ_DRONE).length).toBe(2);
-    // Shoot down every drone: they must respawn near the player.
-    for (const b of projs(s, PJ_DRONE)) b.b = -1;
-    // An enemy in contact triggers the destruction on the next step; here it is forced through HP.
-    run(s, 0.1);
+  it('the Blade sweeps, hurts and knocks back', () => {
+    const s = arena('blade', 5, 5000);
     const p = s.players[0];
-    run(s, 4);
-    const ds = projs(s, PJ_DRONE);
-    expect(ds.length).toBe(2);
-    expect(ds.every((b) => b.age < 4 * TICK_RATE)).toBe(true);
+    const w = p.weapons[0];
+    const angles: number[] = [];
+    run(s, 1.2, () => {
+      if (w.activeTicks > 0 && w.tickTimer < w.vN) angles.push(w.angles[2]);
+    });
     expect(p.damageDealt).toBeGreaterThan(0);
+    expect(new Set(angles).size).toBeGreaterThan(3);
+    expect(alive(s).some((e) => e.kbx !== 0 || e.kby !== 0)).toBe(true);
   });
 
-  it('the Flamethrower no longer turns once lit', () => {
+  it('the Railgun aims at the enemy with the most max HP, even a wounded one', () => {
+    const s = empty('railgun', 1);
+    const p = s.players[0];
+    // Near on the right: a small one at full HP. Farther on the left: a big one already badly hurt.
+    spawnEnemy(s, enemyId('hunter'), p.x + 120, p.y, 1, 0.01, 0.001, 0);
+    const big = spawnEnemy(s, enemyId('block'), p.x - 300, p.y, 1, 0.01, 0.001, 0)!;
+    big.maxHp = 5000;
+    big.hp = 50;
+    s.enemies[0].hp = s.enemies[0].maxHp = 400;
+    const w = p.weapons[0];
+    let aimed: number | null = null;
+    run(s, 1, () => {
+      if (aimed === null && w.burstLeft > 0) aimed = w.angle;
+    });
+    expect(aimed).not.toBeNull();
+    expect(Math.abs(Math.abs(aimed!) - Math.PI)).toBeLessThan(0.05);
+  });
+
+  it('the Electric arc locks on the biggest by max HP, holds it in place and shocks its neighbours', () => {
+    const s = empty('electric_arc', 1);
+    const p = s.players[0];
+    const big = spawnEnemy(s, enemyId('block'), p.x + 150, p.y, 1, 0.01, 1, 0)!;
+    big.maxHp = 100000;
+    big.hp = 50000;
+    const fresh = spawnEnemy(s, enemyId('block'), p.x - 120, p.y, 1, 0.01, 1, 0)!;
+    fresh.maxHp = fresh.hp = 60000;
+    const side = spawnEnemy(s, enemyId('hunter'), p.x + 190, p.y, 1, 0.01, 1, 0)!;
+    side.maxHp = side.hp = 60000;
+    const w = p.weapons[0];
+    let lockedOn = -1;
+    let stunned = false;
+    run(s, 1, () => {
+      if (w.activeTicks > 0 && lockedOn < 0) lockedOn = w.lockId;
+      if (big.stunUntil > s.tick) stunned = true;
+    });
+    expect(lockedOn).toBe(big.id);
+    expect(stunned).toBe(true);
+    expect(big.hp).toBeLessThan(50000);
+    expect(side.hp).toBeLessThan(60000);
+    expect(fresh.hp).toBe(60000);
+  });
+
+  it('the Electric arc works in windows: a short lock, then a pause', () => {
+    const s = arena('electric_arc', 1, 100000);
+    const w = s.players[0].weapons[0];
+    let on = 0;
+    run(s, 6, () => {
+      if (w.activeTicks > 0) on++;
+    });
+    const L = weaponDef(w.def).levels[0];
+    // 0.8 s out of every 3.3 s: well under half of the time.
+    expect(on).toBeGreaterThan(0);
+    expect(on / (6 * TICK_RATE)).toBeLessThan(((L.duration ?? 0) / ((L.duration ?? 0) + (L.cooldown ?? 0))) * 1.5);
+  });
+
+  it('Mines: at most 5 on the ground, and a blast sets off the mines inside it', () => {
+    const s = arena('mines', 1, 100000);
+    let most = 0;
+    run(s, 10, (st) => (most = Math.max(most, projs(st, PJ_MINE).length)));
+    expect(most).toBeLessThanOrEqual(5);
+    const c = empty('mines', 1);
+    const p = c.players[0];
+    p.weapons.length = 0;
+    spawnMine(c, 0, weaponId('mines'), p.x + 200, p.y, 10, 60, 20, 600, 0, 0);
+    spawnMine(c, 0, weaponId('mines'), p.x + 240, p.y, 10, 60, 20, 600, 0, 0);
+    spawnMine(c, 0, weaponId('mines'), p.x + 400, p.y, 10, 60, 20, 600, 0, 0);
+    spawnEnemy(c, enemyId('hunter'), p.x + 200, p.y, 1, 0.01, 0.001, 0);
+    run(c, 0.5);
+    // The two close ones went off, the far one is still there.
+    expect(projs(c, PJ_MINE).map((m) => Math.round(m.x - p.x))).toEqual([400]);
+  });
+
+  it('the Boomerang flies out, stops, and comes back to the player as fast as it left', () => {
+    const s = arena('boomerang', 1, 100000);
+    const p = s.players[0];
+    const steps: number[] = [];
+    let back = false;
+    run(s, 3, (st) => {
+      const b = projs(st, PJ_BOOMERANG)[0];
+      if (!b || back) return;
+      steps.push(Math.hypot(b.x - b.px, b.y - b.py));
+      if (b.a === 1 && Math.hypot(b.x - p.x, b.y - p.y) < 30) back = true;
+    });
+    expect(steps.length).toBeGreaterThan(20);
+    const first = steps[1];
+    const last = Math.max(...steps.slice(-4));
+    // Symmetric: no burst of speed on the way back.
+    expect(last).toBeLessThan(first * 1.3);
+    expect(Math.min(...steps.slice(5, -5))).toBeLessThan(first * 0.2);
+  });
+
+  it('the Shockwave pushes the small ones much more than the big ones, and does not slow', () => {
+    const s = empty('shockwave', 5);
+    const p = s.players[0];
+    const small = spawnEnemy(s, enemyId('hunter'), p.x + 60, p.y, 1, 0.01, 0.001, 0)!;
+    const big = spawnEnemy(s, enemyId('block'), p.x - 60, p.y, 1, 0.01, 0.001, 0)!;
+    small.hp = small.maxHp = big.hp = big.maxHp = 100000;
+    let pushedSmall = 0;
+    let pushedBig = 0;
+    run(s, 1, () => {
+      pushedSmall = Math.max(pushedSmall, Math.hypot(small.kbx, small.kby));
+      pushedBig = Math.max(pushedBig, Math.hypot(big.kbx, big.kby));
+    });
+    expect(projs(s, PJ_RING).length + (pushedSmall > 0 ? 1 : 0)).toBeGreaterThan(0);
+    expect(pushedSmall).toBeGreaterThan(pushedBig * 2);
+    expect(small.slowUntil).toBe(0);
+  });
+
+  it('the Flamethrower sets enemies on fire, and the burn ticks are fire damage', () => {
+    const s = arena('flamethrower', 1, 100000);
+    let burning = false;
+    let fireHits = 0;
+    run(s, 4, (st) => {
+      if (alive(st).some((e) => e.burnUntil > st.tick)) burning = true;
+      for (let i = 0; i < st.eventCount; i++) if (st.events[i].type === EV_HIT && st.events[i].y2 === DMG_FIRE) fireHits++;
+    });
+    expect(burning).toBe(true);
+    expect(fireHits).toBeGreaterThan(0);
+  });
+
+  it('the Flamethrower jet turns only slowly', () => {
     const s = arena('flamethrower', 1, 5000);
     const w = s.players[0].weapons[0];
-    let start = NaN;
-    let moved = false;
-    run(s, 2, () => {
-      if (w.activeTicks > 0) {
-        if (Number.isNaN(start)) start = w.angles[0];
-        else if (w.angles[0] !== start) moved = true;
+    const L = weaponDef(w.def).levels[0];
+    let prev = NaN;
+    let maxTurn = 0;
+    run(s, 3, () => {
+      if (w.activeTicks <= 0) {
+        prev = NaN;
+        return;
       }
+      if (!Number.isNaN(prev)) {
+        let d = Math.abs(w.angles[0] - prev);
+        if (d > Math.PI) d = 2 * Math.PI - d;
+        maxTurn = Math.max(maxTurn, d);
+      }
+      prev = w.angles[0];
     });
-    expect(Number.isNaN(start)).toBe(false);
-    expect(moved).toBe(false);
+    expect(maxTurn).toBeLessThanOrEqual((L.turn ?? 0) / TICK_RATE + 1e-9);
   });
 
-  it('drones split their targets and do not spin in place', () => {
-    const s = arena('drone', 5, 100000);
-    let maxTurn = 0;
-    const heading = new Map<number, number>();
+  it('the Swarm goes for a Shooter before a nearer chaser, and its bees come back', () => {
+    const s = empty('swarm', 1);
+    const p = s.players[0];
+    const chaser = spawnEnemy(s, enemyId('hunter'), p.x + 90, p.y, 1, 0.01, 0.001, 0)!;
+    const shooter = spawnEnemy(s, enemyId('shooter'), p.x - 260, p.y, 1, 0.01, 0.001, 0)!;
+    chaser.hp = chaser.maxHp = shooter.hp = shooter.maxHp = 100000;
+    let first = -1;
     run(s, 3, (st) => {
-      for (const b of projs(st, PJ_DRONE)) {
-        const h = Math.atan2(b.vy, b.vx);
-        const prev = heading.get(b.d);
-        if (prev !== undefined && b.age > 1) {
-          let d = Math.abs(h - prev);
-          if (d > Math.PI) d = 2 * Math.PI - d;
-          maxTurn = Math.max(maxTurn, d);
-        }
-        heading.set(b.d, h);
+      if (first >= 0) return;
+      const b = projs(st, PJ_BEE).find((x) => x.c >= 0);
+      if (b) first = b.ty;
+    });
+    expect(first).toBe(shooter.id);
+    expect(projs(s, PJ_BEE).length).toBe(3);
+    let stuck = false;
+    run(s, 4, (st) => {
+      if (projs(st, PJ_BEE).some((b) => b.a === BEE_STUCK)) stuck = true;
+    });
+    expect(stuck).toBe(true);
+    expect(shooter.hp).toBeLessThan(100000);
+  });
+
+  it('Shurikens bounce off the screen edges around the player', () => {
+    const s = arena('shuriken', 5, 100000);
+    const p = s.players[0];
+    let inside = true;
+    let seen = 0;
+    run(s, 6, (st) => {
+      for (const b of projs(st, PJ_SHURIKEN)) {
+        seen++;
+        if (Math.abs(b.x - p.x) > SHURIKEN_BOX_X + 1 || Math.abs(b.y - p.y) > SHURIKEN_BOX_Y + 1) inside = false;
       }
     });
-    const drones = projs(s, PJ_DRONE).filter((b) => b.c >= 0);
-    expect(drones.length).toBeGreaterThan(2);
-    expect(new Set(drones.map((b) => b.ty)).size).toBe(drones.length);
-    // Limited turning: never a sudden U-turn.
-    expect(maxTurn).toBeLessThan(0.2);
+    expect(seen).toBeGreaterThan(0);
+    expect(inside).toBe(true);
   });
 
   it('Shooters only fire straight ahead', () => {
-    const s = arena('whip', 1, 100000, 'shooter');
+    const s = arena('blaster', 1, 100000, 'shooter');
     s.players[0].weapons.length = 0;
     let checked = 0;
     run(s, 6, (st) => {
@@ -216,86 +308,19 @@ describe('weapons', () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('Phoenixes fly straight without turning back, are reborn near the player and leave fire', () => {
-    const s = arena('phoenix', 1, 100000);
-    const p = s.players[0];
-    let maxTurn = 0;
-    let fires = 0;
-    let maxAlive = 0;
-    const births = new Set<number>();
-    const heading = new Map<number, number>();
-    run(s, 10, (st) => {
-      fires = Math.max(fires, projs(st, PJ_BLAZE).length);
-      const birds = projs(st, PJ_PHOENIX);
-      maxAlive = Math.max(maxAlive, birds.length);
-      for (const ph of birds) {
-        // One bird per flight: identified by its launch tick.
-        const id = st.tick - ph.age;
-        if (ph.age === 1) {
-          births.add(id);
-          expect(Math.hypot(ph.x - p.x, ph.y - p.y)).toBeLessThan(20);
-        }
-        const h = Math.atan2(ph.vy, ph.vx);
-        const prev = heading.get(id);
-        if (prev !== undefined) {
-          let d = Math.abs(h - prev);
-          if (d > Math.PI) d = 2 * Math.PI - d;
-          maxTurn = Math.max(maxTurn, d);
-        }
-        heading.set(id, h);
-      }
-    });
-    expect(maxAlive).toBe(1);
-    // 2.2 s lifetime: in 10 s it is reborn several times.
-    expect(births.size).toBeGreaterThan(2);
-    expect(fires).toBeGreaterThan(3);
-    expect(maxTurn).toBeLessThan(1e-9);
-    expect(p.hp).toBe(p.stats.maxHp);
-  });
-
-  it('the Phoenix heads for the biggest HP pool, not the nearest enemy', () => {
-    const s = arena('phoenix', 1, 5, 'hunter');
-    const p = s.players[0];
-    // A "boss" far to the left, the small crowd all around: it must head left.
-    const big = s.enemies[0];
-    big.x = p.x - 500;
-    big.y = p.y;
-    big.hp = big.maxHp = 5000;
-    let heading: number | null = null;
-    run(s, 3, (st) => {
-      const b = projs(st, PJ_PHOENIX)[0];
-      if (b && heading === null) heading = Math.atan2(b.vy, b.vx);
-    });
-    expect(heading).not.toBeNull();
-    expect(Math.abs(Math.abs(heading!) - Math.PI)).toBeLessThan(0.2);
-  });
-
-  it('at max level the Whip cracks in a fan in front of the player and the Flamethrower in a half circle', () => {
-    const whip = arena('whip', 5, 100000);
-    run(whip, 2);
-    const w = whip.players[0].weapons[0];
-    const spread = (a: Float64Array, n: number) => {
-      let lo = Infinity;
-      let hi = -Infinity;
-      for (let k = 0; k < n; k++) {
-        lo = Math.min(lo, a[k]);
-        hi = Math.max(hi, a[k]);
-      }
-      return hi - lo;
-    };
-    expect(spread(w.angles, 5)).toBeCloseTo((2 * Math.PI) / 5, 5);
-    const fl = arena('flamethrower', 5, 100000);
-    run(fl, 2);
-    const f = fl.players[0].weapons[0];
-    // 5 jets of 1/10 turn each, side by side: a half circle (edge to edge).
-    expect(spread(f.angles, 5) + 2 * (Math.PI / 10)).toBeCloseTo(Math.PI, 5);
-  });
-
-  it('the Mortar lobs shells that explode at a distance, Meteors leave a crater', () => {
+  it('the Mortar only aims at distant groups; Meteors leave a crater', () => {
     const m = arena('mortar', 1);
+    const p = m.players[0];
     let shells = 0;
-    run(m, 3, (st) => (shells += projs(st, PJ_SHELL).length));
+    let near = false;
+    run(m, 3, (st) => {
+      for (const b of projs(st, PJ_SHELL)) {
+        shells++;
+        if (Math.hypot(b.tx - p.x, b.ty - p.y) < 150) near = true;
+      }
+    });
     expect(shells).toBeGreaterThan(0);
+    expect(near).toBe(false);
     expect(m.players[0].damageDealt).toBeGreaterThan(0);
     const met = arena('meteors', 1);
     let craters = 0;

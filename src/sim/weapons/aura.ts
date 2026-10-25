@@ -1,6 +1,6 @@
 /**
  * Aura: damage (and optional `slow`, `lifesteal`) every `tick` to enemies within `radius` of the player.
- * No projectile; visuals read w.vR / w.activeTicks.
+ * No projectile; visuals read w.vR / w.activeTicks / w.vS (1: the last tick hit someone).
  */
 import type { WeaponLevel } from '../../data/weapons';
 import { TICK_RATE } from '../constants';
@@ -39,5 +39,6 @@ export function aura(s: GameState, p: Player, w: WeaponInst, _slot: number, L: W
     hit = true;
   }
   if (hit) w.activeTicks = 8; // visual flash of the tick, only if it hit someone
+  w.vS = hit ? 1 : 0;
   if (heal > 0) healPlayer(s, p, Math.min(heal, 4), false);
 }

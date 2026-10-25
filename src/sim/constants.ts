@@ -2,7 +2,7 @@ import { version } from '../../package.json';
 import { MAP_GEN } from '../data/map';
 
 /** Simulation version: bump it as soon as a change breaks replay compatibility. */
-export const SIM_VERSION = 18;
+export const SIM_VERSION = 19;
 /** Displayed game version, stored in scores. */
 export const GAME_VERSION: string = version;
 

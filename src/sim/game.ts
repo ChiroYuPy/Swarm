@@ -20,7 +20,7 @@ import { LOOT } from '../data/loot';
 import { addWeapon, applyChoice, handleSwapCode, rollOffers } from './levelup';
 import { updateSpawner } from './spawner';
 import { pushOutOfWalls, updateContacts, updateEnemies } from './enemies';
-import { processShatters } from './combat';
+import { processShatters, updateBurns } from './combat';
 import { updateWeapons } from './weapons';
 import { updateProjectiles } from './projectiles';
 import { updateGems, updatePickups } from './pickups';
@@ -176,6 +176,7 @@ function tick(s: GameState, inputs: ArrayLike<number>): void {
   s.grid.build(s.enemies, s.enemyCount, a.x, a.y);
   for (const p of s.players) if (p.alive) updateWeapons(s, p);
   updateProjectiles(s);
+  updateBurns(s);
   updateContacts(s);
   processShatters(s);
   compactEnemies(s);

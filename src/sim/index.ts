@@ -38,9 +38,9 @@ export {
   WALL_RISE,
   EGG_TYPE,
   RALLY_TYPE,
-  SQUADRON_WEAPON,
-  KAMIKAZE_DRONES_WEAPON,
+  HORNETS_WEAPON,
   BLACK_HOLE_WEAPON,
+  VAMPIRE_FIELD_WEAPON,
   BOT_FAVORITE_PASSIVES,
 } from './registry';
 export { hashString, Rng, STREAM, deriveSeed } from './rng';

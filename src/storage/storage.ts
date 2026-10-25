@@ -7,12 +7,13 @@ import type { SandboxConfig, ScoreRecord } from '../sim';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/difficulty';
 import { HERO } from '../data/hero';
 import { DEFAULT_LOCALE, isLocale, type Locale } from '../i18n';
-import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, upgradeId } from './legacy-ids';
+import { ALL_WEAPONS } from '../data/weapons';
+import { LEGACY_ENEMY_IDS, LEGACY_PASSIVE_IDS, LEGACY_WEAPON_IDS, RENAMED_WEAPON_IDS_V4, upgradeId } from './legacy-ids';
 
 export const SAVE_KEY = 'swarm.save';
 /** Key used before the project was renamed, moved to SAVE_KEY on first load. */
 export const LEGACY_SAVE_KEY = 'neonawak.save';
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const TOP_PER_DIFFICULTY = 10;
 
 export interface Settings {
@@ -116,6 +117,11 @@ export function migrate(raw: unknown): SaveData {
     data = { ...data, scores: Array.isArray(data.scores) ? data.scores.map(upgradeScore) : [], sandbox: upgradeSandbox(data.sandbox) };
     version = 3;
   }
+  if (version === 3) {
+    // v3 → v4: weapon redesign, sandbox weapons renamed (laser → railgun...) and removed ones dropped.
+    data = { ...data, sandbox: upgradeSandboxWeaponsV4(data.sandbox) };
+    version = 4;
+  }
   if (version > SAVE_VERSION) return base; // save from a future version: do not break it, ignore it
   const d = typeof data.difficulty === 'number' ? data.difficulty : DEFAULT_DIFFICULTY;
   const settings: Settings = { ...DEFAULT_SETTINGS, ...(typeof data.settings === 'object' && data.settings ? (data.settings as Partial<Settings>) : {}) };
@@ -155,6 +161,21 @@ function upgradeSandbox(raw: unknown): unknown {
   if (Array.isArray(rules.enemies)) rules.enemies = rules.enemies.flatMap((id) => upgradeId(LEGACY_ENEMY_IDS, id) ?? []);
   if (typeof rules.duel === 'string') rules.duel = upgradeId(LEGACY_ENEMY_IDS, rules.duel);
   return { ...setup, rules };
+}
+
+/** v3 → v4 sandbox setup: renamed weapon ids mapped to the new ones, weapons that no longer exist dropped. */
+function upgradeSandboxWeaponsV4(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const setup = raw as Record<string, unknown>;
+  const rules = setup.rules as Record<string, unknown> | undefined;
+  if (!rules || typeof rules !== 'object' || !Array.isArray(rules.weapons)) return setup;
+  const weapons = rules.weapons.flatMap((x) => {
+    const old = x && typeof x === 'object' ? (x as { id?: unknown }).id : undefined;
+    if (typeof old !== 'string') return [];
+    const id = RENAMED_WEAPON_IDS_V4[old] ?? old;
+    return ALL_WEAPONS.some((w) => w.id === id) ? [{ ...(x as object), id }] : [];
+  });
+  return { ...setup, rules: { ...rules, weapons } };
 }
 
 /** Sandbox settings read back carefully: any missing or invalid field falls back to its default value. */

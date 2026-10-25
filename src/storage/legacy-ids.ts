@@ -27,20 +27,20 @@ export const LEGACY_ENEMY_IDS: Readonly<Record<string, string>> = {
   reine: 'swarm_queen',
 };
 
+/** Before save v3. The weapons removed by the v4 redesign (turret, scythe, phoenix, bastion, squadron) are left out: dropped. */
 export const LEGACY_WEAPON_IDS: Readonly<Record<string, string>> = {
   confetti: 'blaster',
-  petitspois: 'orbs',
+  petitspois: 'saws',
   aura: 'force_field',
-  laser: 'laser',
+  laser: 'railgun',
   crepes: 'mines',
   boomerang: 'boomerang',
   rallonge: 'electric_arc',
   klaxon: 'shockwave',
-  fouet: 'whip',
+  fouet: 'blade',
   flammes: 'flamethrower',
-  tourelle: 'turret',
-  drone: 'drone',
-  ricochet: 'ricochet',
+  drone: 'swarm',
+  ricochet: 'shuriken',
   mortier: 'mortar',
   // evolutions
   cotillons: 'spiral',
@@ -49,13 +49,22 @@ export const LEGACY_WEAPON_IDS: Readonly<Record<string, string>> = {
   multiprise: 'electric_storm',
   creperang: 'mine_boomerang',
   periph: 'earthquake',
-  faux: 'scythe',
   tornade: 'fire_tornado',
-  phenix: 'phoenix',
-  bastion: 'bastion',
-  escadrille: 'squadron',
-  kamikazes: 'kamikaze_drones',
+  kamikazes: 'hornets',
   meteores: 'meteors',
+};
+
+/**
+ * Save v3 weapon ids renamed by the v4 weapon redesign. The other v3 ids are unchanged, except the removed
+ * weapons (turret, scythe, phoenix, bastion, squadron), which are dropped.
+ */
+export const RENAMED_WEAPON_IDS_V4: Readonly<Record<string, string>> = {
+  orbs: 'saws',
+  laser: 'railgun',
+  whip: 'blade',
+  drone: 'swarm',
+  ricochet: 'shuriken',
+  kamikaze_drones: 'hornets',
 };
 
 export const LEGACY_PASSIVE_IDS: Readonly<Record<string, string>> = {

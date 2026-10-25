@@ -53,21 +53,20 @@ describe('fusions', () => {
     }
   });
 
-  it('no fusion until both items are at max level', () => {
+  it('no fusion until the weapon is at max level, and no passive needed', () => {
     const s = createGame({ seed: 'FUSION-1' });
     const p = s.players[0];
     p.weapons[0].level = 4; // Blaster level 4
-    givePassive(p, 'overclock', 5);
     expect(availableFusions(p)).toEqual([]);
     p.weapons[0].level = 5;
     expect(availableFusions(p).length).toBe(1);
   });
 
-  it('weapon + passive: the weapon is replaced by the fusion, the passive stays', () => {
+  it('the weapon is replaced by its evolution, the passives stay', () => {
     const s = createGame({ seed: 'FUSION-2' });
     const p = s.players[0];
     p.weapons[0].level = 5;
-    givePassive(p, 'overclock', 5);
+    givePassive(p, 'overclock', 2);
     levelUpAndPickFirst(s);
     expect(p.weapons.map((w) => weaponDef(w.def).id)).toEqual(['spiral']);
     expect(p.passives.map((x) => PASSIVES[x.def].id)).toEqual(['overclock']);
@@ -75,10 +74,10 @@ describe('fusions', () => {
     expect(p.banned).toContain(wIdx('blaster'));
   });
 
-  it('every evolution = one base weapon + one passive, and every evolution has a recipe', () => {
+  it('every evolution comes from one base weapon, at most one per weapon, and every evolution has a recipe', () => {
     for (const f of FUSIONS) {
-      expect(PASSIVES.some((x) => x.id === f.with), f.result).toBe(true);
       expect(ALL_WEAPONS.find((w) => w.id === f.weapon)?.fusion, f.result).toBeFalsy();
+      expect(FUSIONS.filter((g) => g.weapon === f.weapon).length, f.weapon).toBe(1);
     }
     for (const w of ALL_WEAPONS.filter((x) => x.fusion)) expect(FUSIONS.some((f) => f.result === w.id), w.id).toBe(true);
   });
@@ -88,6 +87,7 @@ describe('fusions', () => {
     const p = s.players[0];
     giveWeapon(p, 'electric_arc', 5);
     givePassive(p, 'overclock', 5);
+    p.weapons[0].level = 1;
     const before = p.weapons.length;
     const slot = p.weapons.findIndex((w) => weaponDef(w.def).id === 'electric_arc');
     const fi = FUSION_TABLE.findIndex((f) => weaponDef(f.result).id === 'electric_storm');
@@ -113,7 +113,6 @@ describe('fusions', () => {
     const s = createGame({ seed: 'COFFRE' });
     const p = s.players[0];
     p.weapons[0].level = 5;
-    givePassive(p, 'overclock', 5);
     // Put a chest right under the hero.
     s.pickups[0].kind = PK_CHEST;
     s.pickups[0].life = -1;

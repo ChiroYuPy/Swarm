@@ -21,16 +21,32 @@ import {
   EV_SHATTER,
   EF_BOSS,
   EF_PROP,
+  DMG_COLD,
+  DMG_FIRE,
+  DMG_PHYS,
   PK_CHEST,
   PK_VACUUM,
   emit,
+  type DamageType,
   type GameState,
   type Player,
 } from './state';
 
-/** Deals damage to the enemy at index `idx`. Returns true if it dies. `owner` = credited player (-1 = nobody). */
-/** `quiet`: continuous burn (ground fire) — the hit is flagged (x2 = 1) so it does not make noise every tick. */
-export function damageEnemy(s: GameState, idx: number, amount: number, owner: number, kx: number, ky: number, quiet = false): boolean {
+/**
+ * Deals damage to the enemy at index `idx`. Returns true if it dies. `owner` = credited player (-1 = nobody).
+ * `quiet`: continuous burn (ground fire, burning) — the hit is flagged (x2 = 1) so it does not make noise every tick.
+ * `type`: damage type, only shown (colour of the number).
+ */
+export function damageEnemy(
+  s: GameState,
+  idx: number,
+  amount: number,
+  owner: number,
+  kx: number,
+  ky: number,
+  quiet = false,
+  type: DamageType = DMG_PHYS,
+): boolean {
   const e = s.enemies[idx];
   if (!e.alive) return false;
   owner = credited(s, owner);
@@ -45,12 +61,43 @@ export function damageEnemy(s: GameState, idx: number, amount: number, owner: nu
     e.kby += ky * k;
   }
   if (owner >= 0) s.players[owner].damageDealt += amount;
-  emit(s, EV_HIT, e.x, e.y - e.r, amount, e.type, quiet ? 1 : 0);
+  emit(s, EV_HIT, e.x, e.y - e.r, amount, e.type, quiet ? 1 : 0, type);
   if (e.hp <= 0) {
     killEnemy(s, idx, owner);
     return true;
   }
   return false;
+}
+
+/** a burning enemy takes its fire damage in ticks of this many sim ticks (0.5 s) */
+export const BURN_TICKS = Math.round(TICK_RATE / 2);
+
+/** Sets an enemy on fire: `dps` for `seconds` (the strongest burn wins, the longest duration wins). */
+export function ignite(s: GameState, idx: number, dps: number, seconds: number, owner: number): void {
+  const e = s.enemies[idx];
+  if (!e.alive || dps <= 0) return;
+  const burning = e.burnUntil > s.tick;
+  if (!burning) e.burnNext = s.tick + BURN_TICKS;
+  e.burnDps = burning ? Math.max(e.burnDps, dps) : dps;
+  e.burnUntil = Math.max(e.burnUntil, s.tick + Math.round(seconds * TICK_RATE));
+  e.burnOwner = owner;
+}
+
+/** Burning enemies take their fire damage, one tick every BURN_TICKS (shown as red numbers). */
+export function updateBurns(s: GameState): void {
+  const per = BURN_TICKS / TICK_RATE;
+  for (let i = 0; i < s.enemyCount; i++) {
+    const e = s.enemies[i];
+    if (!e.alive || e.burnUntil <= 0) continue;
+    if (s.tick >= e.burnNext && e.burnNext <= e.burnUntil) {
+      e.burnNext += BURN_TICKS;
+      damageEnemy(s, i, e.burnDps * per, e.burnOwner, 0, 0, true, DMG_FIRE);
+    }
+    if (e.alive && s.tick >= e.burnUntil) {
+      e.burnUntil = 0;
+      e.burnDps = 0;
+    }
+  }
 }
 
 /** Pushes an enemy back without hurting it (it still flashes, so the hit is visible). */
@@ -223,7 +270,7 @@ export function processShatters(s: GameState): void {
       const dy = e.y - y;
       const rr = R + e.r;
       if (dx * dx + dy * dy >= rr * rr) continue;
-      damageEnemy(s, i, dmg, owner, 0, 0);
+      damageEnemy(s, i, dmg, owner, 0, 0, false, DMG_COLD);
     }
   }
 }

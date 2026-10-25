@@ -20,7 +20,7 @@ import {
 import { iconCanvas } from '../../render/icons';
 import { t, tn } from '../../i18n';
 import { passiveDesc, passiveEffect, passiveName, pickupDesc, pickupName, weaponDesc, weaponLevelText, weaponName } from '../../i18n/content';
-import { evolutionHint, fusionPartner, passiveTotal } from '../describe';
+import { evolutionHint, passiveTotal } from '../describe';
 import { SCREEN_COLOR, esc, heading, levelPips } from '../html';
 import type { LevelUpSwap } from '../types';
 import type { UI } from '../ui';
@@ -81,7 +81,7 @@ export function showLevelUp(
         tag = t('common.evolution');
         name = weaponName(r.id);
         line = weaponLevelText(r.id, 1);
-        sub = `${weaponName(weaponDef(f.weapon).id)} + ${passiveName(fusionPartner(o.id).id)}`;
+        sub = t('levelup.replaces', { name: weaponName(weaponDef(f.weapon).id) });
         color = r.color;
         iconId = r.id;
       } else {

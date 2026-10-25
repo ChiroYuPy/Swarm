@@ -3,9 +3,6 @@
  * It reads the state and returns an input code. Used by tests, the balancing script and the demo mode.
  * Deliberately an "average player": it dodges and picks things up, without knowing the patterns.
  */
-import { FUSIONS } from '../data/fusions';
-import { BASE_WEAPONS } from '../data/weapons';
-import { PASSIVES } from '../data/passives';
 import {
   BEHAVIOR,
   BOSS_CONFIGS,
@@ -51,12 +48,8 @@ function offerScore(p: Player, o: Offer): number {
     return p.weapons.length < 3 ? 55 : p.weapons.length === 3 ? 35 : 15;
   }
   if (o.kind === OFFER_PASSIVE) {
-    const id = PASSIVES[o.id].id;
-    // Bonus if this passive unlocks an evolution of an owned weapon.
-    const ownedIds = p.weapons.map((w) => BASE_WEAPONS[w.def]?.id);
-    const helps = FUSIONS.some((f) => f.with === id && ownedIds.includes(f.weapon));
     const base = o.toLevel > 1 ? 40 : 38;
-    return base + (helps ? 12 : 0) + (BOT_FAVORITE_PASSIVES.includes(o.id) ? 6 : 0);
+    return base + (BOT_FAVORITE_PASSIVES.includes(o.id) ? 6 : 0);
   }
   return 1;
 }

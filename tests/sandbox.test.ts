@@ -22,7 +22,7 @@ describe('sandbox', () => {
         level: 12,
         startWave: 6,
         weapons: [
-          { id: 'laser', level: 3 },
+          { id: 'railgun', level: 3 },
           { id: 'spiral', level: 1 },
         ],
         passives: [{ id: 'might', level: 5 }],
@@ -32,7 +32,7 @@ describe('sandbox', () => {
     });
     const p = s.players[0];
     expect(p.weapons.map((w) => [weaponDef(w.def).id, w.level])).toEqual([
-      ['laser', 3],
+      ['railgun', 3],
       ['spiral', 1],
     ]);
     expect(PASSIVES[p.passives[0].def].id).toBe('might');

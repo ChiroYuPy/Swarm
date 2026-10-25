@@ -1,6 +1,6 @@
 /**
  * Projectiles: player bullets (batched by weapon), boomerangs, mines, enemy fire, ground blaze, mortar shells
- * and meteors, drones, phoenixes, turrets, ricochet discs, enemy bullets and shockwave rings.
+ * and meteors, bees, shurikens, enemy bullets and shockwave rings.
  */
 import { ALL_WEAPONS } from '../data/weapons';
 import {
@@ -11,17 +11,15 @@ import {
   PJ_RING,
   PJ_FIRE,
   PJ_BLAZE,
-  PJ_DRONE,
-  PJ_PHOENIX,
-  PJ_RICOCHET,
+  PJ_BEE,
   PJ_SHELL,
-  PJ_TURRET,
-  SQUADRON_WEAPON,
-  KAMIKAZE_DRONES_WEAPON,
+  PJ_SHURIKEN,
+  HORNETS_WEAPON,
   type GameState,
   type ProjectileKind,
 } from '../sim';
-import { drawPhoenix, drawShockwave } from './draw-weapon-fx';
+import { BEE_DEAD } from '../sim/weapons';
+import { drawShockwave } from './draw-weapon-fx';
 import { hash01, lerp, type RenderView } from './view';
 
 /** scratch: weapons that have at least one bullet in flight this frame */
@@ -67,17 +65,28 @@ function drawBoomerangs(view: RenderView, s: GameState, alpha: number): void {
   view.worldTransform(); // view.sprite() leaves its own transform behind
 }
 
-/** Mines + indicator light once armed */
+/** Mines: their blast zone (mines inside it go off together), the mine, its light once armed; white when set off by another. */
 function drawMines(view: RenderView, s: GameState): void {
   const sp = view.sprites;
+  const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_MINE || !view.visible(b.x, b.y, 20)) continue;
-    view.spriteAt(b.b < 65 ? sp.miniMine : sp.mine, b.x, b.y);
+    if (b.kind !== PJ_MINE || !view.visible(b.x, b.y, b.b)) continue;
+    const mini = ALL_WEAPONS[b.weapon].behavior === 'boomerang';
+    if (!mini) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.b, 0, Math.PI * 2);
+      ctx.strokeStyle = ALL_WEAPONS[b.weapon].color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = b.d > 0 ? 0.6 : 0.16;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    view.spriteAt(mini ? sp.miniMine : sp.mine, b.x, b.y);
   }
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_MINE || b.age < b.a || (b.age >> 3) & 1 || !view.visible(b.x, b.y, 20)) continue;
+    if (b.kind !== PJ_MINE || (b.d === 0 && (b.age < b.a || (b.age >> 3) & 1)) || !view.visible(b.x, b.y, 20)) continue;
     view.spriteAt(sp.mineLight, b.x, b.y);
   }
 }
@@ -108,7 +117,7 @@ function drawFires(view: RenderView, s: GameState): void {
   }
 }
 
-/** Player ground fire: Meteors craters (dashed ring, which tells it apart from the solid enemy fire) and the Phoenix trail (simple flamelets), with rising embers. */
+/** Player ground fire: Meteors craters (dashed ring, which tells it apart from the solid enemy fire), with rising embers. */
 function drawBlazes(view: RenderView, s: GameState): void {
   const ctx = view.ctx;
   const flameCore = view.softPuff('#ffe9a8');
@@ -117,26 +126,6 @@ function drawBlazes(view: RenderView, s: GameState): void {
     if (b.kind !== PJ_BLAZE || !view.visible(b.x, b.y, b.r)) continue;
     const def = ALL_WEAPONS[b.weapon];
     const col = def.color;
-    if (def.behavior === 'phoenix') {
-      const fade = Math.min(1, b.life / 40);
-      const mid = view.softPuff(col);
-      const deep = view.softPuff('#ff3d1a');
-      // Ground glow, then rising flamelets (white at first, red as they die out).
-      let R = b.r * 1.1;
-      ctx.globalAlpha = 0.14 * fade;
-      ctx.drawImage(fade > 0.6 ? mid : deep, b.x - R, b.y - R, R * 2, R * 2);
-      for (let k = 0; k < 2; k++) {
-        const h = hash01(i * 5 + k);
-        const t = ((b.age * 0.035 + h) % 1 + 1) % 1;
-        const ex = b.x + (h - 0.5) * b.r * 1.2;
-        const ey = b.y + (hash01(k * 11 + i) - 0.5) * b.r - t * 20;
-        R = b.r * (0.6 - 0.3 * t) * (0.5 + 0.5 * fade);
-        ctx.globalAlpha = 0.32 * fade * (1 - t);
-        ctx.drawImage(t < 0.5 ? mid : deep, ex - R, ey - R, R * 2, R * 2);
-      }
-      ctx.globalAlpha = 1;
-      continue;
-    }
     const fade = Math.min(1, b.life / 30);
     ctx.beginPath();
     ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -232,101 +221,73 @@ function drawShells(view: RenderView, s: GameState, alpha: number): void {
   }
 }
 
-/** Autonomous drones: small oriented arrows that fade in. */
-function drawDrones(view: RenderView, s: GameState, alpha: number): void {
+/** Bees: small darts pointing where they fly (hornets bigger, blinking); they fade in when they come back. */
+function drawBees(view: RenderView, s: GameState, alpha: number): void {
   const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_DRONE) continue;
+    if (b.kind !== PJ_BEE || b.a === BEE_DEAD) continue;
     const x = lerp(b.px, b.x, alpha);
     const y = lerp(b.py, b.y, alpha);
     if (!view.visible(x, y, 16)) continue;
-    const def = ALL_WEAPONS[b.weapon];
-    const sp = Math.hypot(b.vx, b.vy);
-    const ux = sp > 5 ? b.vx / sp : 1;
-    const uy = sp > 5 ? b.vy / sp : 0;
-    const L = b.weapon === SQUADRON_WEAPON ? 10 : 8;
+    const col = ALL_WEAPONS[b.weapon].color;
+    const hornet = b.weapon === HORNETS_WEAPON;
+    const S = hornet ? 10 : 8;
+    const a = b.tx;
     ctx.beginPath();
-    ctx.moveTo(x + ux * L, y + uy * L);
-    ctx.lineTo(x - ux * L * 0.7 - uy * L * 0.7, y - uy * L * 0.7 + ux * L * 0.7);
-    ctx.lineTo(x - ux * L * 0.35, y - uy * L * 0.35);
-    ctx.lineTo(x - ux * L * 0.7 + uy * L * 0.7, y - uy * L * 0.7 - ux * L * 0.7);
+    ctx.moveTo(x + Math.cos(a) * S, y + Math.sin(a) * S);
+    ctx.lineTo(x + Math.cos(a + 2.45) * S * 0.85, y + Math.sin(a + 2.45) * S * 0.85);
+    ctx.lineTo(x - Math.cos(a) * S * 0.3, y - Math.sin(a) * S * 0.3);
+    ctx.lineTo(x + Math.cos(a - 2.45) * S * 0.85, y + Math.sin(a - 2.45) * S * 0.85);
     ctx.closePath();
-    ctx.globalAlpha = Math.min(1, b.age / 20);
-    ctx.fillStyle = def.color;
-    const dive = b.weapon === KAMIKAZE_DRONES_WEAPON;
-    ctx.globalAlpha *= dive && (b.age >> 2) & 1 ? 0.9 : 0.35;
+    const born = Math.min(1, (b.age + alpha) / 20);
+    ctx.fillStyle = col;
+    ctx.globalAlpha = born * (hornet && (b.age >> 2) & 1 ? 0.9 : 0.5);
     ctx.fill();
-    ctx.globalAlpha = Math.min(1, b.age / 20);
-    view.glow(def.color, 1.8);
+    ctx.globalAlpha = born;
+    view.glow(col, 1.6);
     ctx.globalAlpha = 1;
   }
 }
 
-/** Phoenix: a fire bird with flapping wings, followed by flamelets. */
-function drawPhoenixes(view: RenderView, s: GameState, alpha: number): void {
-  for (let i = 0; i < s.projCount; i++) {
-    const b = s.projectiles[i];
-    if (b.kind !== PJ_PHOENIX) continue;
-    const x = lerp(b.px, b.x, alpha);
-    const y = lerp(b.py, b.y, alpha);
-    if (!view.visible(x, y, b.r * 3)) continue;
-    drawPhoenix(view, x, y, b.vx, b.vy, b.r, ALL_WEAPONS[b.weapon].color, b.age + alpha);
-  }
-}
-
-/** Turrets: hexagonal base and barrel turned towards the target; they blink before vanishing. */
-function drawTurrets(view: RenderView, s: GameState): void {
+/** Shurikens: a spinning four-pointed star with a white heart. */
+function drawShurikens(view: RenderView, s: GameState, alpha: number): void {
   const ctx = view.ctx;
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_TURRET || !view.visible(b.x, b.y, 30)) continue;
-    if (b.life < 60 && (b.life >> 3) & 1) continue;
-    const def = ALL_WEAPONS[b.weapon];
-    const big = def.fusion ? 1.3 : 1;
-    ctx.beginPath();
-    view.polygon(b.x, b.y, 6, 12 * big, Math.PI / 6);
-    ctx.fillStyle = def.color;
-    ctx.globalAlpha = 0.15;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    view.glow(def.color, 2);
-    ctx.beginPath();
-    ctx.moveTo(b.x, b.y);
-    ctx.lineTo(b.x + b.vx * 17 * big, b.y + b.vy * 17 * big);
-    if (def.fusion) {
-      const nx = -b.vy * 5;
-      const ny = b.vx * 5;
-      ctx.moveTo(b.x + nx, b.y + ny);
-      ctx.lineTo(b.x + nx + b.vx * 15 * big, b.y + ny + b.vy * 15 * big);
-      ctx.moveTo(b.x - nx, b.y - ny);
-      ctx.lineTo(b.x - nx + b.vx * 15 * big, b.y - ny + b.vy * 15 * big);
-    }
-    view.glow(def.color, 3);
-  }
-}
-
-/** Ricochet discs: a spinning ring with three notches. */
-function drawDiscs(view: RenderView, s: GameState, alpha: number): void {
-  const ctx = view.ctx;
-  for (let i = 0; i < s.projCount; i++) {
-    const b = s.projectiles[i];
-    if (b.kind !== PJ_RICOCHET) continue;
+    if (b.kind !== PJ_SHURIKEN) continue;
     const x = lerp(b.px, b.x, alpha);
     const y = lerp(b.py, b.y, alpha);
     if (!view.visible(x, y, b.r + 6)) continue;
-    const rot = (b.age + alpha) * 0.5;
+    const rot = (b.age + alpha) * 0.27;
+    const R = b.r;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
     ctx.beginPath();
-    for (let k = 0; k < 3; k++) {
-      const a0 = rot + (k * Math.PI * 2) / 3;
-      ctx.moveTo(x + Math.cos(a0 + 0.35) * b.r, y + Math.sin(a0 + 0.35) * b.r);
-      ctx.arc(x, y, b.r, a0 + 0.35, a0 + (Math.PI * 2) / 3 - 0.35);
-    }
-    view.glow(ALL_WEAPONS[b.weapon].color, 2.5);
+    ctx.moveTo(0, -R);
+    ctx.lineTo(R * 0.4, 0);
+    ctx.lineTo(0, R);
+    ctx.lineTo(-R * 0.4, 0);
+    ctx.closePath();
+    ctx.moveTo(-R, 0);
+    ctx.lineTo(0, -R * 0.4);
+    ctx.lineTo(R, 0);
+    ctx.lineTo(0, R * 0.4);
+    ctx.closePath();
+    const col = ALL_WEAPONS[b.weapon].color;
+    ctx.globalAlpha = Math.min(1, b.life / 18);
+    ctx.fillStyle = col;
+    ctx.globalAlpha *= 0.25;
+    ctx.fill();
+    ctx.globalAlpha = Math.min(1, b.life / 18);
+    view.glow(col, 2);
     ctx.beginPath();
-    ctx.arc(x, y, b.r * 0.35, 0, Math.PI * 2);
+    ctx.arc(0, 0, R * 0.14, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }
 
@@ -343,12 +304,12 @@ function drawEnemyBullets(view: RenderView, s: GameState, alpha: number): void {
   }
 }
 
-/** Shockwaves (Shockwave, Earthquake, Bastion): few of them, vector. */
+/** Shockwaves (Shockwave, Earthquake): few of them, vector. */
 function drawRings(view: RenderView, s: GameState, alpha: number): void {
   for (let i = 0; i < s.projCount; i++) {
     const b = s.projectiles[i];
-    if (b.kind !== PJ_RING || !view.visible(b.x, b.y, b.a)) continue;
-    drawShockwave(view, b.x, b.y, b.a, Math.min(1, (b.age + alpha) / b.b), ALL_WEAPONS[b.weapon].color, b.d >= 0.5, i);
+    if (b.kind !== PJ_RING || !view.visible(b.x, b.y, b.a * 1.6)) continue;
+    drawShockwave(view, b.x, b.y, b.a, (b.age + alpha) / b.b, ALL_WEAPONS[b.weapon].color, b.d >= 0.5, i);
   }
 }
 
@@ -362,10 +323,8 @@ const PASSES = [
   [PJ_FIRE, drawFires],
   [PJ_BLAZE, drawBlazes],
   [PJ_SHELL, drawShells],
-  [PJ_DRONE, drawDrones],
-  [PJ_PHOENIX, drawPhoenixes],
-  [PJ_TURRET, drawTurrets],
-  [PJ_RICOCHET, drawDiscs],
+  [PJ_BEE, drawBees],
+  [PJ_SHURIKEN, drawShurikens],
   [PJ_EBULLET, drawEnemyBullets],
   [PJ_RING, drawRings],
 ] as const satisfies readonly (readonly [ProjectileKind, DrawPass])[];

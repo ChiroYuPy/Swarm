@@ -3,13 +3,13 @@
  * real weapon numbers with the hero bonuses, evolution hints, and when the first boss arrives.
  */
 import { ALL_WEAPONS } from '../data/weapons';
-import { PASSIVES, type PassiveDef } from '../data/passives';
+import type { PassiveDef } from '../data/passives';
 import { FUSIONS } from '../data/fusions';
 import { WAVES } from '../data/waves';
 import { weaponLevel } from '../sim';
 import { dec } from '../render/hud';
 import { t } from '../i18n';
-import { passiveName } from '../i18n/content';
+import { weaponName } from '../i18n/content';
 
 export function passiveTotal(def: PassiveDef, level: number): string {
   const p = def.perLevel;
@@ -30,13 +30,7 @@ export function passiveTotal(def: PassiveDef, level: number): string {
 /** Real numbers of a weapon at the given level, hero bonuses included. */
 export function weaponNumbers(id: string, level: number, might: number, cooldownMul: number): string {
   const L = weaponLevel(ALL_WEAPONS.findIndex((w) => w.id === id), level);
-  const out = [
-    L.pctHp
-      ? t('describe.pctHp', { n: dec(L.pctHp * might * 100, 1) })
-      : L.damage > 0
-        ? t('describe.weaponDamage', { n: dec(L.damage * might, 1) })
-        : t('describe.noDamage'),
-  ];
+  const out = [L.damage > 0 ? t('describe.weaponDamage', { n: dec(L.damage * might, 1) }) : t('describe.noDamage')];
   if (L.cooldown) out.push(t('describe.reload', { n: dec(L.cooldown * cooldownMul) }));
   else if (L.tick) out.push(t('describe.every', { n: dec(L.tick) }));
   else if (L.hitCd) out.push(t('describe.hitsEvery', { n: dec(L.hitCd) }));
@@ -44,11 +38,9 @@ export function weaponNumbers(id: string, level: number, might: number, cooldown
   return out.join(' · ');
 }
 
-export const fusionPartner = (i: number) => PASSIVES.find((x) => x.id === FUSIONS[i].with)!;
-
-/** "Max level: evolves with X (or Y) at level 5.", or nothing if the weapon has no evolution. */
+/** "Max level: evolves into X at the next level-up.", or nothing if the weapon has no evolution. */
 export function evolutionHint(weaponId: string): string {
-  const names = FUSIONS.filter((f) => f.weapon === weaponId).map((f) => passiveName(f.with));
+  const names = FUSIONS.filter((f) => f.weapon === weaponId).map((f) => weaponName(f.result));
   return names.length ? t('describe.evolutionHint', { names: names.join(t('describe.or')) }) : '';
 }
 

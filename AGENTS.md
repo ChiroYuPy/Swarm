@@ -5,7 +5,7 @@ Guide for anyone (human or AI agent) changing the game. Read [ARCHITECTURE.md](A
 ## Ground rules
 
 - **Language.** Code, ids, comments, test names and commit messages are in English. Player-facing text lives only in `src/i18n/locales/`: write `fr.ts` first (source of truth), then `en.ts`. Both are required; `en.ts` is typed `LocaleShape`, so a missing or extra key fails `npm run typecheck`. `tests/english-code.test.ts` rejects French text anywhere else.
-- **Ids.** A content id is the plain English translation of its French display name (`Fouet` → `whip`, `Propulseurs` → `thrusters`, `Étoile ricochet` → `ricochet_star`). Keep the French display names; no creative renames. Renaming a shipped id needs an entry in `src/storage/legacy-ids.ts` and a save migration, because sandbox setups store ids.
+- **Ids.** A content id is the plain English translation of its French display name (`Lame` → `blade`, `Propulseurs` → `thrusters`, `Étoile ricochet` → `ricochet_star`). Keep the French display names; no creative renames. Renaming a shipped id needs an entry in `src/storage/legacy-ids.ts` and a save migration, because sandbox setups store ids.
 - **Order.** Never reorder the content arrays (`BASE_WEAPONS`, `FUSED_WEAPONS`, `FUSIONS`, `PASSIVES`, `PICKUPS`, `ENEMIES`, `BOSS_ORDER`, `DIFFICULTIES`, `WAVES.mixes`) unless you mean to change gameplay. Indices drive the sim, the offer draw, replays, saved scores (difficulty index) and the golden test. Add new content at the end of its array.
 - **Determinism.** Nothing in `src/sim` or `src/data` may use `Math.random`, `Date`, `performance`, `Math.sin/cos/atan2/pow/...`, the DOM or `localStorage`. Use `src/sim/dmath.ts` (`dsin`, `dcos`, `datan2`) and the seeded streams of `src/sim/rng.ts`. `src/sim` and `src/data` never import `i18n`, `render`, `ui` or `app`. Enforced by `tsconfig.sim.json`, `tests/purity.test.ts`, `tests/i18n.test.ts`.
 - **Check before you stop.** Always run `npm run typecheck && npm test`. For UI, render or CSS changes also run `npm run build`, and look at the result in `npm run dev`.
@@ -22,7 +22,7 @@ Each recipe lists the files to touch, in order. Every recipe that changes gamepl
 
 ### A weapon with an existing behaviour
 
-1. `src/data/weapons.ts`: append to `BASE_WEAPONS`. Exactly 5 levels, built with `prog()` (levels are cumulative deltas). Use only the `WeaponLevel` fields the behaviour reads: open its updater in `src/sim/weapons/` (`projectile.ts`, `orbit.ts`, `aura.ts`, `melee.ts`...).
+1. `src/data/weapons.ts`: append to `BASE_WEAPONS`. Exactly 5 levels, built with `prog()` (levels are cumulative deltas). Use only the `WeaponLevel` fields the behaviour reads: open its updater in `src/sim/weapons/` (`projectile.ts`, `orbit.ts`, `aura.ts`, `blade.ts`...).
    ```ts
    {
      id: 'nail_gun', // example only
@@ -56,20 +56,19 @@ Caught automatically: missing text or level lines (`i18n.test.ts`), missing icon
 
 ### An evolution (fusion)
 
-An evolution is a max-level base weapon plus a max-level passive. It replaces the weapon in the same slot and the passive stays.
+An evolution is what a base weapon becomes once it is at max level: an "Evolution" card at the next level-up (or the boss chest). It replaces the weapon in the same slot. Passives play no part. At most one evolution per base weapon.
 
 1. `src/data/weapons.ts`: append to `FUSED_WEAPONS` with `fusion: true` and a single level.
-2. `src/data/fusions.ts`: append `{ result, weapon, with }`. List order is the priority when several evolutions are possible.
+2. `src/data/fusions.ts`: append `{ result, weapon }`. List order is the priority when several evolutions are possible.
 3. Locales: `evolutions.<id>` with `name`, `desc`, `levels` (1 line), in `fr.ts` then `en.ts`.
 4. `src/render/icons.ts`: a painter in `WEAPON_PAINTERS`.
-Caught: `fusion.test.ts` (recipe uses a base weapon and an existing passive, every evolution has a recipe, it deals damage), `weapons.test.ts` (every evolution of the data deals damage and is offered once its weapon and passive are maxed), `i18n.test.ts`, `icons.test.ts`. The golden `weapons-N` scenarios include it automatically.
+Caught: `fusion.test.ts` (recipe uses a base weapon, one evolution per weapon, every evolution has a recipe, it deals damage), `weapons.test.ts` (every evolution of the data deals damage and is offered once its weapon is maxed), `i18n.test.ts`, `icons.test.ts`. The golden `weapons-N` scenarios include it automatically.
 
 ### A passive
 
 1. `src/data/passives.ts`: append to `PASSIVES` with `perLevel` using the existing stat keys (`cooldown`, `speed`, `magnet`, `might`, `area`, `maxHp`, `regen`, `armor`, `luck`). Passives have 5 levels (`MAX_ITEM_LEVEL`).
 2. Locales: `passives.<id>` with `name`, `desc`, `effect` (one level).
 3. `src/render/icons.ts`: a painter in `PASSIVE_PAINTERS`.
-4. Optional: an evolution that uses it.
 
 A **new stat** touches more: `PassiveDef.perLevel` (`src/data/passives.ts`), `PlayerStats` and `baseStats()` (`src/sim/state.ts`), `computeStats()` and `applyBuffs()` (`src/sim/player.ts`), the sim code that reads it, `passiveTotal()` (`src/ui/describe.ts`) with a `describe.<stat>` string, and `StatKey` / `STATS` / `statDetails()` (`src/render/hud.ts`) with `stats.<stat>.label` / `.hint` strings.
 
@@ -202,7 +201,7 @@ Menu → **Sandbox**. Everything in the data arrays shows up there automatically
 Sandbox runs are deterministic and replayable, never ranked. The last setup is saved. From the browser console you can start one directly:
 
 ```js
-__swarm.playSandbox({ difficulty: 1, rules: { ...__swarm.save.sandbox.rules, weapons: [{ id: 'whip', level: 5 }], enemies: ['golem'] } })
+__swarm.playSandbox({ difficulty: 1, rules: { ...__swarm.save.sandbox.rules, weapons: [{ id: 'blade', level: 5 }], enemies: ['golem'] } })
 ```
 
 ## Dev tools

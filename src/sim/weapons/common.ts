@@ -1,11 +1,11 @@
 /**
- * Shared helpers for weapon updaters: cooldown in ticks, nearest-enemy targeting, aiming (result in AIM),
- * cone test, facing, and the HITS scratch buffer shared by chain and mortar (reset at the start of each call).
+ * Shared helpers for weapon updaters: cooldown in ticks, nearest / biggest enemy targeting, aiming (result in AIM),
+ * cone test, facing, and the HITS scratch buffer used by the mortar (reset at the start of each call).
  */
 import type { WeaponLevel } from '../../data/weapons';
 import { INPUT_DIRS, TICK_RATE } from '../constants';
 import { TWO_PI, datan2 } from '../dmath';
-import type { GameState, Player } from '../state';
+import { EF_PROP, type GameState, type Player } from '../state';
 
 export const HITS = new Int32Array(64);
 export let hitN = 0;
@@ -28,6 +28,45 @@ export function cdTicks(L: WeaponLevel, p: Player): number {
 
 export function target(s: GameState, x: number, y: number, range: number): number {
   return s.grid.nearest(s.enemies, x, y, range, undefined, 0, true);
+}
+
+/** Enemies at least this big count as "big" for the weapons that weigh them (Blade, Mortar, Swarm). */
+export const BIG_RADIUS = 18;
+
+/**
+ * The biggest enemy by MAX HP within `range` of (x, y) (ties: the nearest), never the bonus crate or a
+ * motionless obstacle. Targeting by max HP (not current HP) keeps the weapon on a big one it has already
+ * wounded until it is finished. -1 if nobody is in range.
+ */
+export function biggest(s: GameState, x: number, y: number, range: number): number {
+  const g = s.grid;
+  const m = g.query(s.enemies, x, y, range);
+  let best = -1;
+  let bestHp = -1;
+  let bestD = Infinity;
+  for (let q = 0; q < m; q++) {
+    const idx = g.out[q];
+    const e = s.enemies[idx];
+    if (!e.alive || e.speed === 0 || e.flags & EF_PROP) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    const d = dx * dx + dy * dy;
+    if (d > range * range) continue;
+    if (e.maxHp > bestHp || (e.maxHp === bestHp && d < bestD)) {
+      best = idx;
+      bestHp = e.maxHp;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/** Shortest signed angle from `b` to `a` (radians, -PI..PI). */
+export function angleDiff(a: number, b: number): number {
+  let d = a - b;
+  while (d > Math.PI) d -= TWO_PI;
+  while (d < -Math.PI) d += TWO_PI;
+  return d;
 }
 
 /** Angle toward the last target found by `aim`. */

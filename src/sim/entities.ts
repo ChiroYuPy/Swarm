@@ -38,6 +38,10 @@ export function spawnEnemy(
   e.slowFactor = 0;
   e.stunUntil = 0;
   e.frozenUntil = 0;
+  e.burnUntil = 0;
+  e.burnDps = 0;
+  e.burnNext = 0;
+  e.burnOwner = -1;
   e.boostUntil = 0;
   e.hitTick = -1000;
   e.attackReady = 0;

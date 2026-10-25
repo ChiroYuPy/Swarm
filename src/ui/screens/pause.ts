@@ -17,11 +17,9 @@ import type { UI } from '../ui';
 
 /**
  * Detailed gear (pause): level as pips, real numbers, and where each evolution stands
- * (ready at the next level-up, or the passive it still needs).
+ * (ready at the next level-up, or at level 5).
  */
 function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
-  const owned = new Map(b.passives.map((x) => [x.id, x.level]));
-  const armed = new Set(b.weapons.map((x) => x.id));
   const row = (kind: 'weapon' | 'passive', id: string, color: string, name: string, lvl: string, lines: string[]) =>
     `<div class="gear" style="--c:${color}"><span class="icon" data-kind="${kind}" data-id="${id}"></span><div class="gear-txt"><div class="gear-top"><b>${esc(name)}</b>${lvl}</div>${lines.map((l) => `<small>${l}</small>`).join('')}</div></div>`;
   const weapons = b.weapons
@@ -30,11 +28,10 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
       const lines = [esc(weaponNumbers(x.id, x.level, b.might, b.cooldownMul))];
       for (const f of FUSIONS.filter((f) => f.weapon === x.id)) {
         const res = esc(weaponName(f.result));
-        const pl = owned.get(f.with) ?? 0;
         lines.push(
-          x.level >= 5 && pl >= 5
+          x.level >= 5
             ? `<em class="evo ready">${t('pause.evoReady', { name: res })}</em>`
-            : `<em class="evo">${t('pause.evolvesInto', { name: res, passive: esc(passiveName(f.with)), progress: pl ? `${pl}/5` : t('pause.toTake') })}</em>`,
+            : `<em class="evo">${t('pause.evolvesInto', { name: res })}</em>`,
         );
       }
       return row('weapon', x.id, d.color, weaponName(d.id), x.fusion ? `<span class="tag">${t('common.evolution')}</span>` : levelPips(x.level, 5), lines);
@@ -44,8 +41,6 @@ function gearHtml(b: BuildInfo): { weapons: string; passives: string } {
     .map((x) => {
       const d = PASSIVES.find((y) => y.id === x.id)!;
       const lines = [esc(passiveTotal(d, x.level))];
-      for (const f of FUSIONS.filter((f) => f.with === x.id && armed.has(f.weapon)))
-        lines.push(`<em class="evo">${t('pause.evolves', { name: esc(weaponName(f.weapon)) })}</em>`);
       return row('passive', x.id, d.color, passiveName(d.id), levelPips(x.level, 5), lines);
     })
     .join('');

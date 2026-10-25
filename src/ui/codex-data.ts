@@ -115,7 +115,7 @@ function chip(tab: CodexTab, id: string, suffix = ''): string {
 function recipe(i: number): string {
   const f = FUSIONS[i];
   const lvl5 = t('common.lvl', { n: 5 });
-  return `<div class="recipe">${chip('weapons', f.weapon, lvl5)}<span class="op">+</span>${chip('passives', f.with, lvl5)}<span class="res"><span class="op">→</span>${chip('evolutions', f.result)}</span></div>`;
+  return `<div class="recipe">${chip('weapons', f.weapon, lvl5)}<span class="res"><span class="op">→</span>${chip('evolutions', f.result)}</span></div>`;
 }
 
 /** "12 → 18" if the value changes between level 1 and max level, else "12". */
@@ -127,12 +127,11 @@ function weaponTiles(id: string): string {
   const a = weaponLevel(i, 1);
   const b = weaponLevel(i, ALL_WEAPONS[i].levels.length);
   const out: [string, string][] = [];
-  if (a.pctHp) out.push([t('codex.tiles.damage'), t('codex.tiles.pctHp', { n: dec(a.pctHp * 100, 1) })]);
-  else if (a.damage > 0) out.push([t('codex.tiles.damage'), span(dec(a.damage, 1), dec(b.damage, 1))]);
-  const rate = (L: typeof a) => L.cooldown ?? L.tick ?? L.hitCd ?? L.fireEvery;
+  if (a.damage > 0) out.push([t('codex.tiles.damage'), span(dec(a.damage, 1), dec(b.damage, 1))]);
+  const rate = (L: typeof a) => L.cooldown ?? L.tick ?? L.hitCd;
   if (rate(a)) out.push([t(a.cooldown ? 'codex.tiles.cooldown' : 'codex.tiles.rate'), seconds(span(dec(rate(a)!), dec(rate(b)!)))]);
   if ((a.count ?? 1) > 1 || (b.count ?? 1) > 1) out.push([t('codex.tiles.count'), span(String(a.count ?? 1), String(b.count ?? 1))]);
-  const reach = (L: typeof a) => L.radius ?? L.range ?? L.length ?? L.attackRange;
+  const reach = (L: typeof a) => L.radius ?? L.range ?? L.length;
   if (reach(a)) out.push([t(a.radius ? 'codex.tiles.radius' : 'codex.tiles.range'), span(String(reach(a)), String(reach(b)))]);
   return out.length ? statTiles(out.slice(0, 4), 'mini') : '';
 }
@@ -177,8 +176,6 @@ export function codexDetail(it: CodexItem): string {
         'mini wide',
       );
       body = `${h3(t('codex.headings.totalPerLevel'))}${rows([1, 2, 3, 4, 5].map((l) => [t('common.lvlCap', { n: l }), passiveTotal(p, l)]))}`;
-      const fi = FUSIONS.map((f, i) => [f, i] as const).filter(([f]) => f.with === it.id);
-      if (fi.length) body += `${evolutionsHeading(fi.length)}${fi.map(([, i]) => recipe(i)).join('')}`;
       break;
     }
     case 'items': {

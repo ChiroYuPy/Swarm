@@ -1,5 +1,5 @@
 /**
- * Base weapons and their evolutions (weapon + passive).
+ * Base weapons and their evolutions (a max-level weapon evolves, see fusions.ts).
  *
  * Each weapon has a `behavior` (the code that drives it in src/sim/weapons/) and a list of levels.
  * Levels are CUMULATIVE: `prog(base, d2, d3, ...)` starts from the base and applies each delta
@@ -11,19 +11,16 @@ export type Behavior =
   | 'spiral'
   | 'orbit'
   | 'aura'
-  | 'beam'
+  | 'rail'
   | 'mine'
   | 'boomerang'
-  | 'chain'
+  | 'arc'
   | 'pulse'
-  | 'whip'
-  | 'scythe'
+  | 'blade'
   | 'flame'
-  | 'turret'
-  | 'drone'
-  | 'ricochet'
-  | 'mortar'
-  | 'phoenix';
+  | 'swarm'
+  | 'shuriken'
+  | 'mortar';
 
 export interface WeaponLevel {
   damage: number;
@@ -41,6 +38,7 @@ export interface WeaponLevel {
   duration?: number;
   length?: number;
   width?: number;
+  /** Electric arc: neighbours of the main target shocked on each tick, within `jumpRange` */
   jumps?: number;
   jumpRange?: number;
   range?: number;
@@ -49,30 +47,28 @@ export interface WeaponLevel {
   /** duration of the slow left by a wave (s) */
   slowTime?: number;
   trigger?: number;
-  branch?: number;
   stun?: number;
+  /** Electric arc: stun of the neighbours (s) */
+  sideStun?: number;
   pull?: number;
   pullRadius?: number;
   lifesteal?: number;
   dropEvery?: number;
   mineDamage?: number;
   mineRadius?: number;
+  /** gap between two shots of a burst (s) */
   delay?: number;
   burstEvery?: number;
   burstCount?: number;
   rotStep?: number;
-  /** half-angle of a cone or a whip lash (radians) */
+  /** half-angle of a flame cone or of a blade sweep (radians) */
   arc?: number;
-  /** finishes off enemies (bosses excluded) that fall below this share of their HP */
-  execute?: number;
-  /** damage as a share of the target's max HP (× Might) instead of `damage`, and this share on bosses */
-  pctHp?: number;
-  bossPct?: number;
-  /** turret fire interval (s) */
-  fireEvery?: number;
-  /** turret: knockback wave every `ringEvery` s (radius `radius`) */
-  ringEvery?: number;
-  /** bounces of a ricochet disc */
+  /** burn left on the enemies hit: damage per second and duration (s) */
+  burn?: number;
+  burnTime?: number;
+  /** max turn rate (radians per second) of a flame jet or of a bee */
+  turn?: number;
+  /** bounces off the screen edges of a shuriken */
   bounces?: number;
   /** burning crater (Meteors): damage per second, radius, duration (s) */
   blazeDamage?: number;
@@ -80,19 +76,13 @@ export interface WeaponLevel {
   blazeLife?: number;
   /** flame jets spinning continuously (rad/s) instead of aiming */
   spin?: number;
-  /** drones: HP, respawn delay (s), attack range, shot speed */
-  hp?: number;
+  /** bees: respawn delay (s), time planted in the target (s) */
   respawn?: number;
-  attackRange?: number;
-  shotSpeed?: number;
-  /** kamikaze drones: charge in and explode (1) */
+  stay?: number;
+  /** hornets: charge in and explode (1) */
   dive?: number;
   /** shells falling from the sky (Meteors): 1 */
   meteor?: number;
-  /** max turn rate (radians per second) of drones: they turn while moving forward */
-  turn?: number;
-  /** drones circling their target at a safe distance (Squadron): 1 */
-  orbit?: number;
 }
 
 export interface WeaponDef {
@@ -116,13 +106,15 @@ function prog(base: WeaponLevel, ...deltas: Partial<WeaponLevel>[]): WeaponLevel
   return out;
 }
 
+const deg = (d: number) => (d * Math.PI) / 180;
+
 export const BASE_WEAPONS: WeaponDef[] = [
   {
     id: 'blaster',
     behavior: 'projectile',
     color: '#7df9ff',
     levels: prog(
-      { damage: 10, cooldown: 1.0, count: 1, speed: 480, pierce: 0, life: 1.2, size: 6, spread: 0.16 },
+      { damage: 10, cooldown: 1.0, count: 1, delay: 0.075, speed: 480, pierce: 0, life: 1.2, size: 6 },
       { count: 2 },
       { count: 3, damage: 11 },
       { count: 4, damage: 12 },
@@ -130,15 +122,15 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'orbs',
+    id: 'saws',
     behavior: 'orbit',
     color: '#9dff6a',
     levels: prog(
-      { damage: 14, count: 1, radius: 85, rotSpeed: 3.0, size: 15, hitCd: 0.35, knockback: 80 },
-      { count: 2 },
-      { count: 3, radius: 96 },
-      { count: 4, damage: 17 },
-      { count: 5, radius: 106, size: 19 },
+      { damage: 12, count: 2, radius: 85, rotSpeed: 3.0, size: 14, hitCd: 0.35, knockback: 60 },
+      { count: 3 },
+      { count: 4, damage: 14, radius: 92 },
+      { count: 5 },
+      { count: 6, damage: 16, radius: 100, size: 16 },
     ),
   },
   {
@@ -154,15 +146,15 @@ export const BASE_WEAPONS: WeaponDef[] = [
     ),
   },
   {
-    id: 'laser',
-    behavior: 'beam',
+    id: 'railgun',
+    behavior: 'rail',
     color: '#ff3b3b',
     levels: prog(
-      { damage: 7, cooldown: 2.4, duration: 0.45, tick: 0.1, length: 380, width: 8, count: 1 },
-      { count: 2 },
-      { count: 3, length: 440 },
-      { count: 4 },
-      { damage: 9, width: 12, length: 500 },
+      { damage: 60, cooldown: 0.8, duration: 1.2, range: 480, length: 900, width: 8, count: 1, knockback: 140 },
+      { duration: 1.0 },
+      { damage: 80 },
+      { duration: 0.9, count: 2 },
+      { damage: 90, burn: 10, burnTime: 2.5 },
     ),
   },
   {
@@ -170,11 +162,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'mine',
     color: '#ffb347',
     levels: prog(
-      { damage: 30, cooldown: 2.2, radius: 70, trigger: 34, life: 9, count: 1, knockback: 220 },
-      { count: 2 },
-      { count: 3 },
-      { count: 4 },
-      { count: 5, radius: 84 },
+      { damage: 45, cooldown: 1.1, radius: 48, trigger: 20, life: 8, count: 5, knockback: 150 },
+      { damage: 55, cooldown: 1.0, radius: 52 },
+      { damage: 65, cooldown: 0.9, radius: 55 },
+      { damage: 75, cooldown: 0.8, radius: 59 },
+      { damage: 90, cooldown: 0.7, radius: 66 },
     ),
   },
   {
@@ -182,23 +174,23 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'boomerang',
     color: '#3dffb5',
     levels: prog(
-      { damage: 14, cooldown: 1.8, speed: 400, range: 260, count: 1, size: 11, knockback: 90 },
-      { count: 2 },
-      { count: 3, damage: 15 },
-      { count: 4 },
-      { count: 5, damage: 17, size: 13 },
+      { damage: 30, cooldown: 1.6, range: 230, duration: 1.3, count: 1, size: 11, knockback: 80 },
+      { count: 2, damage: 33 },
+      { count: 3, damage: 36 },
+      { count: 4, damage: 40 },
+      { count: 5, damage: 45, size: 13 },
     ),
   },
   {
     id: 'electric_arc',
-    behavior: 'chain',
+    behavior: 'arc',
     color: '#5fa8ff',
     levels: prog(
-      { damage: 11, cooldown: 1.5, range: 290, jumps: 3, jumpRange: 150, count: 1 },
-      { count: 2 },
-      { count: 3 },
-      { count: 4, jumps: 4 },
-      { count: 5, damage: 13 },
+      { damage: 8, cooldown: 2.5, duration: 0.8, tick: 0.2, range: 230, jumps: 3, jumpRange: 110, stun: 0.25 },
+      { damage: 9, duration: 1.0 },
+      { damage: 10, duration: 1.2 },
+      { damage: 12, duration: 1.4 },
+      { damage: 14, duration: 1.6 },
     ),
   },
   {
@@ -206,23 +198,23 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'pulse',
     color: '#fff36a',
     levels: prog(
-      { damage: 10, cooldown: 3.0, radius: 150, duration: 0.35, knockback: 260, count: 1, delay: 0.2, slow: 0.25, slowTime: 1.2 },
-      { count: 2 },
-      { count: 3, radius: 165 },
-      { count: 4 },
-      { count: 5, radius: 180, damage: 12 },
+      { damage: 16, cooldown: 2.6, radius: 100, duration: 0.35, knockback: 300, count: 1 },
+      { damage: 20, cooldown: 2.4, radius: 108 },
+      { damage: 24, cooldown: 2.2, radius: 115, knockback: 330 },
+      { damage: 28, cooldown: 2.0, radius: 123, knockback: 360 },
+      { damage: 34, cooldown: 1.8, radius: 132, knockback: 400 },
     ),
   },
   {
-    id: 'whip',
-    behavior: 'whip',
-    color: '#ff8c69',
+    id: 'blade',
+    behavior: 'blade',
+    color: '#ffb39c',
     levels: prog(
-      { damage: 12, cooldown: 1.4, length: 160, width: 26, count: 1, knockback: 420 },
-      { count: 2 },
-      { count: 3, damage: 15, length: 185, knockback: 480 },
-      { count: 4, width: 34, stun: 0.3 },
-      { count: 5, damage: 18, length: 215, knockback: 560, stun: 0.5 },
+      { damage: 14, cooldown: 0.8, arc: deg(45), length: 95, knockback: 60 },
+      { damage: 15, cooldown: 0.74, arc: deg(55), length: 98 },
+      { damage: 17, cooldown: 0.68, arc: deg(65), length: 101 },
+      { damage: 18, cooldown: 0.62, arc: deg(75), length: 105 },
+      { damage: 20, cooldown: 0.56, arc: deg(90), length: 110 },
     ),
   },
   {
@@ -230,47 +222,35 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'flame',
     color: '#ff6a1a',
     levels: prog(
-      { damage: 7, cooldown: 2.6, duration: 1.4, tick: 0.12, length: 135, arc: Math.PI / 10, count: 1 },
-      { count: 2 },
-      { count: 3, damage: 9 },
-      { count: 4, duration: 2.0 },
-      { count: 5, length: 155, damage: 11 },
+      { damage: 5, cooldown: 1.3, duration: 1.0, tick: 0.12, length: 140, arc: 0.2, count: 1, turn: 2, burn: 8, burnTime: 2.5 },
+      { damage: 6, duration: 1.1, length: 150, burn: 9 },
+      { damage: 7, duration: 1.2, length: 158, burn: 11 },
+      { damage: 8, duration: 1.4, length: 167, burn: 12 },
+      { damage: 10, duration: 1.6, length: 185, burn: 14 },
     ),
   },
   {
-    id: 'turret',
-    behavior: 'turret',
-    color: '#c8ff5a',
-    levels: prog(
-      { damage: 9, cooldown: 12, life: 12, fireEvery: 0.6, range: 330, count: 1, speed: 520, pierce: 0, size: 5 },
-      { count: 2 },
-      { count: 3, fireEvery: 0.5 },
-      { count: 4, damage: 11, pierce: 1 },
-      { count: 5, life: 16, cooldown: 16 },
-    ),
-  },
-  {
-    id: 'drone',
-    behavior: 'drone',
+    id: 'swarm',
+    behavior: 'swarm',
     color: '#d6dcff',
     levels: prog(
-      { damage: 7, cooldown: 0.7, count: 1, speed: 260, range: 520, hp: 50, respawn: 3, attackRange: 180, shotSpeed: 600, size: 4, turn: 3.2 },
-      { count: 2 },
-      { count: 3, damage: 9, hp: 70 },
-      { count: 4 },
-      { count: 5, cooldown: 0.55, respawn: 2 },
+      { damage: 20, count: 3, speed: 275, turn: 11, range: 300, stay: 1.5, respawn: 0.8, tick: 0.3 },
+      { count: 4, damage: 24 },
+      { count: 5, damage: 28 },
+      { count: 6, damage: 33 },
+      { count: 8, damage: 40 },
     ),
   },
   {
-    id: 'ricochet',
-    behavior: 'ricochet',
+    id: 'shuriken',
+    behavior: 'shuriken',
     color: '#ff4f9a',
     levels: prog(
-      { damage: 11, cooldown: 1.5, speed: 440, bounces: 1, count: 1, size: 10, life: 2.5, range: 480 },
+      { damage: 10, count: 1, speed: 440, life: 4, size: 15, hitCd: 0.3 },
       { count: 2 },
-      { count: 3, bounces: 2, damage: 13 },
-      { count: 4 },
-      { count: 5, bounces: 3, size: 12, damage: 15 },
+      { damage: 12, life: 5 },
+      { count: 3 },
+      { damage: 14, life: 6, size: 18 },
     ),
   },
   {
@@ -278,11 +258,11 @@ export const BASE_WEAPONS: WeaponDef[] = [
     behavior: 'mortar',
     color: '#ffe08a',
     levels: prog(
-      { damage: 28, cooldown: 2.2, count: 1, radius: 70, range: 420, duration: 0.7, knockback: 160 },
-      { count: 2 },
-      { count: 3, damage: 34, radius: 80 },
-      { count: 4 },
-      { count: 5, radius: 95, damage: 40 },
+      { damage: 22, cooldown: 2.0, count: 1, radius: 88, range: 520, duration: 0.9, knockback: 100 },
+      { damage: 26, radius: 92, knockback: 110 },
+      { damage: 30, radius: 97, knockback: 120 },
+      { damage: 35, radius: 101, knockback: 130 },
+      { damage: 42, radius: 105, knockback: 140 },
     ),
   },
 ];
@@ -305,7 +285,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     behavior: 'orbit',
     color: '#b98cff',
     fusion: true,
-    levels: [{ damage: 22, count: 3, radius: 118, rotSpeed: 1.4, size: 24, hitCd: 0.3, pull: 150, pullRadius: 140, knockback: 0 }],
+    levels: [{ damage: 30, count: 6, radius: 118, rotSpeed: 2.4, size: 22, hitCd: 0.3, pull: 150, pullRadius: 120, knockback: 0 }],
   },
   {
     id: 'vampire_field',
@@ -316,10 +296,10 @@ export const FUSED_WEAPONS: WeaponDef[] = [
   },
   {
     id: 'electric_storm',
-    behavior: 'chain',
+    behavior: 'arc',
     color: '#9fd0ff',
     fusion: true,
-    levels: [{ damage: 34, cooldown: 0.85, range: 340, jumps: 4, jumpRange: 180, branch: 2, count: 1, stun: 0.35 }],
+    levels: [{ damage: 20, cooldown: 1.4, duration: 1.6, tick: 0.2, range: 300, jumps: 6, jumpRange: 150, stun: 0.3, sideStun: 0.2 }],
   },
   {
     id: 'mine_boomerang',
@@ -327,7 +307,7 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     color: '#ffd36a',
     fusion: true,
     levels: [
-      { damage: 26, cooldown: 1.5, speed: 460, range: 330, count: 3, size: 15, knockback: 110, dropEvery: 0.3, mineDamage: 20, mineRadius: 52 },
+      { damage: 50, cooldown: 1.4, range: 300, duration: 1.5, count: 3, size: 15, knockback: 100, dropEvery: 0.3, mineDamage: 30, mineRadius: 52 },
     ],
   },
   {
@@ -338,61 +318,18 @@ export const FUSED_WEAPONS: WeaponDef[] = [
     levels: [{ damage: 16, cooldown: 1.5, radius: 265, duration: 0.45, knockback: 0, count: 3, delay: 0.18, slow: 0.6, slowTime: 2.5 }],
   },
   {
-    id: 'scythe',
-    behavior: 'scythe',
-    color: '#ffb39c',
-    fusion: true,
-    levels: [{ damage: 0, pctHp: 0.15, bossPct: 0.015, cooldown: 2, length: 200, arc: Math.PI, count: 1, knockback: 0, execute: 0.12 }],
-  },
-  {
     id: 'fire_tornado',
     behavior: 'flame',
     color: '#ff7a2e',
     fusion: true,
-    levels: [{ damage: 10, tick: 0.12, length: 200, arc: 0.3, count: 4, spin: 2.4 }],
+    levels: [{ damage: 10, tick: 0.12, length: 200, arc: 0.3, count: 4, spin: 2.4, burn: 16, burnTime: 2.5 }],
   },
   {
-    id: 'phoenix',
-    behavior: 'phoenix',
-    color: '#ffb03a',
-    fusion: true,
-    levels: [
-      {
-        damage: 55, count: 1, speed: 470, life: 2.2, respawn: 0.6, size: 46, hitCd: 0.4, knockback: 40,
-        blazeDamage: 22, blazeRadius: 46, blazeLife: 1.8,
-      },
-    ],
-  },
-  {
-    id: 'bastion',
-    behavior: 'turret',
-    color: '#e4ff9a',
-    fusion: true,
-    levels: [
-      {
-        damage: 14, cooldown: 14, life: 14, fireEvery: 0.4, range: 380, count: 2, speed: 560, pierce: 2, size: 6,
-        spread: 0.18, burstCount: 3, ringEvery: 2.0, radius: 130, knockback: 260,
-      },
-    ],
-  },
-  {
-    id: 'squadron',
-    behavior: 'drone',
-    color: '#ff9ccd',
-    fusion: true,
-    levels: [
-      {
-        damage: 30, cooldown: 0.9, count: 4, speed: 300, range: 600, hp: 140, respawn: 0.4, attackRange: 280,
-        shotSpeed: 480, size: 12, bounces: 5, life: 4.5, turn: 3.4, orbit: 1,
-      },
-    ],
-  },
-  {
-    id: 'kamikaze_drones',
-    behavior: 'drone',
+    id: 'hornets',
+    behavior: 'swarm',
     color: '#ff9a5c',
     fusion: true,
-    levels: [{ damage: 75, count: 4, speed: 430, range: 520, radius: 150, knockback: 260, respawn: 0.3, dive: 1, hp: 1, turn: 4 }],
+    levels: [{ damage: 75, count: 6, speed: 330, turn: 9, range: 320, radius: 110, knockback: 220, respawn: 0.4, dive: 1 }],
   },
   {
     id: 'meteors',

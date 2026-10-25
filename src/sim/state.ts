@@ -46,6 +46,11 @@ export class Enemy {
   stunUntil = 0;
   /** frozen (Freeze item) until this tick: motionless, fragile, shatters on death */
   frozenUntil = 0;
+  /** burning until this tick: `burnDps` fire damage, dealt every BURN_TICKS from `burnNext`, credited to `burnOwner` */
+  burnUntil = 0;
+  burnDps = 0;
+  burnNext = 0;
+  burnOwner = -1;
   /** rallied by a Leader until this tick (faster) */
   boostUntil = 0;
   hitTick = -1000;
@@ -70,18 +75,17 @@ export const PJ_BOOMERANG = 3;
 export const PJ_RING = 4;
 /** ground flame left by the Ricochet star: a = damage per second */
 export const PJ_FIRE = 5;
-/** placed turret (motionless): a = ticks before the next shot, d = ticks before the wave, (vx, vy) = barrel, lv = level */
-export const PJ_TURRET = 6;
-/** ricochet disc: a = bounces left, c = index of the tracked target (ty = its id) */
-export const PJ_RICOCHET = 7;
+/** shuriken flying straight and bouncing off the screen edges: a = bounces left (unused: it lives `life`) */
+export const PJ_SHURIKEN = 6;
 /** player's ground flame (burns enemies): a = damage per second */
-export const PJ_BLAZE = 8;
-/** autonomous drone: a = ticks before its shot, b = HP, c = index of its target (-1 = none, ty = its id), d = rank in the squad, tx = break-away left */
-export const PJ_DRONE = 9;
+export const PJ_BLAZE = 7;
+/**
+ * bee of the Swarm: a = state (BEE_*), b = state timer (ticks), c = index of its target (-1 = none, ty = its id),
+ * d = slot in the ring, tx = heading (radians); planted: (vx, vy) = offset from the target
+ */
+export const PJ_BEE = 8;
 /** shell flying from (vx, vy) to (tx, ty): a = flight duration, b = radius, c = meteor (1) */
-export const PJ_SHELL = 10;
-/** Phoenix: flies straight, (vx, vy) = unit heading */
-export const PJ_PHOENIX = 11;
+export const PJ_SHELL = 9;
 /**
  * Every projectile kind. `Projectile.kind` has this type, so a new PJ_* constant cannot be spawned until it
  * is listed here, and then `updateProjectiles` (sim/projectiles.ts) and `drawProjectiles`
@@ -94,12 +98,10 @@ export type ProjectileKind =
   | typeof PJ_BOOMERANG
   | typeof PJ_RING
   | typeof PJ_FIRE
-  | typeof PJ_TURRET
-  | typeof PJ_RICOCHET
+  | typeof PJ_SHURIKEN
   | typeof PJ_BLAZE
-  | typeof PJ_DRONE
-  | typeof PJ_SHELL
-  | typeof PJ_PHOENIX;
+  | typeof PJ_BEE
+  | typeof PJ_SHELL;
 
 export class Projectile {
   kind: ProjectileKind = PJ_BULLET;
@@ -123,9 +125,7 @@ export class Projectile {
   knock = 0;
   hitIds = new Int32Array(8);
   hitCount = 0;
-  /** level of the weapon that created it (turrets) */
-  lv = 1;
-  /** target: landing point of a shell, or id of the targeted enemy (drones, discs) */
+  /** target: landing point of a shell, or id of the targeted enemy (bees) */
   tx = 0;
   ty = 0;
   /** data specific to the projectile kind */
@@ -199,7 +199,10 @@ export class WeaponInst {
   burstTimer = 0;
   activeTicks = 0;
   tickTimer = 0;
-  // Values computed for rendering (orbits, aura, beams).
+  /** target locked by the Electric arc: index and id (-1 = none) */
+  lockIdx = -1;
+  lockId = -1;
+  // Values computed for rendering (orbits, aura, sweeps).
   vR = 0;
   vS = 0;
   vN = 0;
@@ -315,6 +318,14 @@ export class Player {
   mightMul = 1;
 }
 
+/** Damage types: the colour of the damage numbers (EV_HIT y2). */
+export const DMG_PHYS = 0;
+export const DMG_FIRE = 1;
+export const DMG_COLD = 2;
+export const DMG_ELEC = 3;
+export type DamageType = typeof DMG_PHYS | typeof DMG_FIRE | typeof DMG_COLD | typeof DMG_ELEC;
+
+/** enemy hit: v = damage, k = enemy type, x2 = 1 for a quiet hit (burn: no sound), y2 = DamageType */
 export const EV_HIT = 1;
 export const EV_KILL = 2;
 export const EV_GEM = 3;

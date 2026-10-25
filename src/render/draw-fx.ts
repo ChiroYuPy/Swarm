@@ -1,7 +1,7 @@
 /** Cosmetic effects (lightning, rings, particles), damage numbers and off-screen arrows. */
 import { PICKUPS } from '../data/loot';
-import { EF_BOSS, PK_CHEST, PK_VACUUM, type GameState } from '../sim';
-import { COLORS, FX_COLORS } from './palette';
+import { DMG_PHYS, EF_BOSS, PK_CHEST, PK_VACUUM, type GameState } from '../sim';
+import { COLORS, DAMAGE_COLORS, FX_COLORS } from './palette';
 import type { Effects } from './effects';
 import type { RenderView } from './view';
 
@@ -67,7 +67,8 @@ export function drawTexts(view: RenderView, fx: Effects): void {
     const a = Math.min(1, fx.tlife[i] / 0.25);
     ctx.globalAlpha = a * (big ? 1 : 0.75);
     ctx.font = big ? 'bold 19px "Trebuchet MS", sans-serif' : 'bold 12px "Trebuchet MS", sans-serif';
-    ctx.fillStyle = big ? '#ffe14d' : '#ffffff';
+    const type = fx.ttype[i];
+    ctx.fillStyle = type !== DMG_PHYS ? DAMAGE_COLORS[type] : big ? '#ffe14d' : DAMAGE_COLORS[DMG_PHYS];
     ctx.fillText(String(Math.round(fx.tval[i])), fx.tx[i], fx.ty[i]);
   }
   ctx.globalAlpha = 1;

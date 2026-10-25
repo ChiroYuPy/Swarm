@@ -86,15 +86,13 @@ function makeOffer(p: Player, u: UniverseItem): Offer | null {
   return p.passives.length < MAX_PASSIVE_SLOTS ? { kind: u.kind, id: u.id, toLevel: 1 } : null;
 }
 
-/** Indices of the evolutions available to this player (data priority order). */
+/** Indices of the evolutions available to this player: their weapon is at max level (data priority order). */
 export function availableFusions(p: Player): number[] {
   const out: number[] = [];
   for (let i = 0; i < FUSION_TABLE.length; i++) {
     const f = FUSION_TABLE[i];
     const w = findWeapon(p, f.weapon);
     if (!w || w.level < weaponMaxLevel(f.weapon)) continue;
-    const ps = findPassive(p, f.with);
-    if (!ps || ps.level < MAX_ITEM_LEVEL) continue;
     out.push(i);
   }
   return out;
@@ -106,7 +104,7 @@ export function rollOffers(s: GameState, p: Player): void {
   p.offerLevel = level;
   const offers: Offer[] = [];
   const fusions = availableFusions(p);
-  // Every possible evolution is offered (a weapon can have two: your call).
+  // Every possible evolution is offered first.
   for (const f of fusions) if (offers.length < 3) offers.push({ kind: OFFER_FUSION, id: f, toLevel: 1 });
   const order = offerOrder(s.seed, level);
   for (const idx of order) {
